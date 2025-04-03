@@ -16,10 +16,20 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-image: url('https://s1.1zoom.me/b5154/579/Toyota_Supra_mk5_GR_A90_Gazoo_Racing_mkV_2.0L_584944_2560x1440.jpg');
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    #video-background {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      z-index: -100;
       background-size: cover;
-      background-position: center top;
-      background-attachment: fixed;
     }
     .hero {
       height: 800px;
@@ -47,10 +57,20 @@
     .navbar {
       background-color: rgba(0, 0, 0, 0.5) !important;
     }
+    .navbar-brand,
+    .navbar-nav .nav-link {
+      color: white !important;
+    }
+    .navbar-toggler-icon {
+      filter: invert(1);
+    }
   </style>
 </head>
 
 <body>
+  <video autoplay muted loop id="video-background">
+    <source src="../Black Red 3D Car Intro Video.mp4" type="video/mp4">
+  </video>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">Ressacar</a>
@@ -81,12 +101,10 @@
   </nav>
 
   <div class="hero">
-    <h1>Welcome to Ressacar</h1>
-    <a href="#" class="btn btn-primary">Book Now</a>
   </div>
 
   <main class="container my-5">
-    <h2>Our Car Rental Options</h2>
+    <h2 style="color: white;">Our Car Rental Options</h2>
     <div id="carCarousel" class="carousel slide" data-bs-ride="carousel">
       <div class="carousel-inner">
         <div class="carousel-item active">
