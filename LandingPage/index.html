@@ -16,23 +16,36 @@
   <style>
     body {
       font-family: Arial, sans-serif;
+      background-image: url('https://s1.1zoom.me/b5154/579/Toyota_Supra_mk5_GR_A90_Gazoo_Racing_mkV_2.0L_584944_2560x1440.jpg');
+      background-size: cover;
+      background-position: center top;
+      background-attachment: fixed;
     }
     .hero {
-      background-image: url('https://s1.1zoom.me/b5154/579/Toyota_Supra_mk5_GR_A90_Gazoo_Racing_mkV_2.0L_584944_2560x1440.jpg');
       height: 800px;
-      background-size: cover;
       color: white;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       text-align: center;
-      flex-direction: column; /* Center content vertically */
+      flex-direction: column;
+      padding-top: 150px;
     }
     .footer {
       background: black;
       color: white;
-      padding: 20px;
+      padding: 50px;
       text-align: center;
+    }
+    .carousel-control-prev, .carousel-control-next {
+      width: 5%;
+    }
+    .carousel-control-prev-icon, .carousel-control-next-icon {
+      background-color: rgba(0, 0, 0, 0.7);
+      border-radius: 50%;
+    }
+    .navbar {
+      background-color: rgba(0, 0, 0, 0.5) !important;
     }
   </style>
 </head>
@@ -63,10 +76,6 @@
           <li class="nav-item">
             <a class="nav-link" href="#">Login</a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#">Register</a>
-          </li>
-        </ul>
       </div>
     </div>
   </nav>
@@ -78,37 +87,119 @@
 
   <main class="container my-5">
     <h2>Our Car Rental Options</h2>
-    <div class="row">
-      <div class="col-md-4">
-        <div class="card">
-          <img src="https://th.bing.com/th/id/OIP.6u7MjfSr0g5efTNCqVagZAHaE8?rs=1&pid=ImgDetMain" class="card-img-top" alt="Car 1"> <!-- Replace with actual image URL -->
-          <div class="card-body">
-            <h5 class="card-title">Car Model 1</h5>
-            <p class="card-text">Description of Car Model 1.</p>
-            <a href="#" class="btn btn-primary">Rent Now</a>
+    <div id="carCarousel" class="carousel slide" data-bs-ride="carousel">
+      <div class="carousel-inner">
+        <div class="carousel-item active">
+          <div class="row">
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://th.bing.com/th/id/OIP.6u7MjfSr0g5efTNCqVagZAHaE8?rs=1&pid=ImgDetMain" class="card-img-top" alt="Car 1">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 1</h5>
+                  <p class="card-text">Description of Car Model 1.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://th.bing.com/th/id/OIP.cnqmzHc6kNCVfauGBc_QygHaEK?rs=1&pid=ImgDetMain" class="card-img-top" alt="Car 2">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 2</h5>
+                  <p class="card-text">Description of Car Model 2.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://media.autoexpress.co.uk/image/private/s--g2GdJDft--/v1575322610/autoexpress/2019/10/cla-1.jpg" class="card-img-top" alt="Car 3">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 3</h5>
+                  <p class="card-text">Description of Car Model 3.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-item">
+          <div class="row">
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://th.bing.com/th/id/OIP.jG_2Wg3RjtBEscmeRNzqbgHaEK?rs=1&pid=ImgDetMain" class="card-img-top" alt="Car 4">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 4</h5>
+                  <p class="card-text">Description of Car Model 4.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://uploads.vrum.com.br/2022/11/8b65babf-novo-polo-track_exterior_03.jpg" class="card-img-top" alt="Car 5">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 5</h5>
+                  <p class="card-text">Description of Car Model 5.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://uploads.vrum.com.br/2022/11/8b65babf-novo-polo-track_exterior_03.jpg" class="card-img-top" alt="Car 6">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 6</h5>
+                  <p class="card-text">Description of Car Model 6.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-item">
+          <div class="row">
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://cdn.aquelamaquina.pt/images/2023-02/img_944x629$2023_02_16_17_43_01_223741.jpg" class="card-img-top" alt="Car 7">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 7</h5>
+                  <p class="card-text">Description of Car Model 7.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://www.standvirtual.com/diarioautomovel/wp-content/uploads/2022/09/Novo-Hyundai-Ioniq-6-autonomia-600-kms.jpg" class="card-img-top" alt="Car 8">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 8</h5>
+                  <p class="card-text">Description of Car Model 8.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card">
+                <img src="https://cdn.motor1.com/images/mgl/wllzJN/s1/citroen-c3-2023.jpg" class="card-img-top" alt="Car 9">
+                <div class="card-body">
+                  <h5 class="card-title">Car Model 9</h5>
+                  <p class="card-text">Description of Car Model 9.</p>
+                  <a href="#" class="btn btn-primary">Rent Now</a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-md-4">
-        <div class="card">
-          <img src="https://th.bing.com/th/id/OIP.cnqmzHc6kNCVfauGBc_QygHaEK?rs=1&pid=ImgDetMain" class="card-img-top" alt="Car 2"> <!-- Replace with actual image URL -->
-          <div class="card-body">
-            <h5 class="card-title">Car Model 2</h5>
-            <p class="card-text">Description of Car Model 2.</p>
-            <a href="#" class="btn btn-primary">Rent Now</a>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="card">
-          <img src="https://media.autoexpress.co.uk/image/private/s--g2GdJDft--/v1575322610/autoexpress/2019/10/cla-1.jpg" class="card-img-top" alt="Car 3"> <!-- Replace with actual image URL -->
-          <div class="card-body">
-            <h5 class="card-title">Car Model 3</h5>
-            <p class="card-text">Description of Car Model 3.</p>
-            <a href="#" class="btn btn-primary">Rent Now</a>
-          </div>
-        </div>
-      </div>
+      <button class="carousel-control-prev" type="button" data-bs-target="#carCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Previous</span>
+      </button>
+      <button class="carousel-control-next" type="button" data-bs-target="#carCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Next</span>
+      </button>
     </div>
   </main>
 
