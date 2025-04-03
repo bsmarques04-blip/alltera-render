@@ -2,9 +2,9 @@
 Projecto de Avaliação Contínua de DAW 2425.
 
 ## Constituição do Grupo
-- Nome
-- Nome
-- Turma
+- Frederik Carrapato
+- Bernardo Marques
+- L1
 
 ## Professor
-- Nome Prof. da Aula de Lab
+- Prof. João Ventura
