@@ -1,0 +1,35 @@
+body {
+  font-family: 'Playfair Display', serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #121212;
+  color: #f5f5f5;
+}
+
+#video-background {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  z-index: -100;
+  background-size: cover;
+}
+
+.hero {
+  height: 100vh;
+  min-height: 800px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex-direction: column;
+  position: relative;
+  padding: 0 20px;
+}
+
+/* [Rest of CSS styles from original file would continue here...] */
