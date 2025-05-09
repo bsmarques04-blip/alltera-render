@@ -1,7 +1,16 @@
-{% extends "base.html" %}
-
+{% extends 'base.html' %}
+{% block title %}Home{% endblock %}
 {% block content %}
-    <h2>Landing Page</h2>
-    <p><a href="{{ url_for('app_index') }}">Application</a></p>
-    <img src="{{ url_for('static', filename='images/crazy_cat.jpg') }}">
+  <div class="hero">
+    <video autoplay muted loop id="video-background">
+      <source src="Black Red 3D Car Intro Video.mp4" type="video/mp4">
+    </video>
+    <div class="hero-content text-center">
+      <h1>Experience Automotive Excellence</h1>
+      <p>…</p>
+      <a href="{{ url_for('collection') }}" class="btn btn-gold">Explore Collection</a>
+    </div>
+    <div class="hero-overlay"></div>
+  </div>
+  <!-- Featured Cars shows first 3 -->
 {% endblock %}

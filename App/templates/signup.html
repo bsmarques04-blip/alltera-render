@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign Up{% endblock %}
+{% block content %}
+  <main class="container my-5" style="max-width:400px;">
+    <h2 class="text-center mb-4">Sign Up</h2>
+    <form method="POST">
+      <div class="mb-3">
+        <label for="name" class="form-label">Nome</label>
+        <input type="text" name="name" class="form-control" id="name" required>
+      </div>
+      <div class="mb-3">
+        <label for="email" class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" id="email" required>
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">Senha</label>
+        <input type="password" name="password" class="form-control" id="password" required>
+      </div>
+      <button type="submit" class="btn btn-gold w-100">Registrar</button>
+      <p class="text-center mt-3">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
+    </form>
+  </main>
+{% endblock %}

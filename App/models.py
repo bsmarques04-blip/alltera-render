@@ -1,43 +1,26 @@
-"""
-Models file
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
 
-"""
-
-from peewee import *
-
-db = SqliteDatabase('database.db')
-db.connect(reuse_if_open=True)
-
-
-def clear_database():
-    """Clears the database."""
-    db.drop_tables(models, safe=True)
-
-def create_tables():
-    """Recreates the database."""
-    db.create_tables(models, safe=True)
-
+db = SQLAlchemy()
 
 class User(db.Model):
-    name = CharField()
-    username = CharField()
-    password = CharField()
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def __str__(self):
-        return f'User ({self.name})'
+class ContactMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-
-models = [User, ]
-
-
-if __name__ == '__main__':
-    # Recreate DB
-    clear_database()
-    create_tables()
-
-    # Create users
-    bart = User(name='Bart Simpson', username='bart', password='1234')
-    bart.save()
-
-    homer = User(name='Homer Simpson', username='homer', password='1234')
-    homer.save()
+class Car(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.String(255), nullable=False)
+    price_per_day = db.Column(db.Float, nullable=False)
+    image_url = db.Column(db.String(255), nullable=False)
+    is_premium = db.Column(db.Boolean, default=False)

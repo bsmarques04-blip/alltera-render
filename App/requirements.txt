@@ -1,4 +1,0 @@
-# Install with "pip install -r requirements.txt"
-
-flask
-peewee

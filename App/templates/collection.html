@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Collection{% endblock %}
+{% block content %}
+  <main class="container my-5">
+    <h2 class="text-center mb-5">Our Exclusive Collection</h2>
+    <div id="carCarousel" class="carousel slide" data-bs-ride="carousel">
+      <div class="carousel-inner">
+        {% for car in cars %}
+        <div class="carousel-item {% if loop.first %}active{% endif %}">
+          <div class="row">
+            <div class="col-md-4">
+              <div class="card luxury-card h-100">
+                <div class="card-img-overlay">
+                  <span class="badge bg-gold">{{ 'Premium' if car.is_premium else 'Standard' }}</span>
+                </div>
+                <img src="{{ car.image_url }}" class="card-img-top img-fluid" alt="{{ car.title }}" style="height:200px;object-fit:cover;">
+                <div class="card-body">
+                  <h5 class="card-title">{{ car.title }}</h5>
+                  <p class="card-text">{{ car.description }}</p>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="price">€{{ '%.0f'|format(car.price_per_day) }}/day</span>
+                    <a href="#" class="btn btn-gold">Reserve</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button class="carousel-control-prev" type="button" data-bs-target="#carCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Previous</span>
+      </button>
+      <button class="carousel-control-next" type="button" data-bs-target="#carCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Next</span>
+      </button>
+    </div>
+  </main>
+{% endblock %}
