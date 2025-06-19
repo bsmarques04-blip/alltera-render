@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Os Meus Alugueres{% endblock %}
+{% block content %}
+  <main class="container my-5">
+    <h2 class="text-center mb-4">Os Meus Carros Alugados</h2>
+    {% if rentals %}
+      <ul class="list-group">
+        {% for rental in rentals %}
+          <li class="list-group-item">
+            <strong>{{ rental.car.title }}</strong><br>
+            Início: {{ rental.start_date.strftime('%d/%m/%Y') }}
+            {% if rental.end_date %}
+              | Fim: {{ rental.end_date.strftime('%d/%m/%Y') }}
+            {% else %}
+              | <span class="text-success">Ativo</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Não tem carros alugados de momento.</p>
+    {% endif %}
+  </main>
+{% endblock %}

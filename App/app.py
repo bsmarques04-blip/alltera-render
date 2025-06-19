@@ -117,6 +117,7 @@ def load_public_routes():
             senha = request.form['password']
             user = User.query.filter_by(email=email, password=senha).first()
             if user:
+                session['user_id'] = user.id
                 flash(f'Login bem-sucedido: {user.name}', 'info')
                 return redirect(url_for('home'))
             flash('Credenciais inválidas', 'danger')
@@ -135,8 +136,19 @@ def load_public_routes():
             return redirect(url_for('login'))
         return render_template('signup.html')
 
-# Carrega as rotas públicas
 load_public_routes()
+
+@app.route('/alugar_carro/<int:car_id>', methods=['POST'])
+def alugar_carro(car_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Precisa de fazer login para alugar um carro.', 'warning')
+        return redirect(url_for('login'))
+    novo_aluguer = Rental(user_id=user_id, car_id=car_id, start_date=datetime.utcnow())
+    db.session.add(novo_aluguer)
+    db.session.commit()
+    flash('Carro alugado com sucesso!', 'success')
+    return redirect(url_for('meus_carros'))
 
 if __name__ == '__main__':
     app.run(debug=True)
