@@ -1,7 +1,7 @@
 import os
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from models import db, User, ContactMessage, Car
+from models import db, User, ContactMessage, Car, Rental
 
 # Configura paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -113,8 +113,11 @@ def load_public_routes():
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         if request.method == 'POST':
-            email = request.form['email']
-            senha = request.form['password']
+            email = request.form.get('email')
+            senha = request.form.get('password')
+            if not email or not senha:
+                flash('Por favor, preencha todos os campos.', 'warning')
+                return render_template('login.html')
             user = User.query.filter_by(email=email, password=senha).first()
             if user:
                 session['user_id'] = user.id
@@ -136,19 +139,26 @@ def load_public_routes():
             return redirect(url_for('login'))
         return render_template('signup.html')
 
-load_public_routes()
+    @app.route('/meus_carros')
+    def meus_carros():
+        user_id = session.get('user_id')
+        if not user_id:
+            flash('Precisa de fazer login para ver os seus carros.', 'warning')
+            return redirect(url_for('login'))
+        from datetime import datetime
+        now = datetime.utcnow()
+        current_rentals = Rental.query.filter(Rental.user_id == user_id, (Rental.end_date == None) | (Rental.end_date > now)).all()
+        past_rentals = Rental.query.filter(Rental.user_id == user_id, Rental.end_date != None, Rental.end_date <= now).all()
+        return render_template('carros.alugados.html', current_rentals=current_rentals, past_rentals=past_rentals)
+    
+    
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    flash('Logout efetuado', 'info')
+    return redirect(url_for('login'))
 
-@app.route('/alugar_carro/<int:car_id>', methods=['POST'])
-def alugar_carro(car_id):
-    user_id = session.get('user_id')
-    if not user_id:
-        flash('Precisa de fazer login para alugar um carro.', 'warning')
-        return redirect(url_for('login'))
-    novo_aluguer = Rental(user_id=user_id, car_id=car_id, start_date=datetime.utcnow())
-    db.session.add(novo_aluguer)
-    db.session.commit()
-    flash('Carro alugado com sucesso!', 'success')
-    return redirect(url_for('meus_carros'))
+load_public_routes()
 
 if __name__ == '__main__':
     app.run(debug=True)
