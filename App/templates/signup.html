@@ -15,9 +15,24 @@
       <div class="mb-3">
         <label for="password" class="form-label">Senha</label>
         <input type="password" name="password" class="form-control" id="password" required>
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="showPasswordSignup" onclick="togglePassword('password', 'showPasswordSignup')">
+          <label class="form-check-label" for="showPasswordSignup">Mostrar senha</label>
+        </div>
       </div>
       <button type="submit" class="btn btn-gold w-100">Registrar</button>
       <p class="text-center mt-3">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
     </form>
   </main>
+  <script>
+    function togglePassword(passwordFieldId, checkboxId) {
+      const passwordField = document.getElementById(passwordFieldId);
+      const checkbox = document.getElementById(checkboxId);
+      if (checkbox.checked) {
+        passwordField.type = "text";
+      } else {
+        passwordField.type = "password";
+      }
+    }
+  </script>
 {% endblock %}

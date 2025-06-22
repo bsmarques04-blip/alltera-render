@@ -1,5 +1,6 @@
-/* Google Font import */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
+/* Cleaned styles.css with no duplicates */
+
+/* Reverted styles.css to original state before changes */
 
 body {
   font-family: 'Playfair Display', serif;
@@ -45,7 +46,7 @@ body {
   font-size: 4rem;
   font-weight: 700;
   margin-bottom: 20px;
-  text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+  /* Removed text-shadow for minimalism */
 }
 
 .hero p {
@@ -66,8 +67,17 @@ body {
 }
 
 .btn-gold:hover {
-  background: #D4AF37;
+  background-color: #D4AF37;
   color: #121212;
+  border-color: #D4AF37;
+}
+
+.navbar-nav .nav-link:hover {
+  background-color: #D4AF37 !important;
+  color: #121212 !important;
+  border-radius: 4px;
+  padding: 5px 10px;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .navbar {
@@ -125,25 +135,24 @@ body {
   border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 10px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: none; /* Removed transition */
   color: #f5f5f5;
 }
 
 .luxury-card:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
-  border-color: rgba(212, 175, 55, 0.5);
+  /* Removed hover transform and shadow for minimalism */
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(212, 175, 55, 0.2);
 }
 
 .card-img-overlay {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  z-index: 2;
+  /* Removed overlay for minimalism */
+  display: none;
 }
 
 .badge.bg-gold {
-  background-color: #D4AF37;
+  background-color: rgba(212, 175, 55, 0.5); /* Reduced intensity */
   color: #121212;
   font-weight: 600;
   padding: 5px 10px;
@@ -162,7 +171,7 @@ body {
 
 .carousel-control-prev-icon,
 .carousel-control-next-icon {
-  background-color: rgba(212, 175, 55, 0.7);
+  background-color: transparent; /* Removed background color */
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -282,20 +291,23 @@ body {
   border: 1px solid #D4AF37;
   padding: 20px;
   border-radius: 10px;
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-  transition: box-shadow 0.3s ease;
+  /* Removed box-shadow and transition */
+  box-shadow: none;
+  transition: none;
 }
 
 .services-content h2,
 .services-content h3 {
-  text-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
-  transition: color 0.3s ease, text-shadow 0.3s ease;
+  /* Removed text-shadow and transition */
+  text-shadow: none;
+  transition: none;
   cursor: default;
 }
 
 .services-content h3:hover {
-  color: #fff;
-  text-shadow: 0 0 15px rgba(212, 175, 55, 1);
+  /* Removed hover color and text-shadow */
+  color: #D4AF37;
+  text-shadow: none;
 }
 
 .services-content p {
@@ -304,7 +316,8 @@ body {
 }
 
 .services-content:hover {
-  box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+  /* Removed hover box-shadow */
+  box-shadow: none;
 }
 
 /* Contact page styling to match services page style */
@@ -314,27 +327,31 @@ body {
   border: 1px solid #D4AF37;
   padding: 20px;
   border-radius: 10px;
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-  transition: box-shadow 0.3s ease;
+  /* Removed box-shadow and transition */
+  box-shadow: none;
+  transition: none;
   max-width: 600px;
   margin: 0 auto;
 }
 
 .contact-content h2 {
-  text-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
+  /* Removed text-shadow and transition */
+  text-shadow: none;
   cursor: default;
-  transition: color 0.3s ease, text-shadow 0.3s ease;
+  transition: none;
 }
 
 .contact-content h2:hover {
-  color: #fff;
-  text-shadow: 0 0 15px rgba(212, 175, 55, 1);
+  /* Removed hover color and text-shadow */
+  color: #D4AF37;
+  text-shadow: none;
 }
 
 .contact-content label {
   color: #D4AF37;
   font-weight: 600;
-  text-shadow: 0 0 5px rgba(212, 175, 55, 0.7);
+  /* Removed text-shadow */
+  text-shadow: none;
 }
 
 .contact-content input.form-control,
@@ -348,7 +365,7 @@ body {
 .contact-content input.form-control:focus,
 .contact-content textarea.form-control:focus {
   border-color: #fff;
-  box-shadow: 0 0 8px rgba(212, 175, 55, 1);
+  box-shadow: none; /* Removed focus box-shadow */
   background: rgba(18, 18, 18, 1);
   color: #fff;
 }
@@ -363,7 +380,8 @@ body {
 }
 
 .contact-content:hover {
-  box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+  /* Removed hover box-shadow */
+  box-shadow: none;
 }
 
 /* Collection page styling to match services page style */
@@ -373,71 +391,66 @@ body {
   border: 1px solid #D4AF37;
   padding: 20px;
   border-radius: 10px;
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-  transition: box-shadow 0.3s ease;
+  /* Removed box-shadow and transition */
+  box-shadow: none;
+  transition: none;
 }
 
 .collection-content h2 {
-  text-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
+  /* Removed text-shadow and transition */
+  text-shadow: none;
   cursor: default;
-  transition: color 0.3s ease, text-shadow 0.3s ease;
+  transition: none;
 }
 
 .collection-content h2:hover {
-  color: #fff;
-  text-shadow: 0 0 15px rgba(212, 175, 55, 1);
-}
-
-/* Rentals page styling to match services page style */
-.rentals-content {
+  /* Removed hover color and text-shadow */
   color: #D4AF37;
-  background: rgba(212, 175, 55, 0.1);
-  border: 1px solid #D4AF37;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-  transition: box-shadow 0.3s ease;
-}
-
-.rentals-content h2 {
-  text-shadow: 0 0 8px rgba(212, 175, 55, 0.8);
-  cursor: default;
-  transition: color 0.3s ease, text-shadow 0.3s ease;
-}
-
-.rentals-content h2:hover {
-  color: #fff;
-  text-shadow: 0 0 15px rgba(212, 175, 55, 1);
-}
-
-.rentals-content ul.list-group {
-  background: rgba(18, 18, 18, 0.8);
-  border: 1px solid #D4AF37;
-  border-radius: 8px;
-  padding: 15px;
-  color: #D4AF37;
-}
-
-.rentals-content ul.list-group li.list-group-item {
-  background: transparent;
-  border: none;
-  color: #D4AF37;
-  font-weight: 600;
-  text-shadow: 0 0 5px rgba(212, 175, 55, 0.7);
-}
-
-.rentals-content ul.list-group li.list-group-item .text-success {
-  color: #A3D977;
-  font-weight: 700;
   text-shadow: none;
 }
 
-.rentals-content p {
+/* Rental history page styling for gold and black minimalist theme */
+.rentals-content {
   color: #D4AF37;
-  font-weight: 600;
-  text-shadow: 0 0 5px rgba(212, 175, 55, 0.7);
+  background-color: #121212;
+  border: 1px solid #D4AF37;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: none;
+  transition: none;
 }
 
-.rentals-content:hover {
-  box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+.rentals-content h2 {
+  color: #D4AF37;
+  text-shadow: none;
+  cursor: default;
+  transition: none;
+  margin-bottom: 1rem;
+}
+
+.list-group-item {
+  background-color: #1a1a1a;
+  border: 1px solid #D4AF37;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  color: #D4AF37;
+}
+
+.list-group-item strong {
+  color: #D4AF37;
+}
+
+.btn-danger {
+  background-color: transparent;
+  border: 2px solid #D4AF37;
+  color: #D4AF37;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.btn-danger:hover {
+  background-color: #D4AF37;
+  color: #121212;
+  border-color: #D4AF37;
 }

@@ -54,7 +54,7 @@
   <div class="container mt-3">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}{% for category, msg in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show flash-message" role="alert">
+          <div class="alert alert-{{ category }} alert-dismissible flash-message" role="alert">
             {{ msg }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
           </div>
@@ -109,12 +109,13 @@
       flashMessages.forEach((msg) => {
         msg.classList.add('flash-gold');
         msg.style.display = 'block';
+        // Keep flash message visible for 3 seconds before fading
         setTimeout(() => {
           msg.classList.add('fade');
           setTimeout(() => {
             msg.remove();
-          }, 100000);
-        }, 300000);
+          }, 1000); // fade out duration 1 second
+        }, 3000); // visible duration 3 seconds
       });
     });
   </script>

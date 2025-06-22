@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Reserve Car{% endblock %}
+{% block content %}
+<main class="container my-5">
+  <h2 class="mb-4">Reserve {{ car.title }}</h2>
+  <div class="card p-4">
+    <p><strong>Description:</strong> {{ car.description }}</p>
+    <p><strong>Price per day:</strong> ${{ "%.2f"|format(car.price_per_day) }}</p>
+      <form method="POST" action="{{ url_for('reserve_car', car_id=car.id) }}">
+      <div class="mb-3">
+        <label for="start_date" class="form-label">Start Date</label>
+        <input type="date" class="form-control" id="start_date" name="start_date" required>
+      </div>
+      <div class="mb-3">
+        <label for="end_date" class="form-label">End Date</label>
+        <input type="date" class="form-control" id="end_date" name="end_date" required>
+      </div>
+      <div class="mb-3">
+        <label for="payment_method" class="form-label">Select Payment Method</label>
+        <select class="form-select" id="payment_method" name="payment_method" required>
+          <option value="" selected disabled>Choose...</option>
+          <option value="credit_card">Credit Card</option>
+          <option value="paypal">PayPal</option>
+          <option value="bank_transfer">Bank Transfer</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Confirm Reservation</button>
+    </form>
+  </div>
+</main>
+{% endblock %}

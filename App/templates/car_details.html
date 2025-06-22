@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ car.title }} Details{% endblock %}
+{% block content %}
+  <main class="container my-5">
+    <h2 class="mb-4">{{ car.title }}</h2>
+    <div class="row">
+      <div class="col-md-6">
+        <div id="carPhotosCarousel" class="carousel slide mb-3" data-bs-ride="carousel">
+          <div class="carousel-inner">
+            {% for photo_url in car.photo_urls %}
+            <div class="carousel-item {% if loop.first %}active{% endif %}">
+              <img src="{{ photo_url }}" class="d-block w-100" alt="{{ car.title }} photo" style="height: 400px; object-fit: cover;">
+            </div>
+            {% endfor %}
+          </div>
+          <button class="carousel-control-prev" type="button" data-bs-target="#carPhotosCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+          </button>
+          <button class="carousel-control-next" type="button" data-bs-target="#carPhotosCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+          </button>
+        </div>
+        <div class="d-flex gap-2 justify-content-center">
+          {% for photo_url in car.photo_urls %}
+          <img src="{{ photo_url }}" class="img-thumbnail" style="width: 100px; height: 75px; object-fit: cover; cursor: pointer;" alt="{{ car.title }} photo" data-bs-target="#carPhotosCarousel" data-bs-slide-to="{{ loop.index0 }}">
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h4>Description</h4>
+        <p>{{ car.description }}</p>
+        <h4>Details</h4>
+        <ul>
+          <li><strong>Kilometers:</strong> {{ car.km }} km</li>
+          <li><strong>Year:</strong> {{ car.year }}</li>
+          <li><strong>Color:</strong> {{ car.color }}</li>
+          <li><strong>Model:</strong> {{ car.model }}</li>
+          <li><strong>Transmission:</strong> {{ car.transmission }}</li>
+        </ul>
+        <h4>Price</h4>
+        <p>€{{ '%.0f'|format(car.price_per_day) }} / day</p>
+        <a href="{{ url_for('reserve_car', car_id=car.id) }}" class="btn btn-gold">Reserve</a>
+      </div>
+    </div>
+  </main>
+{% endblock %}

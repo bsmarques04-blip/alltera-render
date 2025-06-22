@@ -31,3 +31,5 @@ class Rental(db.Model):
     car_id = db.Column(db.Integer, db.ForeignKey('car.id'), nullable=False)
     start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     end_date = db.Column(db.DateTime, nullable=True)
+
+    car = db.relationship('Car')
