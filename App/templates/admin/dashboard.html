@@ -3,8 +3,10 @@
 {% block content %}
   <main class="container my-5">
     <h2 class="text-center mb-4">Admin Dashboard</h2>
-    <div class="d-flex justify-content-center gap-3">
+    <div class="d-flex justify-content-center gap-3 flex-wrap">
       <a href="{{ url_for('admin_cars') }}" class="btn btn-gold">Gerir Carros</a>
+      <a href="{{ url_for('admin_users') }}" class="btn btn-gold">Gerir Utilizadores</a>
+      <a href="{{ url_for('admin_reservations') }}" class="btn btn-gold">Gerir Reservas</a>
       <a href="{{ url_for('admin_logout') }}" class="btn btn-light">Logout</a>
     </div>
   </main>

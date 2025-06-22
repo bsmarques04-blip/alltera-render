@@ -18,12 +18,29 @@
       <div class="mb-3">
         <label for="payment_method" class="form-label">Select Payment Method</label>
         <select class="form-select" id="payment_method" name="payment_method" required>
-          <option value="" selected disabled>Choose...</option>
-          <option value="credit_card">Credit Card</option>
-          <option value="paypal">PayPal</option>
-          <option value="bank_transfer">Bank Transfer</option>
+          <option value="credit_card" selected>Credit Card</option>
         </select>
       </div>
+
+      <div id="payment_details">
+
+        <div id="credit_card_fields">
+          <div class="mb-3">
+            <label for="cc_number" class="form-label">Card Number</label>
+            <input type="text" class="form-control" id="cc_number" name="cc_number" maxlength="19" placeholder="1234 5678 9012 3456" required>
+          </div>
+          <div class="mb-3">
+            <label for="cc_expiry" class="form-label">Expiry Date</label>
+            <input type="month" class="form-control" id="cc_expiry" name="cc_expiry" required>
+          </div>
+          <div class="mb-3">
+            <label for="cc_cvv" class="form-label">CVV</label>
+            <input type="text" class="form-control" id="cc_cvv" name="cc_cvv" maxlength="4" placeholder="123" required>
+          </div>
+        </div>
+
+      </div>
+
       <button type="submit" class="btn btn-primary">Confirm Reservation</button>
     </form>
   </div>

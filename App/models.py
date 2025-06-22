@@ -24,6 +24,10 @@ class Car(db.Model):
     price_per_day = db.Column(db.Float, nullable=False)
     image_url = db.Column(db.String(500), nullable=False)
     is_premium = db.Column(db.Boolean, default=False)
+    color = db.Column(db.String(50), nullable=True)
+    year = db.Column(db.Integer, nullable=True)
+    mileage = db.Column(db.Integer, nullable=True)
+    seats = db.Column(db.Integer, nullable=True)
 
 class Rental(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -32,4 +36,5 @@ class Rental(db.Model):
     start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     end_date = db.Column(db.DateTime, nullable=True)
 
+    user = db.relationship('User')
     car = db.relationship('Car')

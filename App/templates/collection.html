@@ -1,28 +1,31 @@
 {% extends "base.html" %}
+
 {% block title %}Collection{% endblock %}
+
 {% block content %}
-  <main class="container my-5 collection-content">
-    <h2 class="text-center mb-5">Our Exclusive Collection</h2>
-    <div class="row g-4">
-      {% for car in cars %}
-      <div class="col-md-4">
+<main class="container my-5 collection-content">
+  <h2 class="text-center mb-5">Our Exclusive Collection</h2>
+
+  <div class="row g-4">
+    {% for car in cars %}
+    <div class="col-md-4">
       <div class="card luxury-card h-100">
-          {% if car.image_url.startswith('http') %}
-            <div class="card-img-top" style="height:200px; background-image: url('{{ car.image_url }}'); background-size: cover; background-position: center;"></div>
-          {% else %}
-            <img src="{{ url_for('static', filename='images/' + car.image_url) }}" class="card-img-top" alt="{{ car.title }}" style="height:200px; object-fit: cover;">
-          {% endif %}
-          <div class="card-body text-center">
-            <h5 class="card-title">{{ car.title }}</h5>
-            <p class="text-gold">{{ car.description }}</p>
-            <div class="d-flex justify-content-center gap-3 mt-3">
-              <a href="{{ url_for('reserve_car', car_id=car.id) }}" class="btn btn-gold">Alugar</a>
-              <a href="{{ url_for('car_details', car_id=car.id) }}" class="btn btn-outline-gold text-gold">Detalhes</a>
-            </div>
+        {% if car.image_url and car.image_url.startswith('http') %}
+          <div class="card-img-top" style="height:200px; background-image: url('{{ car.image_url }}'); background-size: cover; background-position: center;"></div>
+        {% else %}
+          <img src="{{ url_for('static', filename=car.image_url.replace('static/', '')) }}" class="card-img-top" alt="{{ car.title }}" style="height:200px; object-fit: cover;">
+        {% endif %}
+        <div class="card-body text-center">
+          <h5 class="card-title">{{ car.title }}</h5>
+          <p class="text-gold">{{ car.description }}</p>
+          <div class="d-flex justify-content-center gap-3 mt-3">
+            <a href="{{ url_for('reserve_car', car_id=car.id) }}" class="btn btn-gold">Alugar</a>
+            <a href="{{ url_for('car_details', car_id=car.id) }}" class="btn btn-outline-gold text-gold">Detalhes</a>
           </div>
         </div>
       </div>
-      {% endfor %}
     </div>
-  </main>
+    {% endfor %}
+  </div>
+</main>
 {% endblock %}
