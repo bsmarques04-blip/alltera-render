@@ -82,80 +82,77 @@ def admin_cars():
     cars = Car.query.all()
     return render_template('admin/cars.html', cars=cars)
 
-# Rotas públicas
-def load_public_routes():
-    @app.route('/')
-    def home():
-        cars = Car.query.all()
-        return render_template('index.html', cars=cars)
+@app.route('/')
+def home():
+    cars = Car.query.all()
+    return render_template('index.html', cars=cars)
 
-    @app.route('/collection')
-    def collection():
-        # Insert sample cars into DB if empty
-        # Insert sample cars if they don't already exist
-        existing_titles = {car.title for car in Car.query.all()}
-        sample_cars = [
-            Car(title='Ford Fiesta', description='Compact and efficient', price_per_day=30, image_url='images/ford_fiesta.jpg', is_premium=False),
-            Car(title='BMW X5', description='Luxury SUV', price_per_day=80, image_url='images/bmw x5.avif', is_premium=False),
-            Car(title='Audi A4', description='Comfort and style', price_per_day=50, image_url='images/audi a4.jpeg', is_premium=False),
-            Car(title='Tesla Model 3', description='Electric and innovative', price_per_day=70, image_url='https://cdn.easysite.pt/noticias/publicados/24629897-0.jpeg', is_premium=False),
-            Car(title='Honda Civic', description='Reliable and efficient', price_per_day=40, image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT3mMqcRYCJDeEBVysy-BNQ07cXezqh7bf-LQ&s', is_premium=False),
-            Car(title='Mercedes-Benz C-Class', description='Luxury and performance', price_per_day=90, image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-FByddYneZoh5lSWTNI3dti6g26pL59MyJg&s', is_premium=True),
-            Car(title='Volkswagen Golf', description='Compact and sporty', price_per_day=35, image_url='images/volkswagen_golf.jpg', is_premium=False),
-            Car(title='Mazda CX-5', description='Stylish and practical SUV', price_per_day=60, image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSKnrtBexNOAVSiLSXDsDIw06rOdbhNqyyrdQ&s', is_premium=False),
-            Car(title='Lexus RX 350', description='Luxury crossover SUV', price_per_day=95, image_url='images/lexus_rx350.jpg', is_premium=True)
-        ]
-        new_cars = [car for car in sample_cars if car.title not in existing_titles]
-        if new_cars:
-            db.session.bulk_save_objects(new_cars)
-            db.session.commit()
-        cars = Car.query.all()
-        return render_template('collection.html', cars=cars)
+@app.route('/collection')
+def collection():
+    # Verifica se já existem carros na base de dados
+    existing_titles = {car.title for car in Car.query.all()}
+    sample_cars = [
+        Car(title='Ford Fiesta', description='Compact and efficient', price_per_day=30, image_url='ford_fiesta.jpg', is_premium=False),
+        Car(title='BMW X7', description='Luxury SUV', price_per_day=80, image_url='bmw_x7.jpg', is_premium=False),
+        Car(title='Audi A5', description='Comfort and style', price_per_day=50, image_url='audi_a5.jpg', is_premium=False),
+        Car(title='Tesla Model 3', description='Electric and innovative', price_per_day=70, image_url='images(1).jpeg', is_premium=False),
+        Car(title='Honda Civic', description='Reliable and efficient', price_per_day=40, image_url='images.jpeg', is_premium=False),
+        Car(title='Mercedes-Benz C-Class', description='Luxury and performance', price_per_day=90, image_url='images(1)', is_premium=True),
+        Car(title='Volkswagen Golf', description='Compact and sporty', price_per_day=35, image_url='volkswagen-GOLF-GTE-MY24.webp', is_premium=False),
+        Car(title='Mazda CX-5', description='Stylish and practical SUV', price_per_day=60, image_url='images(2)', is_premium=False),
+        Car(title='Lexus RX 350', description='Luxury crossover SUV', price_per_day=95, image_url='large-17.avif', is_premium=True)
+    ]
+    new_cars = [car for car in sample_cars if car.title not in existing_titles]
+    if new_cars:
+        db.session.bulk_save_objects(new_cars)
+        db.session.commit()
+    cars = Car.query.all()
+    return render_template('collection.html', cars=cars)
 
-    @app.route('/reserve/<int:car_id>', methods=['GET', 'POST'])
-    def reserve_car(car_id):
-        if 'user_id' not in session:
-            flash('Precisa de fazer login para reservar um carro.', 'warning')
-            return redirect(url_for('login'))
-        car = Car.query.get_or_404(car_id)
-        if request.method == 'POST':
-            start_date_str = request.form.get('start_date')
-            end_date_str = request.form.get('end_date')
-            payment_method = request.form.get('payment_method')
-            from datetime import datetime
-            try:
-                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-                end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-                if end_date < start_date:
-                    flash('A data de fim deve ser posterior à data de início.', 'danger')
-                    return render_template('reserve.html', car=car)
-            except Exception as e:
-                flash('Datas inválidas.', 'danger')
+@app.route('/reserve/<int:car_id>', methods=['GET', 'POST'])
+def reserve_car(car_id):
+    if 'user_id' not in session:
+        flash('Precisa de fazer login para reservar um carro.', 'warning')
+        return redirect(url_for('login'))
+    car = Car.query.get_or_404(car_id)
+    if request.method == 'POST':
+        start_date_str = request.form.get('start_date')
+        end_date_str = request.form.get('end_date')
+        payment_method = request.form.get('payment_method')
+        from datetime import datetime
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+            if end_date < start_date:
+                flash('A data de fim deve ser posterior à data de início.', 'danger')
                 return render_template('reserve.html', car=car)
-            rental = Rental(user_id=session['user_id'], car_id=car.id, start_date=start_date, end_date=end_date)
-            db.session.add(rental)
-            db.session.commit()
-            flash(f'Reserva confirmada para {car.title} com pagamento via {payment_method}.', 'success')
-            return redirect(url_for('meus_carros'))
-        return render_template('reserve.html', car=car)
+        except Exception as e:
+            flash('Datas inválidas.', 'danger')
+            return render_template('reserve.html', car=car)
+        rental = Rental(user_id=session['user_id'], car_id=car.id, start_date=start_date, end_date=end_date)
+        db.session.add(rental)
+        db.session.commit()
+        flash(f'Reserva confirmada para {car.title} com pagamento via {payment_method}.', 'success')
+        return redirect(url_for('meus_carros'))
+    return render_template('reserve.html', car=car)
 
 @app.route('/car_details/<int:car_id>')
 def car_details(car_id):
     car = Car.query.get_or_404(car_id)
 
-    if car.title == 'Ford Fiesta':
+    if car.title == 'BMW X7':
         car.km = 120000
         car.year = 2022
         car.color = 'White'
         car.model = 'Economico'
         car.transmission = 'Automatica'
-    elif car.title == 'BMW X5':
+    elif car.title == 'Ford Fiesta':
         car.km = 50000
         car.year = 2021
         car.color = 'Black'
         car.model = 'Luxury'
         car.transmission = 'Automatic'
-    elif car.title == 'Audi A4':
+    elif car.title == 'Audi A5':
         car.km = 70000
         car.year = 2020
         car.color = 'Silver'
@@ -235,31 +232,22 @@ def car_details(car_id):
         car.model = 'Standard'
         car.transmission = 'Manual'
 
-    # Add photo_urls attribute with specific image URLs based on car title
     if car.title == 'Ford Fiesta':
         car.photo_urls = [
             'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRkMzr06lQM8GWDD4f0zz4nWUq3qE2oA0g8qw&s',
             'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiAHIoKo6AQnA7vlMUFgg3-Dly7JSnv0wLVQenQhYZTCjU6OGg2s21Vra77vqFfGtCpYwYD4sDHX-jh1X7aGkblXJCDHdeYkuf1329iCrFnE449ATpoc3PkRLihDtI-DFBUTD3pqGJFTWzl/s2048/Novo-Ford-Fiesta-2022+%252814%2529.jpg',
             'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2HCkfkvPtYs2m-1C9TM8ga9oIiFCMUHe3gA&s'
         ]
-    elif car.title == 'BMW X5':
+    elif car.title == 'BMW X7':
         car.photo_urls = [
             'https://hips.hearstapps.com/hmg-prod/images/2025-bmw-x5-xdrive40i-108-6824bd45baa30.jpg?crop=0.641xw:0.540xh;0.131xw,0.315xh&resize=1200:*',
             'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwL0uO3w2fC6VD3FFWjLkilioJpDZgOBMw8w&s'
         ]
-    elif car.title == 'Audi A4':
+    elif car.title == 'Audi A5':
         car.photo_urls = [
             'https://cdn.jornaldenegocios.pt/images/2015-11/img_900x561uu2015-11-06-15-09-00-267483.jpg',
             'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjE143dsh3p1KaqQWkJZ1kFc358hSXZytS5lN4SqZ1hIe2fL4IG9MXyEOfvSXr2A_Jg_I59A0SPwEfmPLCHwXOD6h6Xp0AWh6Ba24AxRQcGaPOZBfhZ8Ueo5VCxtdbrSMyJOD7l20lpIfU/s1600/novo-Audi-A4-2017+%25283%2529.jpg'
         ]
-    elif car.title == 'Tesla Model 3':
-        car.photo_urls = [
-            'https://cdn.easysite.pt/noticias/publicados/24629897-0.jpeg',
-            'https://live.staticflickr.com/65535/53382776892_bab9abe448_k.jpg',
-            'https://www.ayvens.com/-/media/leaseplan-digital/pt/business-lease-and-private-lease/spotlight-pages/135_tesla-model-3/tesla-model_3-2018-1280-12.jpg?rev=-1&mw=480&io=transform%3Afill%2Cwidth%3A480'
-        ]
-        
-
 
     return render_template('car_details.html', car=car)
 
@@ -348,7 +336,6 @@ def cancel_reservation(rental_id):
     flash(f'Reserva do carro {rental.car.title} cancelada com sucesso.', 'success')
     return redirect(url_for('meus_carros'))
 
-load_public_routes()
 
 if __name__ == '__main__':
     app.run(debug=True)

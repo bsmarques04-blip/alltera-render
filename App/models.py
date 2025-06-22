@@ -22,7 +22,7 @@ class Car(db.Model):
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.String(255), nullable=False)
     price_per_day = db.Column(db.Float, nullable=False)
-    image_url = db.Column(db.String(255), nullable=False)
+    image_url = db.Column(db.String(500), nullable=False)
     is_premium = db.Column(db.Boolean, default=False)
 
 class Rental(db.Model):

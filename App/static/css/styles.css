@@ -135,24 +135,23 @@ body {
   border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 10px;
   overflow: hidden;
-  transition: none; /* Removed transition */
+  transition: none; 
   color: #f5f5f5;
 }
 
 .luxury-card:hover {
-  /* Removed hover transform and shadow for minimalism */
+  
   transform: none;
   box-shadow: none;
   border-color: rgba(212, 175, 55, 0.2);
 }
 
 .card-img-overlay {
-  /* Removed overlay for minimalism */
   display: none;
 }
 
 .badge.bg-gold {
-  background-color: rgba(212, 175, 55, 0.5); /* Reduced intensity */
+  background-color: rgba(212, 175, 55, 0.5);
   color: #121212;
   font-weight: 600;
   padding: 5px 10px;
@@ -171,7 +170,7 @@ body {
 
 .carousel-control-prev-icon,
 .carousel-control-next-icon {
-  background-color: transparent; /* Removed background color */
+  background-color: transparent; 
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -215,7 +214,7 @@ body {
   background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.3) 100%);
 }
 
-/* Dropdown menu styling to match navbar */
+
 .dropdown-menu {
   background-color: rgba(18, 18, 18, 0.9) !important;
   border: none !important;
@@ -237,7 +236,7 @@ body {
   transition: color 0.3s ease;
 }
 
-/* Style user icon in navbar */
+
 .navbar-nav .nav-link.dropdown-toggle {
   color: #D4AF37 !important;
   border-bottom: none !important;
@@ -259,7 +258,7 @@ body {
   color: #121212 !important;
 }
 
-/* Back to Top Button */
+
 #backToTopBtn {
   display: none;
   position: fixed;
@@ -272,7 +271,7 @@ body {
   outline: none;
 }
 
-/* Flash message gold style */
+
 .flash-gold {
   background-color: #D4AF37 !important;
   color: #121212 !important;
@@ -284,28 +283,28 @@ body {
   transition: opacity 1s ease;
 }
 
-/* Services page styling to make it less boring and gold text */
+
 .services-content {
   color: #D4AF37;
   background: rgba(212, 175, 55, 0.1);
   border: 1px solid #D4AF37;
   padding: 20px;
   border-radius: 10px;
-  /* Removed box-shadow and transition */
+  
   box-shadow: none;
   transition: none;
 }
 
 .services-content h2,
 .services-content h3 {
-  /* Removed text-shadow and transition */
+
   text-shadow: none;
   transition: none;
   cursor: default;
 }
 
 .services-content h3:hover {
-  /* Removed hover color and text-shadow */
+  
   color: #D4AF37;
   text-shadow: none;
 }
@@ -316,18 +315,18 @@ body {
 }
 
 .services-content:hover {
-  /* Removed hover box-shadow */
+ 
   box-shadow: none;
 }
 
-/* Contact page styling to match services page style */
+
 .contact-content {
   color: #D4AF37;
   background: rgba(212, 175, 55, 0.1);
   border: 1px solid #D4AF37;
   padding: 20px;
   border-radius: 10px;
-  /* Removed box-shadow and transition */
+  
   box-shadow: none;
   transition: none;
   max-width: 600px;
@@ -335,14 +334,14 @@ body {
 }
 
 .contact-content h2 {
-  /* Removed text-shadow and transition */
+
   text-shadow: none;
   cursor: default;
   transition: none;
 }
 
 .contact-content h2:hover {
-  /* Removed hover color and text-shadow */
+
   color: #D4AF37;
   text-shadow: none;
 }
@@ -350,7 +349,7 @@ body {
 .contact-content label {
   color: #D4AF37;
   font-weight: 600;
-  /* Removed text-shadow */
+
   text-shadow: none;
 }
 
@@ -365,7 +364,7 @@ body {
 .contact-content input.form-control:focus,
 .contact-content textarea.form-control:focus {
   border-color: #fff;
-  box-shadow: none; /* Removed focus box-shadow */
+  box-shadow: none; 
   background: rgba(18, 18, 18, 1);
   color: #fff;
 }
@@ -380,36 +379,33 @@ body {
 }
 
 .contact-content:hover {
-  /* Removed hover box-shadow */
+  
   box-shadow: none;
 }
 
-/* Collection page styling to match services page style */
 .collection-content {
   color: #D4AF37;
   background: rgba(212, 175, 55, 0.1);
   border: 1px solid #D4AF37;
   padding: 20px;
   border-radius: 10px;
-  /* Removed box-shadow and transition */
+
   box-shadow: none;
   transition: none;
 }
 
 .collection-content h2 {
-  /* Removed text-shadow and transition */
+
   text-shadow: none;
   cursor: default;
   transition: none;
 }
 
 .collection-content h2:hover {
-  /* Removed hover color and text-shadow */
+
   color: #D4AF37;
   text-shadow: none;
 }
-
-/* Rental history page styling for gold and black minimalist theme */
 .rentals-content {
   color: #D4AF37;
   background-color: #121212;

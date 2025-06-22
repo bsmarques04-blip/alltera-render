@@ -10,7 +10,7 @@
           {% if car.image_url.startswith('http') %}
             <div class="card-img-top" style="height:200px; background-image: url('{{ car.image_url }}'); background-size: cover; background-position: center;"></div>
           {% else %}
-            <div class="card-img-top" style="height:200px; background-image: url('{{ url_for('static', filename=car.image_url) }}'); background-size: cover; background-position: center;"></div>
+            <img src="{{ url_for('static', filename='images/' + car.image_url) }}" class="card-img-top" alt="{{ car.title }}" style="height:200px; object-fit: cover;">
           {% endif %}
           <div class="card-body text-center">
             <h5 class="card-title">{{ car.title }}</h5>
