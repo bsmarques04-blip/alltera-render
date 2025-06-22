@@ -2,6 +2,9 @@
 {% block title %}Admin - Gestão de Carros{% endblock %}
 {% block content %}
   <main class="container my-5">
+    <div class="mb-3">
+      <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Voltar ao Dashboard</a>
+    </div>
     <h2 class="text-center mb-4">Gestão de Carros</nSubheading>
     <form method="POST" class="mb-5" id="car-form">
       <div class="row g-3">
