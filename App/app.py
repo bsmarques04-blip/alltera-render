@@ -339,5 +339,11 @@ def cancel_reservation(rental_id):
     return redirect(url_for('meus_carros'))
 
 
+from flask import redirect
+
+@app.route('/collection/admin')
+def collection_admin_redirect():
+    return redirect('/admin')
+
 if __name__ == '__main__':
     app.run(debug=True)
