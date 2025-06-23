@@ -18,4 +18,13 @@ Projecto de Avaliação Contínua de DAW 2425.
 
 - python .\App\app.py
 
+## A aplicação inclui um painel de administração acessível com credenciais predefinidas:
+
+- URL: /admin
+Exemplo: http://localhost:8000/admin
+
+- Email: admin@gmail.com
+
+- Password: secret
+
 
