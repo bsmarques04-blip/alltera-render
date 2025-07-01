@@ -60,8 +60,38 @@ footer {
   box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
 
+.about {
+  background-color: #fff;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.about h2 {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.about p {
+  font-size: 16px;
+  color: #555;
+}
+
 .nav-links a:hover {
   text-decoration: underline;
+}
+
+.btn-reservar {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #000;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-reservar:hover {
+  background-color: #333;
 }
 
 @media (max-width: 768px) {
