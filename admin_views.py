@@ -5,7 +5,7 @@ def login():
         username = request.form.get("username")
         password = request.form.get("password")
 
-        if username == "admin" and password == "password":
+        if username == "admin" and password == "1234":
             session["admin"] = True
             flash("Login efetuado com sucesso!", "success")
             return redirect(url_for("admin_panel"))
