@@ -1,12 +1,34 @@
 from flask import Flask, render_template
-from models import db, Categoria
+from models import db, Categoria, Veiculo
+
 
 app = Flask(__name__)
 
-@app.before_first_request
-def criar_tabelas():
+with app.app_context():
     db.connect()
-    db.create_tables([Categoria], safe=True)
+    db.create_tables([Categoria, Veiculo], safe=True)
+
+# Inserir veículos exemplo
+if not Veiculo.select().exists():
+    cat_eco = Categoria.get(Categoria.nome == "Económico")
+    Veiculo.create(
+        type="CARRO",
+        brand="BMW",
+        model="Série 5",
+        year=2022,
+        price_per_day=120,
+        imagens="carro1.jpg",
+        categoria=cat_eco,
+    )
+    Veiculo.create(
+        type="MOTA",
+        brand="Yamaha",
+        model="MT-07",
+        year=2023,
+        price_per_day=80,
+        imagens="mota1.jpg",
+        categoria=cat_eco,
+    )
     
       # Categorias padrão
     categorias = ["Económico", "Silver", "Gold"]
@@ -16,7 +38,11 @@ def criar_tabelas():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    veiculos = Veiculo.select().where(Veiculo.status == True)
+    veiculos_carros = [v for v in veiculos if v.type == "CARRO"]
+    veiculos_motas = [v for v in veiculos if v.type == "MOTA"]
+    return render_template("index.html", veiculos_carros=veiculos_carros, veiculos_motas=veiculos_motas)
+
 
 if __name__ == "__main__":
     app.run(debug=True)

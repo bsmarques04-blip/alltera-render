@@ -21,20 +21,37 @@
     <p>Conduz o teu sonho com estilo e segurança.</p>
   </header>
 
-  <main class="cards-container">
-    <div class="card">
-      <img src="/static/images/carro1.jpg" alt="Carro 1">
-      <h3>BMW Série 5</h3>
-      <p>Elegância e potência combinadas.</p>
-      <button class="btn-reservar">Reservar agora</button>
+  <section class="cards-container">
+    <h2>Carros Disponíveis</h2>
+    <div class="cards">
+      {% for veiculo in veiculos_carros %}
+      <div class="card">
+        <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="{{ veiculo.model }}">
+        <h3>{{ veiculo.brand }} {{ veiculo.model }}</h3>
+        <p>{{ veiculo.price_per_day }} € / dia</p>
+        <button class="btn-reservar">Reservar agora</button>
+      </div>
+      {% else %}
+      <p>Nenhum carro disponível no momento.</p>
+      {% endfor %}
     </div>
-    <div class="card">
-      <img src="/static/images/mota1.jpg" alt="Mota 1">
-      <h3>Yamaha MT-07</h3>
-      <p>Aventura em duas rodas.</p>
-      <button class="btn-reservar">Reservar agora</button>
+  </section>
+
+  <section class="cards-container">
+    <h2>Motas Disponíveis</h2>
+    <div class="cards">
+      {% for veiculo in veiculos_motas %}
+      <div class="card">
+        <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="{{ veiculo.model }}">
+        <h3>{{ veiculo.brand }} {{ veiculo.model }}</h3>
+        <p>{{ veiculo.price_per_day }} € / dia</p>
+        <button class="btn-reservar">Reservar agora</button>
+      </div>
+      {% else %}
+      <p>Nenhuma mota disponível no momento.</p>
+      {% endfor %}
     </div>
-  </main>
+  </section>
 
   <section class="about">
     <h2>Sobre Nós</h2>
