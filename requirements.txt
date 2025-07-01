@@ -2,5 +2,4 @@
 
 Flask>=2.2
 peewee
-Flask-SQLAlchemy>=3.0
 python-dotenv>=0.20

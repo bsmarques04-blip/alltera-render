@@ -1,9 +1,8 @@
 # Projecto-AC-DAW2425
-Projecto de Avaliação Contínua de DAW 2425.
+Projecto de Avaliação Contínua de DAW 2025. (Nova Realização)
 
 ## Constituição do Grupo
 - Frederik Carrapato
-- Bernardo Marques
 - L1
 
 ## Professor
