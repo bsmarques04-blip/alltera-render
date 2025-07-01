@@ -1,6 +1,6 @@
 from flask import Flask, render_template
 from models import db, Categoria, Veiculo
-
+from admin_views import login, logout, admin_panel
 
 app = Flask(__name__)
 
@@ -43,6 +43,12 @@ def index():
     veiculos_motas = [v for v in veiculos if v.type == "MOTA"]
     return render_template("index.html", veiculos_carros=veiculos_carros, veiculos_motas=veiculos_motas)
 
+@app.before_request
+def check_admin_session():
+    admin_routes = ["/admin", "/add_vehicle", "/edit_vehicle", "/delete_vehicle"]
+    if any(request.path.startswith(route) for route in admin_routes):
+        if "admin" not in session:
+            return redirect(url_for("login"))
 
 if __name__ == "__main__":
     app.run(debug=True)
