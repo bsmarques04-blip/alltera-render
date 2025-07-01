@@ -7,7 +7,8 @@ app = Flask(__name__)
 app.secret_key = "segredo"  # necessário para usar sessões
 
 with app.app_context():
-    db.connect()
+    if db.is_closed():
+        db.connect()
     db.create_tables([Categoria, Veiculo], safe=True)
 
     # Categorias padrão
