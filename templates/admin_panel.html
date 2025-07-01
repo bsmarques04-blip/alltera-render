@@ -7,10 +7,6 @@
 <body>
   <h1>Painel de Administração</h1>
   <p>Bem-vindo, administrador!</p>
-
-  <ul>
-    <li><a href="{{ url_for('add_vehicle') }}">Adicionar Veículo</a></li>
-    <li><a href="{{ url_for('logout') }}">Terminar Sessão</a></li>
-  </ul>
+  <a href="{{ url_for('logout') }}">Logout</a>
 </body>
 </html>

@@ -15,15 +15,12 @@ Projecto de Avaliação Contínua de DAW 2025. (Nova Realização)
 
 - pip install -r requirements.txt
 
-- python .\App\app.py
+- python app.py
 
 ## A aplicação inclui um painel de administração acessível com credenciais predefinidas:
 
-- URL: /admin
-Exemplo: http://localhost:8000/admin
+- Utilizador: "admin"
 
-- Email: admin@gmail.com
-
-- Password: secret
+- Password: "1234"
 
 
