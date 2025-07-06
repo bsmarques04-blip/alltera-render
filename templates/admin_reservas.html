@@ -28,6 +28,17 @@
 </head>
 <body>
   <h1>Reservas Realizadas</h1>
+
+  <form method="GET" action="{{ url_for('admin_reservas') }}">
+    <label for="estado">Filtrar por estado:</label>
+    <select name="estado" onchange="this.form.submit()">
+      <option value="todas" {% if not filtro_estado or filtro_estado == 'todas' %}selected{% endif %}>Todas</option>
+      <option value="pendente" {% if filtro_estado == 'pendente' %}selected{% endif %}>Pendente</option>
+      <option value="confirmada" {% if filtro_estado == 'confirmada' %}selected{% endif %}>Confirmada</option>
+      <option value="cancelada" {% if filtro_estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
+    </select>
+  </form>
+
   <a class="top-link" href="{{ url_for('admin_panel') }}">← Voltar ao Painel</a>
 
   {% if reservas %}

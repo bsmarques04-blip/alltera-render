@@ -152,8 +152,14 @@ def admin_reservas():
     if "admin" not in session:
         return redirect(url_for("login"))
 
-    reservas = Reserva.select().order_by(Reserva.data_inicio.desc())
-    return render_template("admin_reservas.html", reservas=reservas)
+    estado = request.args.get("estado")
+    if estado and estado != "todas":
+        reservas = Reserva.select().where(Reserva.estado == estado).order_by(Reserva.data_inicio.desc())
+    else:
+        reservas = Reserva.select().order_by(Reserva.data_inicio.desc())
+
+    return render_template("admin_reservas.html", reservas=reservas, filtro_estado=estado)
+
 
 @app.route("/admin/cancelar_reserva/<int:id>")
 def admin_cancelar_reserva(id):
