@@ -275,17 +275,33 @@ def reservar_veiculo(veiculo_id):
         data_inicio = request.form.get("data_inicio")
         data_fim = request.form.get("data_fim")
 
-        if data_inicio and data_fim:
-            Reserva.create(
-                cliente=session["cliente_id"],
-                veiculo=veiculo,
-                data_inicio=datetime.strptime(data_inicio, "%Y-%m-%d"),
-                data_fim=datetime.strptime(data_fim, "%Y-%m-%d")
+        if not data_inicio or not data_fim:
+            flash("Preenche ambas as datas.", "warning")
+            return redirect(url_for("reservar_veiculo", veiculo_id=veiculo_id))
+
+        # Verificar conflitos de datas
+        conflito = Reserva.select().where(
+            (Reserva.veiculo == veiculo) &
+            (Reserva.estado != "cancelada") &
+            (
+                (Reserva.data_inicio <= data_fim) &
+                (Reserva.data_fim >= data_inicio)
             )
-            flash("Reserva efetuada com sucesso!", "success")
-            return redirect(url_for("index"))
-        else:
-            flash("Preenche as datas corretamente.", "warning")
+        ).exists()
+
+        if conflito:
+            flash("Este veículo já está reservado nessas datas.", "danger")
+            return redirect(url_for("reservar_veiculo", veiculo_id=veiculo_id))
+
+        # Criar reserva
+        Reserva.create(
+            cliente=session["cliente_id"],
+            veiculo=veiculo,
+            data_inicio=data_inicio,
+            data_fim=data_fim
+        )
+        flash("Reserva efetuada com sucesso!", "success")
+        return redirect(url_for("index"))
 
     return render_template("reserva_form.html", veiculo=veiculo)
 
