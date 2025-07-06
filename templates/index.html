@@ -14,14 +14,20 @@
       <li><a href="#">Veículos</a></li>
       <li><a href="#">Sobre</a></li>
       <li><a href="#">Contacto</a></li>
-      <li><a href="{{ url_for('login') }}">Login</a></li>
-      <li><a href="{{ url_for('register_client') }}">Registar</a></li>
+
+      {% if session.cliente_nome %}
+        <li><strong>Olá, {{ session.cliente_nome }}</strong></li>
+        <li><a href="{{ url_for('logout') }}">Logout</a></li>
+      {% else %}
+        <li><a href="{{ url_for('login') }}">Login</a></li>
+        <li><a href="{{ url_for('register_client') }}">Registar</a></li>
+      {% endif %}
     </ul>
   </nav>
 
   <header class="hero">
-    <h1></h1>
-    <p></p>
+    <h1>Aluguer de Carros e Motas de Luxo</h1>
+    <p>Conduz o teu sonho com estilo e segurança.</p>
   </header>
 
   <section class="cards-container">
