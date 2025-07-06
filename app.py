@@ -127,12 +127,12 @@ with app.app_context():
         )
         
 @app.route("/admin/veiculos")
-def admin_veiculos():
+def admin_veiculos_gestao():
     if "admin" not in session:
         return redirect(url_for("login"))
     
     veiculos = Veiculo.select().order_by(Veiculo.id.desc())
-    return render_template("admin_veiculos.html", veiculos=veiculos)
+    return render_template("admin_veiculos_gestao.html", veiculos=veiculos)
 
 
 if __name__ == "__main__":
