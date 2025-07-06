@@ -38,7 +38,7 @@
         <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="{{ veiculo.model }}">
         <h3>{{ veiculo.brand }} {{ veiculo.model }}</h3>
         <p>{{ veiculo.price_per_day }} € / dia</p>
-        <button class="btn-reservar">Reservar agora</button>
+        <a href="{{ url_for('reservar_veiculo', veiculo_id=veiculo.id) }}" class="btn-reservar">Reservar agora</a>
       </div>
       {% else %}
       <p>Nenhum carro disponível no momento.</p>
