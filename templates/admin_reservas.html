@@ -21,6 +21,9 @@
       display: inline-block;
       margin-bottom: 15px;
     }
+    select {
+      padding: 5px;
+    }
   </style>
 </head>
 <body>
@@ -45,7 +48,17 @@
       <td>{{ r.veiculo.type }}</td>
       <td>{{ r.data_inicio }}</td>
       <td>{{ r.data_fim }}</td>
-      <td>{{ r.estado }}</td>
+
+      <td>
+        <form method="POST" action="{{ url_for('admin_atualizar_reserva', id=r.id) }}">
+          <select name="estado" onchange="this.form.submit()">
+            <option value="pendente" {% if r.estado == 'pendente' %}selected{% endif %}>Pendente</option>
+            <option value="confirmada" {% if r.estado == 'confirmada' %}selected{% endif %}>Confirmada</option>
+            <option value="cancelada" {% if r.estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
+          </select>
+        </form>
+      </td>
+
       <td>
         {% if r.estado != "cancelada" %}
           <a href="{{ url_for('admin_cancelar_reserva', id=r.id) }}" onclick="return confirm('Cancelar esta reserva?');">Cancelar</a>

@@ -174,6 +174,24 @@ def admin_cancelar_reserva(id):
 
     return redirect(url_for("admin_reservas"))
 
+@app.route("/admin/atualizar_reserva/<int:id>", methods=["POST"])
+def admin_atualizar_reserva(id):
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    reserva = Reserva.get_or_none(Reserva.id == id)
+    if not reserva:
+        flash("Reserva não encontrada.", "danger")
+        return redirect(url_for("admin_reservas"))
+
+    novo_estado = request.form.get("estado")
+    if novo_estado:
+        reserva.estado = novo_estado
+        reserva.save()
+        flash(f"Estado atualizado para '{novo_estado}'.", "success")
+
+    return redirect(url_for("admin_reservas"))
+
 #Editar Veiuclos
 @app.route("/edit_vehicle/<int:id>", methods=["GET", "POST"])
 def edit_vehicle(id):
