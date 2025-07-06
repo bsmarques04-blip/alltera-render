@@ -193,5 +193,23 @@ def register_client():
 
     return render_template("register_client.html")
 
+@app.route("/login_cliente", methods=["GET", "POST"])
+def login_client():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        cliente = Cliente.get_or_none(Cliente.email == email)
+
+        if cliente and cliente.check_password(password):
+            session["cliente_id"] = cliente.id
+            session["cliente_nome"] = cliente.nome
+            flash(f"Bem-vindo, {cliente.nome}!", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("Credenciais inválidas!", "danger")
+
+    return render_template("login_client.html")
+            
 if __name__ == "__main__":
     app.run(debug=True)
