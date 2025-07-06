@@ -134,6 +134,31 @@ def admin_veiculos_gestao():
     veiculos = Veiculo.select().order_by(Veiculo.id.desc())
     return render_template("admin_veiculos_gestao.html", veiculos=veiculos)
 
+@app.route("/edit_vehicle/<int:id>", methods=["GET", "POST"])
+def edit_vehicle(id):
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    veiculo = Veiculo.get_or_none(Veiculo.id == id)
+    if not veiculo:
+        flash("Veículo não encontrado.", "danger")
+        return redirect(url_for("admin_veiculos_gestao"))
+
+    if request.method == "POST":
+        veiculo.type = request.form.get("type")
+        veiculo.brand = request.form.get("brand")
+        veiculo.model = request.form.get("model")
+        veiculo.year = int(request.form.get("year"))
+        veiculo.price_per_day = float(request.form.get("price_per_day"))
+        veiculo.categoria = Categoria.get_by_id(int(request.form.get("categoria")))
+        veiculo.save()
+
+        flash("Veículo atualizado com sucesso!", "success")
+        return redirect(url_for("admin_veiculos_gestao"))
+
+    categorias = Categoria.select()
+    return render_template("edit_vehicle.html", veiculo=veiculo, categorias=categorias)
+
 
 if __name__ == "__main__":
     app.run(debug=True)

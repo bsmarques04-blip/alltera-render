@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Editar Veículo</title>
+</head>
+<body>
+  <h1>Editar Veículo</h1>
+
+  <form method="POST">
+    <label>Tipo:</label>
+    <select name="type">
+      <option value="CARRO" {% if veiculo.type == "CARRO" %}selected{% endif %}>Carro</option>
+      <option value="MOTA" {% if veiculo.type == "MOTA" %}selected{% endif %}>Mota</option>
+    </select><br><br>
+
+    <label>Marca:</label>
+    <input type="text" name="brand" value="{{ veiculo.brand }}" required><br><br>
+
+    <label>Modelo:</label>
+    <input type="text" name="model" value="{{ veiculo.model }}" required><br><br>
+
+    <label>Ano:</label>
+    <input type="number" name="year" value="{{ veiculo.year }}" required><br><br>
+
+    <label>Preço por dia (€):</label>
+    <input type="number" step="0.01" name="price_per_day" value="{{ veiculo.price_per_day }}" required><br><br>
+
+    <label>Categoria:</label>
+    <select name="categoria">
+      {% for cat in categorias %}
+        <option value="{{ cat.id }}" {% if veiculo.categoria.id == cat.id %}selected{% endif %}>
+          {{ cat.nome }}
+        </option>
+      {% endfor %}
+    </select><br><br>
+
+    <button type="submit">Guardar Alterações</button>
+  </form>
+
+  <br>
+  <a href="{{ url_for('admin_veiculos_gestao') }}">← Voltar</a>
+</body>
+</html>
