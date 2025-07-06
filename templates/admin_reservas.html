@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Reservas - Administração</title>
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #eee;
+    }
+    .top-link {
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Reservas Realizadas</h1>
+  <a class="top-link" href="{{ url_for('admin_panel') }}">← Voltar ao Painel</a>
+
+  {% if reservas %}
+  <table>
+    <tr>
+      <th>Cliente</th>
+      <th>Veículo</th>
+      <th>Tipo</th>
+      <th>Data Início</th>
+      <th>Data Fim</th>
+      <th>Estado</th>
+    </tr>
+    {% for r in reservas %}
+    <tr>
+      <td>{{ r.cliente.nome }}</td>
+      <td>{{ r.veiculo.brand }} {{ r.veiculo.model }}</td>
+      <td>{{ r.veiculo.type }}</td>
+      <td>{{ r.data_inicio }}</td>
+      <td>{{ r.data_fim }}</td>
+      <td>{{ r.estado }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p>Não existem reservas registadas.</p>
+  {% endif %}
+</body>
+</html>

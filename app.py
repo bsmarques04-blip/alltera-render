@@ -147,6 +147,14 @@ def admin_veiculos_gestao():
     veiculos = Veiculo.select().order_by(Veiculo.id.desc())
     return render_template("admin_veiculos_gestao.html", veiculos=veiculos)
 
+@app.route("/admin/reservas")
+def admin_reservas():
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    reservas = Reserva.select().order_by(Reserva.data_inicio.desc())
+    return render_template("admin_reservas.html", reservas=reservas)
+
 @app.route("/edit_vehicle/<int:id>", methods=["GET", "POST"])
 def edit_vehicle(id):
     if "admin" not in session:
@@ -245,6 +253,26 @@ def minhas_reservas():
 
     reservas = Reserva.select().where(Reserva.cliente == session["cliente_id"]).order_by(Reserva.data_inicio.desc())
     return render_template("minhas_reservas.html", reservas=reservas)
+
+@app.route("/cancelar_reserva/<int:id>")
+def cancelar_reserva(id):
+    if "cliente_id" not in session:
+        flash("Tens de iniciar sessão.", "warning")
+        return redirect(url_for("login"))
+
+    reserva = Reserva.get_or_none(Reserva.id == id, Reserva.cliente == session["cliente_id"])
+    if not reserva:
+        flash("Reserva não encontrada.", "danger")
+        return redirect(url_for("minhas_reservas"))
+
+    if reserva.estado != "cancelada":
+        reserva.estado = "cancelada"
+        reserva.save()
+        flash("Reserva cancelada com sucesso.", "success")
+    else:
+        flash("Esta reserva já foi cancelada.", "info")
+
+    return redirect(url_for("minhas_reservas"))
 
 if __name__ == "__main__":
     app.run(debug=True)
