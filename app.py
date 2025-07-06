@@ -159,6 +159,20 @@ def edit_vehicle(id):
     categorias = Categoria.select()
     return render_template("edit_vehicle.html", veiculo=veiculo, categorias=categorias)
 
+@app.route("/delete_vehicle/<int:id>")
+def delete_vehicle(id):
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    veiculo = Veiculo.get_or_none(Veiculo.id == id)
+    if not veiculo:
+        flash("Veículo não encontrado.", "danger")
+        return redirect(url_for("admin_veiculos_gestao"))
+
+    veiculo.delete_instance()
+    flash("Veículo eliminado com sucesso!", "success")
+    return redirect(url_for("admin_veiculos_gestao"))
+
 
 if __name__ == "__main__":
     app.run(debug=True)
