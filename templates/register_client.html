@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Registar Cliente</title>
+</head>
+<body>
+  <h2>Registo de Cliente</h2>
+  <form method="POST">
+    <input type="text" name="nome" placeholder="Nome completo" required><br><br>
+    <input type="email" name="email" placeholder="Email" required><br><br>
+    <input type="password" name="password" placeholder="Palavra-passe" required><br><br>
+    <button type="submit">Registar</button>
+  </form>
+
+  <p>Já tens conta? <a href="{{ url_for('login_client') }}">Inicia sessão aqui</a>.</p>
+</body>
+</html>

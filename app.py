@@ -173,6 +173,25 @@ def delete_vehicle(id):
     flash("Veículo eliminado com sucesso!", "success")
     return redirect(url_for("admin_veiculos_gestao"))
 
+@app.route("/register", methods=["GET", "POST"])
+def register_client():
+    if request.method == "POST":
+        nome = request.form.get("nome")
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        if Cliente.select().where(Cliente.email == email).exists():
+            flash("Este email já está registado.", "danger")
+            return redirect(url_for("register_client"))
+
+        cliente = Cliente.create(nome=nome, email=email)
+        cliente.set_password(password)
+        cliente.save()
+
+        flash("Registo efetuado com sucesso! Faça login.", "success")
+        return redirect(url_for("login_client"))
+
+    return render_template("register_client.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
