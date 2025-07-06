@@ -1,5 +1,5 @@
 from flask import Flask, render_template, session, redirect, url_for, request, flash
-from models import db, Categoria, Veiculo
+from models import db, Categoria, Veiculo, Cliente
 import os
 from werkzeug.utils import secure_filename
 
@@ -98,7 +98,7 @@ def check_admin_session():
 with app.app_context():
     if db.is_closed():
         db.connect()
-    db.create_tables([Categoria, Veiculo], safe=True)
+    db.create_tables([Categoria, Veiculo, Cliente], safe=True)
 
     categorias = ["Económico", "Silver", "Gold"]
     for nome in categorias:
