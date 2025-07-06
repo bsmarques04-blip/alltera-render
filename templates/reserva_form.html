@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Reserva</title>
+</head>
+<body>
+  <h2>Reservar: {{ veiculo.brand }} {{ veiculo.model }}</h2>
+
+  <form method="POST">
+    <label>Data de Início:</label><br>
+    <input type="date" name="data_inicio" required><br><br>
+
+    <label>Data de Fim:</label><br>
+    <input type="date" name="data_fim" required><br><br>
+
+    <button type="submit">Confirmar Reserva</button>
+  </form>
+
+  <br>
+  <a href="{{ url_for('index') }}">← Voltar</a>
+</body>
+</html>

@@ -2,6 +2,7 @@ from flask import Flask, render_template, session, redirect, url_for, request, f
 from models import db, Categoria, Veiculo, Cliente, Reserva
 import os
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = "segredo"
@@ -205,6 +206,35 @@ def register_client():
         return redirect(url_for("login"))
 
     return render_template("register_client.html")
+# Reservas
+@app.route("/reserve/<int:veiculo_id>", methods=["GET", "POST"])
+def reservar_veiculo(veiculo_id):
+    if "cliente_id" not in session:
+        flash("Tens de iniciar sessão para reservar.", "warning")
+        return redirect(url_for("login"))
+
+    veiculo = Veiculo.get_or_none(Veiculo.id == veiculo_id)
+    if not veiculo:
+        flash("Veículo não encontrado.", "danger")
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        data_inicio = request.form.get("data_inicio")
+        data_fim = request.form.get("data_fim")
+
+        if data_inicio and data_fim:
+            Reserva.create(
+                cliente=session["cliente_id"],
+                veiculo=veiculo,
+                data_inicio=datetime.strptime(data_inicio, "%Y-%m-%d"),
+                data_fim=datetime.strptime(data_fim, "%Y-%m-%d")
+            )
+            flash("Reserva efetuada com sucesso!", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("Preenche as datas corretamente.", "warning")
+
+    return render_template("reserva_form.html", veiculo=veiculo)
 
 if __name__ == "__main__":
     app.run(debug=True)
