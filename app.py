@@ -8,69 +8,49 @@ app.secret_key = "segredo"
 
 UPLOAD_FOLDER = "static/images"
 
+# LOGIN 
 @app.route("/login", methods=["GET", "POST"])
-def login_unificado():
+def login():
     if request.method == "POST":
-        tipo = request.form.get("tipo_utilizador")
-
-        if tipo == "admin":
-            username = request.form.get("username")
-            password = request.form.get("password")
-
-            if username == "admin" and password == "1234":
-                session["admin"] = True
-                flash("Login de administrador efetuado com sucesso!", "success")
-                return redirect(url_for("admin_panel"))
-            else:
-                flash("Credenciais de administrador inválidas.", "danger")
-
-        elif tipo == "cliente":
-            email = request.form.get("email")
-            password = request.form.get("password")
-
-            cliente = Cliente.get_or_none(Cliente.email == email)
-            if cliente and cliente.check_password(password):
-                session["cliente_id"] = cliente.id
-                session["cliente_nome"] = cliente.nome
-                flash(f"Bem-vindo, {cliente.nome}!", "success")
-                return redirect(url_for("index"))
-            else:
-                flash("Credenciais de cliente inválidas.", "danger")
-
-    return render_template("login_unificado.html")
-
-# ROTAS ADMIN 
-#@app.route("/login", methods=["GET", "POST"])
-#def login():
-    if request.method == "POST":
-        username = request.form.get("username")
+        email = request.form.get("email")
         password = request.form.get("password")
 
-        if username == "admin" and password == "1234":
+        # Se for admin fixo:
+        if email == "admin@gmail.com" and password == "1234":
             session["admin"] = True
-            flash("Login efetuado com sucesso!", "success")
+            flash("Login de administrador efetuado com sucesso!", "success")
             return redirect(url_for("admin_panel"))
-        else:
-            flash("Credenciais inválidas", "danger")
 
-    return render_template("admin_login.html")
+        # Senão, tenta como cliente
+        cliente = Cliente.get_or_none(Cliente.email == email)
+        if cliente and cliente.check_password(password):
+            session["cliente_id"] = cliente.id
+            session["cliente_nome"] = cliente.nome
+            flash(f"Bem-vindo, {cliente.nome}!", "success")
+            return redirect(url_for("index"))
+
+        flash("Credenciais inválidas!", "danger")
+
+    return render_template("login_client.html")
+
 
 @app.route("/logout")
 def logout():
-    session.pop("admin", None)
-    flash("Sessão terminada com sucesso", "success")
-    return redirect(url_for("login"))
+    session.clear()
+    flash("Sessão terminada com sucesso!", "success")
+    return redirect(url_for("index"))
 
+#  PAINEL ADMIN
 @app.route("/admin")
 def admin_panel():
     if "admin" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("login_admin"))
     return render_template("admin_panel.html")
 
 @app.route("/add_vehicle", methods=["GET", "POST"])
 def add_vehicle():
     if "admin" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("login_admin"))
 
     if request.method == "POST":
         tipo = request.form.get("type")
@@ -109,7 +89,7 @@ def add_vehicle():
     categorias = Categoria.select()
     return render_template("add_vehicle.html", categorias=categorias)
 
-# LANDING PAGE 
+# LANDING PAGE
 @app.route("/")
 def index():
     veiculos = Veiculo.select().where(Veiculo.status == True)
@@ -117,13 +97,13 @@ def index():
     veiculos_motas = [v for v in veiculos if v.type == "MOTA"]
     return render_template("index.html", veiculos_carros=veiculos_carros, veiculos_motas=veiculos_motas)
 
-# PROTEGER ROTAS 
+#  PROTEGER ROTAS DE ADMIN
 @app.before_request
 def check_admin_session():
-    admin_routes = ["/admin", "/add_vehicle"]
+    admin_routes = ["/admin", "/add_vehicle", "/admin/veiculos", "/edit_vehicle", "/delete_vehicle"]
     if any(request.path.startswith(route) for route in admin_routes):
-        if "admin" not in session and request.endpoint != "login":
-            return redirect(url_for("login"))
+        if "admin" not in session and request.endpoint != "login_admin":
+            return redirect(url_for("login_admin"))
 
 # CRIAR TABELAS E DADOS
 with app.app_context():
@@ -156,11 +136,12 @@ with app.app_context():
             imagens="mota1.jpg",
             categoria=cat_eco,
         )
-        
+
+# CRUD ADMIN VEÍCULOS
 @app.route("/admin/veiculos")
 def admin_veiculos_gestao():
     if "admin" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("login_admin"))
     
     veiculos = Veiculo.select().order_by(Veiculo.id.desc())
     return render_template("admin_veiculos_gestao.html", veiculos=veiculos)
@@ -168,7 +149,7 @@ def admin_veiculos_gestao():
 @app.route("/edit_vehicle/<int:id>", methods=["GET", "POST"])
 def edit_vehicle(id):
     if "admin" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("login_admin"))
 
     veiculo = Veiculo.get_or_none(Veiculo.id == id)
     if not veiculo:
@@ -193,7 +174,7 @@ def edit_vehicle(id):
 @app.route("/delete_vehicle/<int:id>")
 def delete_vehicle(id):
     if "admin" not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for("login_admin"))
 
     veiculo = Veiculo.get_or_none(Veiculo.id == id)
     if not veiculo:
@@ -204,6 +185,7 @@ def delete_vehicle(id):
     flash("Veículo eliminado com sucesso!", "success")
     return redirect(url_for("admin_veiculos_gestao"))
 
+# REGISTO DE CLIENTE
 @app.route("/register", methods=["GET", "POST"])
 def register_client():
     if request.method == "POST":
@@ -220,27 +202,9 @@ def register_client():
         cliente.save()
 
         flash("Registo efetuado com sucesso! Faça login.", "success")
-        return redirect(url_for("login_client"))
+        return redirect(url_for("login"))
 
     return render_template("register_client.html")
 
-#@app.route("/login_cliente", methods=["GET", "POST"])
-#def login_client():
-    if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
-
-        cliente = Cliente.get_or_none(Cliente.email == email)
-
-        if cliente and cliente.check_password(password):
-            session["cliente_id"] = cliente.id
-            session["cliente_nome"] = cliente.nome
-            flash(f"Bem-vindo, {cliente.nome}!", "success")
-            return redirect(url_for("index"))
-        else:
-            flash("Credenciais inválidas!", "danger")
-
-    return render_template("login_client.html")
-            
 if __name__ == "__main__":
     app.run(debug=True)
