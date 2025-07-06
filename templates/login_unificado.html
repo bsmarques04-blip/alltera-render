@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <script>
+    function mostrarCampos(tipo) {
+      document.getElementById("admin_fields").style.display = tipo === "admin" ? "block" : "none";
+      document.getElementById("cliente_fields").style.display = tipo === "cliente" ? "block" : "none";
+    }
+  </script>
+</head>
+<body>
+  <h2>Login</h2>
+  <form method="POST">
+    <label>Entrar como:</label>
+    <select name="tipo_utilizador" onchange="mostrarCampos(this.value)">
+      <option value="cliente">Cliente</option>
+      <option value="admin">Administrador</option>
+    </select><br><br>
+
+    <div id="cliente_fields" style="display: block;">
+      <input type="email" name="email" placeholder="Email"><br><br>
+      <input type="password" name="password" placeholder="Palavra-passe"><br><br>
+    </div>
+
+    <div id="admin_fields" style="display: none;">
+      <input type="text" name="username" placeholder="Utilizador"><br><br>
+      <input type="password" name="password" placeholder="Palavra-passe"><br><br>
+    </div>
+
+    <button type="submit">Entrar</button>
+  </form>
+
+  <p>Não tens conta? <a href="{{ url_for('register_client') }}">Regista-te aqui</a></p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <p>{{ message }}</p>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+</body>
+</html>

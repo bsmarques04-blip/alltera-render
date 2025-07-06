@@ -8,9 +8,40 @@ app.secret_key = "segredo"
 
 UPLOAD_FOLDER = "static/images"
 
-# ROTAS ADMIN 
 @app.route("/login", methods=["GET", "POST"])
-def login():
+def login_unificado():
+    if request.method == "POST":
+        tipo = request.form.get("tipo_utilizador")
+
+        if tipo == "admin":
+            username = request.form.get("username")
+            password = request.form.get("password")
+
+            if username == "admin" and password == "1234":
+                session["admin"] = True
+                flash("Login de administrador efetuado com sucesso!", "success")
+                return redirect(url_for("admin_panel"))
+            else:
+                flash("Credenciais de administrador inválidas.", "danger")
+
+        elif tipo == "cliente":
+            email = request.form.get("email")
+            password = request.form.get("password")
+
+            cliente = Cliente.get_or_none(Cliente.email == email)
+            if cliente and cliente.check_password(password):
+                session["cliente_id"] = cliente.id
+                session["cliente_nome"] = cliente.nome
+                flash(f"Bem-vindo, {cliente.nome}!", "success")
+                return redirect(url_for("index"))
+            else:
+                flash("Credenciais de cliente inválidas.", "danger")
+
+    return render_template("login_unificado.html")
+
+# ROTAS ADMIN 
+#@app.route("/login", methods=["GET", "POST"])
+#def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
@@ -193,8 +224,8 @@ def register_client():
 
     return render_template("register_client.html")
 
-@app.route("/login_cliente", methods=["GET", "POST"])
-def login_client():
+#@app.route("/login_cliente", methods=["GET", "POST"])
+#def login_client():
     if request.method == "POST":
         email = request.form.get("email")
         password = request.form.get("password")
