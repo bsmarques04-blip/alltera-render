@@ -155,6 +155,26 @@ def admin_reservas():
     reservas = Reserva.select().order_by(Reserva.data_inicio.desc())
     return render_template("admin_reservas.html", reservas=reservas)
 
+@app.route("/admin/cancelar_reserva/<int:id>")
+def admin_cancelar_reserva(id):
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    reserva = Reserva.get_or_none(Reserva.id == id)
+    if not reserva:
+        flash("Reserva não encontrada.", "danger")
+        return redirect(url_for("admin_reservas"))
+
+    if reserva.estado != "cancelada":
+        reserva.estado = "cancelada"
+        reserva.save()
+        flash("Reserva cancelada pelo administrador.", "success")
+    else:
+        flash("Reserva já estava cancelada.", "info")
+
+    return redirect(url_for("admin_reservas"))
+
+#Editar Veiuclos
 @app.route("/edit_vehicle/<int:id>", methods=["GET", "POST"])
 def edit_vehicle(id):
     if "admin" not in session:
@@ -180,6 +200,7 @@ def edit_vehicle(id):
     categorias = Categoria.select()
     return render_template("edit_vehicle.html", veiculo=veiculo, categorias=categorias)
 
+# Apagar Veículos
 @app.route("/delete_vehicle/<int:id>")
 def delete_vehicle(id):
     if "admin" not in session:
