@@ -39,3 +39,10 @@ class Cliente(BaseModel):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+class Reserva(BaseModel):
+    cliente = ForeignKeyField(Cliente, backref='reservas')
+    veiculo = ForeignKeyField(Veiculo, backref='reservas')
+    data_inicio = DateField()
+    data_fim = DateField()
+    estado = CharField(default="pendente")
