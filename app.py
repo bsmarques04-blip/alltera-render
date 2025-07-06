@@ -198,7 +198,7 @@ def register_client():
             flash("Este email já está registado.", "danger")
             return redirect(url_for("register_client"))
 
-        cliente = Cliente.create(nome=nome, email=email)
+        cliente = Cliente(nome=nome, email=email)
         cliente.set_password(password)
         cliente.save()
 
