@@ -125,6 +125,15 @@ with app.app_context():
             imagens="mota1.jpg",
             categoria=cat_eco,
         )
+        
+@app.route("/admin/veiculos")
+def admin_veiculos():
+    if "admin" not in session:
+        return redirect(url_for("login"))
+    
+    veiculos = Veiculo.select().order_by(Veiculo.id.desc())
+    return render_template("admin_veiculos.html", veiculos=veiculos)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
