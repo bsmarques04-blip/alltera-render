@@ -236,5 +236,15 @@ def reservar_veiculo(veiculo_id):
 
     return render_template("reserva_form.html", veiculo=veiculo)
 
+# Minhas Reservas
+@app.route("/minhas_reservas")
+def minhas_reservas():
+    if "cliente_id" not in session:
+        flash("Tens de iniciar sessão para ver as tuas reservas.", "warning")
+        return redirect(url_for("login"))
+
+    reservas = Reserva.select().where(Reserva.cliente == session["cliente_id"]).order_by(Reserva.data_inicio.desc())
+    return render_template("minhas_reservas.html", reservas=reservas)
+
 if __name__ == "__main__":
     app.run(debug=True)

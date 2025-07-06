@@ -18,6 +18,7 @@
       {% if session.cliente_nome %}
         <li><strong>Olá, {{ session.cliente_nome }}</strong></li>
         <li><a href="{{ url_for('logout') }}">Logout</a></li>
+        <li><a href="{{ url_for('minhas_reservas') }}">As minhas reservas</a></li>
       {% else %}
         <li><a href="{{ url_for('login') }}">Login</a></li>
         <li><a href="{{ url_for('register_client') }}">Registar</a></li>

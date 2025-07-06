@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>As Minhas Reservas</title>
+</head>
+<body>
+  <h2>As Minhas Reservas</h2>
+
+  {% if reservas %}
+    <table border="1" cellpadding="10" cellspacing="0">
+      <tr>
+        <th>Veículo</th>
+        <th>Tipo</th>
+        <th>Data Início</th>
+        <th>Data Fim</th>
+        <th>Estado</th>
+      </tr>
+      {% for r in reservas %}
+      <tr>
+        <td>{{ r.veiculo.brand }} {{ r.veiculo.model }}</td>
+        <td>{{ r.veiculo.type }}</td>
+        <td>{{ r.data_inicio }}</td>
+        <td>{{ r.data_fim }}</td>
+        <td>{{ r.estado }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>Não tens reservas efetuadas.</p>
+  {% endif %}
+
+  <br>
+  <a href="{{ url_for('index') }}">← Voltar à página inicial</a>
+</body>
+</html>
