@@ -259,6 +259,7 @@ def register_client():
         return redirect(url_for("login"))
 
     return render_template("register_client.html")
+
 # Reservas
 @app.route("/reserve/<int:veiculo_id>", methods=["GET", "POST"])
 def reservar_veiculo(veiculo_id):
@@ -279,13 +280,30 @@ def reservar_veiculo(veiculo_id):
             flash("Preenche ambas as datas.", "warning")
             return redirect(url_for("reservar_veiculo", veiculo_id=veiculo_id))
 
+        # Validar formato e lógica das datas
+        try:
+            d_inicio = datetime.strptime(data_inicio, "%Y-%m-%d").date()
+            d_fim = datetime.strptime(data_fim, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Formato de data inválido.", "danger")
+            return redirect(url_for("reservar_veiculo", veiculo_id=veiculo_id))
+
+        hoje = datetime.today().date()
+        if d_inicio < hoje:
+            flash("A data de início não pode ser anterior a hoje.", "warning")
+            return redirect(url_for("reservar_veiculo", veiculo_id=veiculo_id))
+
+        if d_fim <= d_inicio:
+            flash("A data de fim deve ser posterior à data de início.", "warning")
+            return redirect(url_for("reservar_veiculo", veiculo_id=veiculo_id))
+
         # Verificar conflitos de datas
         conflito = Reserva.select().where(
             (Reserva.veiculo == veiculo) &
             (Reserva.estado != "cancelada") &
             (
-                (Reserva.data_inicio <= data_fim) &
-                (Reserva.data_fim >= data_inicio)
+                (Reserva.data_inicio <= d_fim) &
+                (Reserva.data_fim >= d_inicio)
             )
         ).exists()
 
@@ -297,8 +315,8 @@ def reservar_veiculo(veiculo_id):
         Reserva.create(
             cliente=session["cliente_id"],
             veiculo=veiculo,
-            data_inicio=data_inicio,
-            data_fim=data_fim
+            data_inicio=d_inicio,
+            data_fim=d_fim
         )
         flash("Reserva efetuada com sucesso!", "success")
         return redirect(url_for("index"))
