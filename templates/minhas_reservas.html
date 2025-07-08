@@ -5,42 +5,50 @@
   <title>As Minhas Reservas</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-  <h2>As Minhas Reservas</h2>
+<body class="bg-light">
 
-  {% if reservas %}
-    <table border="1" cellpadding="10" cellspacing="0">
-      <tr>
-        <th>Veículo</th>
-        <th>Tipo</th>
-        <th>Data Início</th>
-        <th>Data Fim</th>
-        <th>Estado</th>
-        <th>Ação</th>
-      </tr>
-      {% for r in reservas %}
-      <tr>
-        <td>{{ r.veiculo.brand }} {{ r.veiculo.model }}</td>
-        <td>{{ r.veiculo.type }}</td>
-        <td>{{ r.data_inicio }}</td>
-        <td>{{ r.data_fim }}</td>
-        <td>{{ r.estado }}</td>
-        <td>
-          {% if r.estado != "cancelada" %}
-            <a href="{{ url_for('cancelar_reserva', id=r.id) }}" onclick="return confirm('Tens a certeza que queres cancelar esta reserva?');">Cancelar</a>
-          {% else %}
-            —
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  {% else %}
-    <p>Não tens reservas efetuadas.</p>
-  {% endif %}
+  <div class="container py-4">
 
-  <br>
-  <a href="{{ url_for('index') }}">← Voltar à página inicial</a>
+    <h2>As Minhas Reservas</h2>
+
+    {% if reservas %}
+      <table class="table table-bordered mt-3">
+        <thead class="table-light">
+          <tr>
+            <th>Veículo</th>
+            <th>Tipo</th>
+            <th>Data Início</th>
+            <th>Data Fim</th>
+            <th>Estado</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reservas %}
+          <tr>
+            <td>{{ r.veiculo.brand }} {{ r.veiculo.model }}</td>
+            <td>{{ r.veiculo.type }}</td>
+            <td>{{ r.data_inicio }}</td>
+            <td>{{ r.data_fim }}</td>
+            <td>{{ r.estado }}</td>
+            <td>
+              {% if r.estado != "cancelada" %}
+                <a href="{{ url_for('cancelar_reserva', id=r.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Tens a certeza que queres cancelar esta reserva?');">Cancelar</a>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="mt-4">Não tens reservas efetuadas.</p>
+    {% endif %}
+
+    <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">← Voltar à página inicial</a>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
