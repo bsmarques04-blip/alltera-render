@@ -12,6 +12,14 @@ app.secret_key = "segredo"
 
 UPLOAD_FOLDER = "static/images"
 
+@app.route("/sobre")
+def sobre():
+    return render_template("sobre.html")
+
+@app.route("/contacto")
+def contacto():
+    return render_template("contacto.html")
+
 # LOGIN 
 @app.route("/login", methods=["GET", "POST"])
 def login():
