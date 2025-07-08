@@ -3,16 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <title>Painel de Administração</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
-<body>
-  <h1>Painel de Administração</h1>
-  <p>Bem-vindo, administrador!</p>
+<body class="admin-dashboard">
 
-  <ul>
-    <li><a href="{{ url_for('add_vehicle') }}">Adicionar Veículo</a></li>
-    <li><a href="{{ url_for('logout') }}">Terminar Sessão</a></li>
-    <li><a href="{{ url_for('admin_veiculos_gestao') }}">Gerir Veículos</a></li>
-    <li><a href="{{ url_for('admin_reservas') }}">Reservas</a></li>
-  </ul>
+  <div class="admin-container">
+    <h1>Painel de Administração</h1>
+    <p class="subinfo">Bem-vindo, administrador. Escolhe uma ação abaixo.</p>
+
+    <div class="admin-actions">
+      <a href="{{ url_for('add_vehicle') }}" class="admin-card">➕ Adicionar Veículo</a>
+      <a href="{{ url_for('admin_veiculos_gestao') }}" class="admin-card">🚗 Gerir Veículos</a>
+      <a href="{{ url_for('admin_reservas') }}" class="admin-card">📋 Ver Reservas</a>
+      <a href="{{ url_for('logout') }}" class="admin-card logout">⛔ Terminar Sessão</a>
+    </div>
+  </div>
+
 </body>
 </html>

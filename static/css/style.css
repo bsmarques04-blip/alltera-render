@@ -132,3 +132,60 @@ spline-viewer {
     margin-top: 40px;
   }
 }
+
+/* Admin */
+.admin-dashboard {
+  background-color: #000;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  padding: 80px 40px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.admin-container {
+  max-width: 900px;
+  width: 100%;
+}
+
+.admin-container h1 {
+  font-size: 38px;
+  margin-bottom: 10px;
+}
+
+.admin-container .subinfo {
+  color: #bbb;
+  margin-bottom: 40px;
+  font-size: 16px;
+}
+
+.admin-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.admin-card {
+  background: #111;
+  padding: 30px;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+  font-weight: 600;
+  font-size: 18px;
+  border: 1px solid #222;
+  transition: 0.3s;
+  text-decoration: none;
+}
+
+.admin-card:hover {
+  background: #00ffff;
+  color: #000;
+}
+
+.admin-card.logout:hover {
+  background: #ff4d4d;
+  color: white;
+}
