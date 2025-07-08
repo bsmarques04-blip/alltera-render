@@ -3,73 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <title>MotoCarGo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.10.24/build/spline-viewer.js"></script>
 </head>
 <body>
-  <nav class="navbar">
+
+  <nav>
     <div class="logo">MotoCarGo</div>
     <ul class="nav-links">
       <li><a href="#">Início</a></li>
-      <li><a href="#">Veículos</a></li>
+      <li><a href="#colecao">Coleção</a></li>
       <li><a href="#">Sobre</a></li>
       <li><a href="#">Contacto</a></li>
-
-      {% if session.cliente_nome %}
-        <li><strong>Olá, {{ session.cliente_nome }}</strong></li>
-        <li><a href="{{ url_for('logout') }}">Logout</a></li>
-        <li><a href="{{ url_for('minhas_reservas') }}">As minhas reservas</a></li>
-      {% else %}
-        <li><a href="{{ url_for('login') }}">Login</a></li>
-        <li><a href="{{ url_for('register_client') }}">Registar</a></li>
-      {% endif %}
     </ul>
   </nav>
 
-  <header class="hero">
-    <h1>Aluguer de Carros e Motas de Luxo</h1>
-    <p>Conduz o teu sonho com estilo e segurança.</p>
-  </header>
-
-  <section class="cards-container">
-    <h2>Carros Disponíveis</h2>
-    <div class="cards">
-      {% for veiculo in veiculos_carros %}
-      <div class="card">
-        <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="{{ veiculo.model }}">
-        <h3>{{ veiculo.brand }} {{ veiculo.model }}</h3>
-        <p>{{ veiculo.price_per_day }} € / dia</p>
-        <a href="{{ url_for('reservar_veiculo', veiculo_id=veiculo.id) }}" class="btn-reservar">Reservar agora</a>
+  <section class="hero">
+    <div class="hero-text">
+      <span>APRESENTAMOS</span>
+      <h1>Aluguer Premium de Veículos</h1>
+      <p>A forma mais inteligente e elegante de conduzir o teu sonho. Reserva já o teu carro ou mota de luxo com a MotoCarGo.</p>
+      <div class="buttons">
+        <a href="#colecao" class="btn-primario">Ver Coleção</a>
+        <a href="{{ url_for('login') }}" class="btn-secundario">Login</a>
       </div>
-      {% else %}
-      <p>Nenhum carro disponível no momento.</p>
-      {% endfor %}
+    </div>
+
+    <div class="spline-container">
+      <spline-viewer url="https://prod.spline.design/T28MqcMMykQawsZi/scene.splinecode"></spline-viewer>
     </div>
   </section>
 
-  <section class="cards-container">
-    <h2>Motas Disponíveis</h2>
-    <div class="cards">
-      {% for veiculo in veiculos_motas %}
-      <div class="card">
-        <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="{{ veiculo.model }}">
-        <h3>{{ veiculo.brand }} {{ veiculo.model }}</h3>
-        <p>{{ veiculo.price_per_day }} € / dia</p>
-        <a href="{{ url_for('reservar_veiculo', veiculo_id=veiculo.id) }}" class="btn-reservar">Reservar agora</a>
-      </div>
-      {% else %}
-      <p>Nenhuma mota disponível no momento.</p>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="about">
-    <h2>Sobre Nós</h2>
-    <p>Na MotoCarGo, oferecemos uma seleção exclusiva de carros e motas de luxo para alugar. Conduz o teu sonho.</p>
-  </section>
-
-  <footer>
-    <p>© 2025 MotoCarGo. Todos os direitos reservados.</p>
-  </footer>
 </body>
 </html>
