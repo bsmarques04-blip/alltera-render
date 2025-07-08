@@ -7,11 +7,15 @@
 <body>
   <h2>Registo</h2>
   <form method="POST">
-    <input type="text" name="nome" placeholder="Nome completo" required><br><br>
-    <input type="email" name="email" placeholder="Email" required><br><br>
-    <input type="password" name="password" placeholder="Palavra-passe" required><br><br>
-    <button type="submit">Registar</button>
-  </form>
+  <input type="text" name="nome" placeholder="Nome completo" required>
+  <input type="email" name="email" placeholder="Email" required>
+  <input type="password" name="password" placeholder="Palavra-passe" required>
+  <input type="text" name="telefone" placeholder="Telefone">
+  <input type="text" name="nif" placeholder="NIF">
+  <input type="text" name="morada" placeholder="Morada">
+  <button type="submit">Registar</button>
+</form>
+
 
   <p>Já tens conta? <a href="{{ url_for('login') }}">Inicia sessão aqui</a>.</p>
 </body>

@@ -30,9 +30,12 @@ class Veiculo(BaseModel):
     categoria = ForeignKeyField(Categoria, backref='veiculos')
 
 class Cliente(BaseModel):
-    nome = CharField(max_length=100)
+    nome = CharField()
     email = CharField(unique=True)
     password_hash = CharField()
+    telefone = CharField(null=True)
+    nif = CharField(null=True)
+    morada = TextField(null=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

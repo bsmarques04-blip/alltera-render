@@ -246,12 +246,21 @@ def register_client():
         nome = request.form.get("nome")
         email = request.form.get("email")
         password = request.form.get("password")
+        telefone = request.form.get("telefone")
+        nif = request.form.get("nif")
+        morada = request.form.get("morada")
 
         if Cliente.select().where(Cliente.email == email).exists():
             flash("Este email já está registado.", "danger")
             return redirect(url_for("register_client"))
 
-        cliente = Cliente(nome=nome, email=email)
+        cliente = Cliente(
+            nome=nome,
+            email=email,
+            telefone=telefone,
+            nif=nif,
+            morada=morada
+        )
         cliente.set_password(password)
         cliente.save()
 
