@@ -3,75 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <title>Gestão de Veículos</title>
-  <style>
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    th, td {
-      padding: 12px;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-    th {
-      background-color: #f4f4f4;
-    }
-    a.btn {
-      padding: 6px 12px;
-      border-radius: 4px;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    .edit {
-      background-color: #4CAF50;
-      color: white;
-    }
-    .delete {
-      background-color: #f44336;
-      color: white;
-    }
-    .top-link {
-      display: inline-block;
-      margin-bottom: 15px;
-    }
-  </style>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body>
-  <h1>Gestão de Veículos</h1>
+<body class="admin-body">
+  <div class="admin-container">
+    <h1>Gestão de Veículos</h1>
 
-  <a class="top-link" href="{{ url_for('admin_panel') }}">← Voltar ao Painel</a>
+    <div class="admin-links">
+      <a href="{{ url_for('admin_panel') }}" class="btn-secundario">← Voltar ao Painel</a>
+      <a href="{{ url_for('add_vehicle') }}" class="btn-primario">+ Adicionar Veículo</a>
+    </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Tipo</th>
-        <th>Marca</th>
-        <th>Modelo</th>
-        <th>Ano</th>
-        <th>Preço/Dia</th>
-        <th>Categoria</th>
-        <th>Ações</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for veiculo in veiculos %}
-      <tr>
-        <td>{{ veiculo.id }}</td>
-        <td>{{ veiculo.type }}</td>
-        <td>{{ veiculo.brand }}</td>
-        <td>{{ veiculo.model }}</td>
-        <td>{{ veiculo.year }}</td>
-        <td>{{ veiculo.price_per_day }} €</td>
-        <td>{{ veiculo.categoria.nome }}</td>
-        <td>
-          <a href="{{ url_for('edit_vehicle', id=veiculo.id) }}" class="btn edit">Editar</a>
-          <a href="{{ url_for('delete_vehicle', id=veiculo.id) }}" class="btn delete" onclick="return confirm('Tens a certeza que queres eliminar este veículo?');">Eliminar</a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    {% if veiculos %}
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Tipo</th>
+          <th>Marca</th>
+          <th>Modelo</th>
+          <th>Ano</th>
+          <th>Preço/Dia</th>
+          <th>Categoria</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for veiculo in veiculos %}
+        <tr>
+          <td>{{ veiculo.id }}</td>
+          <td>{{ veiculo.type }}</td>
+          <td>{{ veiculo.brand }}</td>
+          <td>{{ veiculo.model }}</td>
+          <td>{{ veiculo.year }}</td>
+          <td>{{ veiculo.price_per_day }} €</td>
+          <td>{{ veiculo.categoria.nome }}</td>
+          <td>
+            <a href="{{ url_for('edit_vehicle', id=veiculo.id) }}" class="btn edit">Editar</a>
+            <a href="{{ url_for('delete_vehicle', id=veiculo.id) }}" class="btn delete" onclick="return confirm('Tens a certeza que queres eliminar este veículo?');">Eliminar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p>Não existem veículos registados.</p>
+    {% endif %}
+  </div>
 </body>
 </html>

@@ -133,7 +133,7 @@ spline-viewer {
   }
 }
 
-/* Admin */
+/* Painel Admin */
 .admin-dashboard {
   background-color: #000;
   color: white;
@@ -187,5 +187,92 @@ spline-viewer {
 
 .admin-card.logout:hover {
   background: #ff4d4d;
+  color: white;
+}
+
+/* Gestão de veiculos Admin */
+.admin-body {
+  background-color: #0f0f0f;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  padding: 40px;
+  min-height: 100vh;
+}
+
+.admin-container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.admin-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #1a1a1a;
+  color: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.admin-table th, .admin-table td {
+  padding: 14px 12px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+.admin-table th {
+  background-color: #222;
+  text-transform: uppercase;
+  font-size: 14px;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn.edit {
+  background-color: #00cccc;
+  color: black;
+}
+
+.btn.delete {
+  background-color: #ff4444;
+  color: white;
+}
+
+.btn-primario {
+  background-color: #00ffff;
+  color: black;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-secundario {
+  border: 1px solid #aaa;
+  color: #aaa;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-primario:hover {
+  background-color: #00cccc;
+}
+
+.btn-secundario:hover {
+  border-color: white;
   color: white;
 }
