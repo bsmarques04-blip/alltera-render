@@ -1,8 +1,11 @@
-from flask import Flask, render_template, session, redirect, url_for, request, flash
+from flask import Flask, render_template, session, redirect, url_for, request, flash, make_response
 from models import db, Categoria, Veiculo, Cliente, Reserva
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import csv
+import io
+import pandas as pd
 
 app = Flask(__name__)
 app.secret_key = "segredo"
@@ -45,13 +48,13 @@ def logout():
 @app.route("/admin")
 def admin_panel():
     if "admin" not in session:
-        return redirect(url_for("login_admin"))
+        return redirect(url_for("login"))
     return render_template("admin_panel.html")
 
 @app.route("/add_vehicle", methods=["GET", "POST"])
 def add_vehicle():
     if "admin" not in session:
-        return redirect(url_for("login_admin"))
+        return redirect(url_for("admin"))
 
     if request.method == "POST":
         tipo = request.form.get("type")
@@ -104,7 +107,7 @@ def check_admin_session():
     admin_routes = ["/admin", "/add_vehicle", "/admin/veiculos", "/edit_vehicle", "/delete_vehicle"]
     if any(request.path.startswith(route) for route in admin_routes):
         if "admin" not in session and request.endpoint != "login_admin":
-            return redirect(url_for("login_admin"))
+            return redirect(url_for("login"))
 
 # CRIAR TABELAS E DADOS
 with app.app_context():
@@ -142,7 +145,7 @@ with app.app_context():
 @app.route("/admin/veiculos")
 def admin_veiculos_gestao():
     if "admin" not in session:
-        return redirect(url_for("login_admin"))
+        return redirect(url_for("login"))
     
     veiculos = Veiculo.select().order_by(Veiculo.id.desc())
     return render_template("admin_veiculos_gestao.html", veiculos=veiculos)
@@ -198,6 +201,66 @@ def admin_atualizar_reserva(id):
 
     return redirect(url_for("admin_reservas"))
 
+# Exportar Reservas
+@app.route("/admin/exportar_reservas/csv")
+def exportar_reservas_csv():
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    reservas = Reserva.select()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Cliente", "Veículo", "Tipo", "Data Início", "Data Fim", "Estado"])
+
+    for r in reservas:
+        writer.writerow([
+            r.id,
+            r.cliente.nome,
+            f"{r.veiculo.brand} {r.veiculo.model}",
+            r.veiculo.type,
+            r.data_inicio,
+            r.data_fim,
+            r.estado
+        ])
+
+    response = make_response(output.getvalue())
+    response.headers["Content-Disposition"] = "attachment; filename=reservas.csv"
+    response.headers["Content-type"] = "text/csv"
+    return response
+
+
+@app.route("/admin/exportar_reservas/excel")
+def exportar_reservas_excel():
+    if "admin" not in session:
+        return redirect(url_for("login"))
+
+    reservas = Reserva.select()
+    data = []
+
+    for r in reservas:
+        data.append({
+            "ID": r.id,
+            "Cliente": r.cliente.nome,
+            "Veículo": f"{r.veiculo.brand} {r.veiculo.model}",
+            "Tipo": r.veiculo.type,
+            "Data Início": r.data_inicio,
+            "Data Fim": r.data_fim,
+            "Estado": r.estado
+        })
+
+    df = pd.DataFrame(data)
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Reservas')
+
+    output.seek(0)
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = "attachment; filename=reservas.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
+
 #Editar Veiuclos
 @app.route("/edit_vehicle/<int:id>", methods=["GET", "POST"])
 def edit_vehicle(id):
@@ -228,7 +291,7 @@ def edit_vehicle(id):
 @app.route("/delete_vehicle/<int:id>")
 def delete_vehicle(id):
     if "admin" not in session:
-        return redirect(url_for("login_admin"))
+        return redirect(url_for("login"))
 
     veiculo = Veiculo.get_or_none(Veiculo.id == id)
     if not veiculo:

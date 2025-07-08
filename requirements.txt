@@ -3,3 +3,5 @@
 Flask>=2.2
 peewee
 python-dotenv>=0.20
+openpyxl
+pandas

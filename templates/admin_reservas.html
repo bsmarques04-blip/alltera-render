@@ -24,6 +24,20 @@
     select {
       padding: 5px;
     }
+    .export-buttons {
+      margin: 15px 0;
+    }
+    .export-buttons a {
+      margin-right: 10px;
+      padding: 6px 10px;
+      background-color: #333;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .export-buttons a:hover {
+      background-color: #555;
+    }
   </style>
 </head>
 <body>
@@ -38,6 +52,11 @@
       <option value="cancelada" {% if filtro_estado == 'cancelada' %}selected{% endif %}>Cancelada</option>
     </select>
   </form>
+
+  <div class="export-buttons">
+    <a href="{{ url_for('exportar_reservas_csv') }}">Exportar CSV</a>
+    <a href="{{ url_for('exportar_reservas_excel') }}">Exportar Excel</a>
+  </div>
 
   <a class="top-link" href="{{ url_for('admin_panel') }}">← Voltar ao Painel</a>
 
@@ -69,7 +88,7 @@
           </select>
         </form>
       </td>
-
+      
       <td>
         {% if r.estado != "cancelada" %}
           <a href="{{ url_for('admin_cancelar_reserva', id=r.id) }}" onclick="return confirm('Cancelar esta reserva?');">Cancelar</a>
