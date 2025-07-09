@@ -8,6 +8,41 @@
 <body class="bg-light">
 
   <div class="container py-4">
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top bg-dark bg-opacity-75 px-5 py-3 shadow">
+  <div class="container-fluid d-flex justify-content-between align-items-center">
+
+    <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">MotoCarGo</a>
+
+    <div class="mx-auto">
+      <ul class="navbar-nav gap-4">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Início</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('colecao') }}">Coleção</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('sobre') }}">Sobre</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('contacto') }}">Contacto</a></li>
+      </ul>
+    </div>
+
+    {% if session.get('cliente_id') %}
+    <div class="dropdown">
+      <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-person-circle"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">As Minhas Reservas</a></li>
+        <li><a class="dropdown-item" href="#">Perfil</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a></li>
+      </ul>
+    </div>
+    {% else %}
+    <div>
+      <a href="{{ url_for('login') }}" class="btn btn-outline-light me-2">Login</a>
+      <a href="{{ url_for('register_client') }}" class="btn btn-primary">Registar</a>
+    </div>
+    {% endif %}
+  </div>
+</nav>
+
 
     <h2>As Minhas Reservas</h2>
 
