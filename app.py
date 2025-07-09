@@ -20,6 +20,22 @@ def sobre():
 def contacto():
     return render_template("contacto.html")
 
+@app.route("/colecao")
+def colecao():
+    tipo = request.args.get("tipo")  # Ex: "CARRO"
+    categoria_id = request.args.get("categoria")  # Ex: "1"
+
+    query = Veiculo.select().where(Veiculo.status == True)
+
+    if tipo:
+        query = query.where(Veiculo.type == tipo)
+    if categoria_id:
+        query = query.where(Veiculo.categoria == int(categoria_id))
+
+    categorias = Categoria.select()
+    return render_template("colecao.html", veiculos=query, categorias=categorias, tipo_selecionado=tipo, categoria_selecionada=categoria_id)
+
+
 # LOGIN 
 @app.route("/login", methods=["GET", "POST"])
 def login():
