@@ -41,7 +41,7 @@ nav {
 }
 
 .nav-links a:hover {
-  color: #00ffff;
+  color: #6f42c1;
 }
 
 /* Hero */
@@ -101,12 +101,12 @@ nav {
 }
 
 .btn-primario:hover {
-  background: #00cccc;
+  background: #6f42c1;
 }
 
 .btn-secundario:hover {
   border-color: #aaa;
-  color: #00ffff;
+  color: #6f42c1;
 }
 
 /* Spline */
@@ -181,7 +181,7 @@ spline-viewer {
 }
 
 .admin-card:hover {
-  background: #00ffff;
+  background: #6f42c1;
   color: #000;
 }
 
@@ -241,7 +241,7 @@ spline-viewer {
 }
 
 .btn.edit {
-  background-color: #00cccc;
+  background-color: #6f42c1;
   color: black;
 }
 
@@ -251,7 +251,7 @@ spline-viewer {
 }
 
 .btn-primario {
-  background-color: #00ffff;
+  background-color: #6f42c1;
   color: black;
   padding: 10px 20px;
   border-radius: 6px;
@@ -269,7 +269,7 @@ spline-viewer {
 }
 
 .btn-primario:hover {
-  background-color: #00cccc;
+  background-color: #6f42c1;
 }
 
 .btn-secundario:hover {
