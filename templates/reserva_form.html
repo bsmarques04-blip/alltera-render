@@ -11,9 +11,16 @@
 
 <div class="container">
   <h2 class="text-center fw-bold mb-4">Reserva: {{ veiculo.brand }} {{ veiculo.model }}</h2>
-  
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} text-center">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
   <div class="row">
-    <!-- Formulário -->
     <div class="col-md-7">
       <div class="reserva-card">
         <form method="POST">
@@ -29,13 +36,16 @@
 
           <div class="mb-3">
             <label for="metodo_pagamento">Método de Pagamento</label>
-            <select id="metodo_pagamento" name="metodo_pagamento" class="form-select" required>
+            <select id="metodo_pagamento" name="metodo_pagamento" class="form-select" required onchange="mostrarDetalhesPagamento()">
               <option value="" disabled selected>Seleciona uma opção</option>
               <option value="cartao">Cartão de Crédito</option>
               <option value="mbway">MB Way</option>
               <option value="transferencia">Transferência Bancária</option>
             </select>
           </div>
+
+          
+          <div id="info_pagamento" class="text-muted small mb-3" style="display: none;"></div>
 
           <div class="mb-3">
             <label for="observacoes">Observações (opcional)</label>
@@ -47,12 +57,15 @@
             <label class="form-check-label" for="termos">Aceito os <a href="#">termos e condições</a></label>
           </div>
 
+          <div class="mb-3">
+            <strong>Total estimado:</strong> <span id="valor_total">—</span>
+          </div>
+
           <button type="submit" class="btn btn-roxo w-100">Confirmar Reserva</button>
         </form>
       </div>
     </div>
 
-    <!-- Resumo -->
     <div class="col-md-5 mt-4 mt-md-0">
       <div class="resumo-card text-center">
         <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="Imagem do veículo" class="img-fluid rounded mb-3">
@@ -60,7 +73,7 @@
         <p class="text-muted">{{ veiculo.type|capitalize }}</p>
         <p><strong>{{ veiculo.price_per_day }} €</strong> / dia</p>
         <hr class="border-secondary">
-        <p class="small text-muted">O valor total será calculado após seleção das datas.</p>
+        <p class="small text-muted">O valor será atualizado ao escolher as datas.</p>
       </div>
     </div>
   </div>
@@ -71,6 +84,42 @@
     </a>
   </div>
 </div>
+
+<script>
+function mostrarDetalhesPagamento() {
+  const metodo = document.getElementById('metodo_pagamento').value;
+  const infoDiv = document.getElementById('info_pagamento');
+  infoDiv.style.display = 'block';
+
+  if (metodo === 'cartao') {
+    infoDiv.innerHTML = 'Serás redirecionado para um portal seguro para inserir os dados do teu cartão.';
+  } else if (metodo === 'mbway') {
+    infoDiv.innerHTML = 'Enviaremos uma notificação MB Way para o teu número após confirmação da reserva.';
+  } else if (metodo === 'transferencia') {
+    infoDiv.innerHTML = 'Irás receber os dados bancários para transferir o valor da reserva.';
+  } else {
+    infoDiv.style.display = 'none';
+  }
+}
+
+document.getElementById("data_inicio").addEventListener("change", calcularTotal);
+document.getElementById("data_fim").addEventListener("change", calcularTotal);
+
+function calcularTotal() {
+  const inicio = new Date(document.getElementById("data_inicio").value);
+  const fim = new Date(document.getElementById("data_fim").value);
+  const dias = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24));
+
+  const precoDia = {{ veiculo.price_per_day }};
+  const totalSpan = document.getElementById("valor_total");
+
+  if (dias > 0) {
+    totalSpan.innerText = (dias * precoDia).toFixed(2) + " €";
+  } else {
+    totalSpan.innerText = "—";
+  }
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
