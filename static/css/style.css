@@ -260,3 +260,48 @@ spline-viewer {
   border-color: white;
   color: white;
 }
+
+/* Reservas */
+.reserva-body {
+  background-color: #000;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  padding-top: 60px;
+}
+
+.reserva-card {
+  background-color: #111;
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.resumo-card {
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.form-control,
+.form-select {
+  background-color: #222;
+  border: 1px solid #444;
+  color: white;
+}
+
+.form-control::placeholder {
+  color: #aaa;
+}
+
+label {
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+.btn-roxo {
+  background-color: #6f42c1;
+  color: white;
+}
+
+.btn-roxo:hover {
+  background-color: #5e37a8;
+}
