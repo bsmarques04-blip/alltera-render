@@ -449,5 +449,27 @@ def cancelar_reserva(id):
 
     return redirect(url_for("minhas_reservas"))
 
+@app.route('/perfil', methods=['GET', 'POST'])
+def perfil():
+    if 'cliente_id' not in session:
+        return redirect(url_for('login'))
+
+    cliente = Cliente.get_or_none(Cliente.id == session["cliente_id"])
+
+    if not cliente:
+        flash("Cliente não encontrado.", "danger")
+        return redirect(url_for("index"))
+
+    if request.method == 'POST':
+        cliente.nome = request.form['nome']
+        cliente.email = request.form['email']
+        cliente.telefone = request.form['telefone']
+        cliente.save()
+        flash('Perfil atualizado com sucesso!', 'success')
+        return redirect(url_for('perfil'))
+
+    return render_template('perfil.html', cliente=cliente)
+
+
 if __name__ == "__main__":
     app.run(debug=True)

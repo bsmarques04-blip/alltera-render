@@ -305,3 +305,14 @@ label {
 .btn-roxo:hover {
   background-color: #5e37a8;
 }
+
+/* Perfil */
+.btn-roxo {
+  background-color: #6f42c1;
+  color: white;
+  font-weight: 600;
+  border: none;
+}
+.btn-roxo:hover {
+  background-color: #5a32a3;
+}
