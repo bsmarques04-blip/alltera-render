@@ -470,6 +470,37 @@ def perfil():
 
     return render_template('perfil.html', cliente=cliente)
 
+@app.route("/alterar_password", methods=["POST"])
+def alterar_password():
+    if "cliente_id" not in session:
+        flash("Tens de iniciar sessão para alterar a palavra-passe.", "warning")
+        return redirect(url_for("login"))
+
+    cliente = Cliente.get_or_none(Cliente.id == session["cliente_id"])
+    if not cliente:
+        flash("Cliente não encontrado.", "danger")
+        return redirect(url_for("perfil"))
+
+    password_atual = request.form.get("password_atual")
+    nova_password = request.form.get("nova_password")
+    confirmar_password = request.form.get("confirmar_password")
+
+    # Verifica se a password atual está correta
+    if not cliente.check_password(password_atual):
+        flash("A palavra-passe atual está incorreta.", "danger")
+        return redirect(url_for("perfil"))
+
+    # Verifica se as novas coincidem
+    if nova_password != confirmar_password:
+        flash("As novas palavras-passe não coincidem.", "warning")
+        return redirect(url_for("perfil"))
+
+    # Atualiza a password
+    cliente.set_password(nova_password)
+    cliente.save()
+
+    flash("Palavra-passe atualizada com sucesso!", "success")
+    return redirect(url_for("perfil"))
 
 if __name__ == "__main__":
     app.run(debug=True)
