@@ -7,9 +7,9 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="reserva-body">
+<body class="reserva-body bg-dark text-white">
 
-<div class="container">
+<div class="container py-5">
   <h2 class="text-center fw-bold mb-4">Reserva: {{ veiculo.brand }} {{ veiculo.model }}</h2>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -25,7 +25,7 @@
 
   <div class="row">
     <div class="col-md-7">
-      <div class="reserva-card">
+      <div class="reserva-card bg-black p-4 rounded shadow">
         <form method="POST">
           <div class="mb-3">
             <label for="data_inicio">Data de Início</label>
@@ -46,7 +46,8 @@
               <option value="transferencia">Transferência Bancária</option>
             </select>
           </div>
-            <div id="detalhes_pagamento" class="mb-3"></div>
+
+          <div id="detalhes_pagamento" class="mb-3"></div>
 
           <div class="mb-3">
             <label for="observacoes">Observações (opcional)</label>
@@ -55,40 +56,40 @@
 
           <div class="form-check mb-4">
             <input type="checkbox" class="form-check-input" id="termos" required>
-            <label class="form-check-label" for="termos">Aceito os <a href="#">termos e condições</a></label>
+            <label class="form-check-label" for="termos">Aceito os <a href="#" class="text-info">termos e condições</a></label>
           </div>
 
           <div class="mb-3">
             <strong>Total estimado:</strong> <span id="valor_total">—</span>
           </div>
 
-          <button type="submit" class="btn btn-roxo w-100">Confirmar Reserva</button>
+          <button type="submit" class="btn btn-primary w-100">Confirmar Reserva</button>
         </form>
       </div>
     </div>
 
     <div class="col-md-5 mt-4 mt-md-0">
-      <div class="resumo-card text-center">
-        <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="Imagem do veículo" class="img-fluid rounded mb-3">
+      <div class="resumo-card bg-black p-4 rounded shadow text-center">
+        {% if veiculo.imagens %}
+          <img src="{{ url_for('static', filename='images/' + veiculo.imagens.split(',')[0]) }}" alt="Imagem do veículo" class="img-fluid rounded mb-3">
+        {% endif %}
         <h4>{{ veiculo.brand }} {{ veiculo.model }}</h4>
         <p class="text-muted">{{ veiculo.type|capitalize }}</p>
         <p><strong>{{ veiculo.price_per_day }} €</strong> / dia</p>
-
-        <hr class="border-secondary">
-        <div class="text-start small text-light">
-          {% if veiculo.descricao_longa %}
-            <h6 class="text-uppercase text-muted">Sobre o veículo:</h6>
-            <p>{{ veiculo.descricao_longa }}</p>
-          {% else %}
-            <p class="text-muted">Sem descrição detalhada disponível.</p>
-          {% endif %}
-        </div>
-
-        <hr class="border-secondary">
+          <hr class="border-secondary">
         <p class="small text-muted">O valor será atualizado ao escolher as datas.</p>
       </div>
     </div>
   </div>
+
+  {% if veiculo.descricao_longa %}
+    <div class="descricao-veiculo bg-black text-white mt-5 p-4 rounded shadow-sm">
+      <h5 class="text-uppercase text-info mb-3">Informações Detalhadas</h5>
+      <div class="descricao-content">
+        {{ veiculo.descricao_longa | safe }}
+      </div>
+    </div>
+  {% endif %}
 
   <div class="text-center mt-4">
     <a href="{{ url_for('index') }}" class="text-decoration-none text-light">
