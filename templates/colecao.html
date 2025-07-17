@@ -8,44 +8,39 @@
 </head>
 <body class="bg-dark text-white">
   <nav class="navbar navbar-expand-lg navbar-dark fixed-top bg-dark bg-opacity-75 px-5 py-3 shadow">
-  <div class="container-fluid d-flex justify-content-between align-items-center">
-
-    <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">MotoCarGo</a>
-
-    <div class="mx-auto">
-      <ul class="navbar-nav gap-4">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Início</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('colecao') }}">Coleção</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('sobre') }}">Sobre</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('contacto') }}">Contacto</a></li>
-      </ul>
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+      <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">MotoCarGo</a>
+      <div class="mx-auto">
+        <ul class="navbar-nav gap-4">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Início</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('colecao') }}">Coleção</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('sobre') }}">Sobre</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('contacto') }}">Contacto</a></li>
+        </ul>
+      </div>
+      {% if session.get('cliente_id') %}
+      <div class="dropdown">
+        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-person-circle"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">As Minhas Reservas</a></li>
+          <li><a class="dropdown-item" href="#">Perfil</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a></li>
+        </ul>
+      </div>
+      {% else %}
+      <div>
+        <a href="{{ url_for('login') }}" class="btn btn-outline-light me-2">Login</a>
+        <a href="{{ url_for('register_client') }}" class="btn btn-primary">Registar</a>
+      </div>
+      {% endif %}
     </div>
-
-    {% if session.get('cliente_id') %}
-    <div class="dropdown">
-      <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="bi bi-person-circle"></i>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="{{ url_for('minhas_reservas') }}">As Minhas Reservas</a></li>
-        <li><a class="dropdown-item" href="#">Perfil</a></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}">Logout</a></li>
-      </ul>
-    </div>
-    {% else %}
-    <div>
-      <a href="{{ url_for('login') }}" class="btn btn-outline-light me-2">Login</a>
-      <a href="{{ url_for('register_client') }}" class="btn btn-primary">Registar</a>
-    </div>
-    {% endif %}
-  </div>
-</nav>
-
+  </nav>
 
   <div class="container py-5">
     <h1 class="text-center mb-4">A Nossa Coleção</h1>
-
 
     <form method="get" class="row g-3 mb-4">
       <div class="col-md-4">
@@ -65,15 +60,18 @@
       </div>
     </form>
 
-    <div class="row row-cols-1 row-cols-md-3 g-4">
+    <div class="row g-4">
       {% for v in veiculos %}
-      <div class="col">
-        <div class="card h-100 bg-light text-dark">
-          <img src="{{ url_for('static', filename='images/' + v.imagens.split(',')[0]) }}" class="card-img-top" alt="{{ v.model }}">
-          <div class="card-body">
+      <div class="col-sm-6 col-md-4 col-lg-3">
+        <div class="card h-100 bg-dark text-white border border-secondary shadow-sm">
+          {% if v.imagens %}
+          <img src="{{ url_for('static', filename='images/' + v.imagens.split(',')[0]) }}" class="card-img-top img-fluid" style="object-fit: cover; height: 180px;" alt="Imagem do veículo">
+          {% endif %}
+          <div class="card-body d-flex flex-column">
             <h5 class="card-title">{{ v.brand }} {{ v.model }}</h5>
-            <p class="card-text">{{ v.price_per_day }} € / dia</p>
-            <a href="{{ url_for('reservar_veiculo', veiculo_id=v.id) }}" class="btn btn-primary">Reservar</a>
+            <p class="text-muted small mb-2">{{ v.type|capitalize }}</p>
+            <p class="fw-bold mb-3">{{ v.price_per_day }} € / dia</p>
+            <a href="{{ url_for('reservar_veiculo', veiculo_id=v.id) }}" class="btn btn-outline-info mt-auto">Ver Detalhes</a>
           </div>
         </div>
       </div>
@@ -81,7 +79,7 @@
     </div>
 
     {% if not veiculos %}
-      <p class="text-center mt-4">Nenhum veículo encontrado com os filtros selecionados.</p>
+    <p class="text-center mt-4">Nenhum veículo encontrado com os filtros selecionados.</p>
     {% endif %}
   </div>
 
