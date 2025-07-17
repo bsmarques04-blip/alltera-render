@@ -19,7 +19,7 @@ Projecto de Avaliação Contínua de DAW 2025. (Nova Realização)
 
 ## A aplicação inclui um painel de administração acessível com credenciais predefinidas:
 
-- Utilizador: "admin"
+- Utilizador: "admin@gmail.com"
 
 - Password: "1234"
 
