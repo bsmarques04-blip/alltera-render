@@ -4,54 +4,84 @@
   <meta charset="UTF-8">
   <title>Editar Veículo</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <script src="{{ url_for('static', filename='tinymce/js/tinymce/tinymce.min.js') }}"></script>
+  <script>
+    tinymce.init({
+      selector: 'textarea[name=descricao]',
+      plugins: 'lists link image code table',
+      toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | code',
+      menubar: false,
+      height: 300
+    });
+  </script>
 </head>
-<body>
-  <h1>Editar Veículo</h1>
+<body class="bg-dark text-white p-4">
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
-        </div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+  <div class="container">
+    <h1 class="mb-4">Editar Veículo</h1>
 
-  <form method="POST">
-    <label>Tipo:</label>
-    <select name="type">
-      <option value="CARRO" {% if veiculo.type == "CARRO" %}selected{% endif %}>Carro</option>
-      <option value="MOTA" {% if veiculo.type == "MOTA" %}selected{% endif %}>Mota</option>
-    </select><br><br>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-    <label>Marca:</label>
-    <input type="text" name="brand" value="{{ veiculo.brand }}" required><br><br>
+    <form method="POST">
+      <div class="mb-3">
+        <label>Tipo:</label>
+        <select name="type" class="form-select">
+          <option value="CARRO" {% if veiculo.type == "CARRO" %}selected{% endif %}>Carro</option>
+          <option value="MOTA" {% if veiculo.type == "MOTA" %}selected{% endif %}>Mota</option>
+        </select>
+      </div>
 
-    <label>Modelo:</label>
-    <input type="text" name="model" value="{{ veiculo.model }}" required><br><br>
+      <div class="mb-3">
+        <label>Marca:</label>
+        <input type="text" name="brand" class="form-control" value="{{ veiculo.brand }}" required>
+      </div>
 
-    <label>Ano:</label>
-    <input type="number" name="year" value="{{ veiculo.year }}" required><br><br>
+      <div class="mb-3">
+        <label>Modelo:</label>
+        <input type="text" name="model" class="form-control" value="{{ veiculo.model }}" required>
+      </div>
 
-    <label>Preço por dia (€):</label>
-    <input type="number" step="0.01" name="price_per_day" value="{{ veiculo.price_per_day }}" required><br><br>
+      <div class="mb-3">
+        <label>Ano:</label>
+        <input type="number" name="year" class="form-control" value="{{ veiculo.year }}" required>
+      </div>
 
-    <label>Categoria:</label>
-    <select name="categoria">
-      {% for cat in categorias %}
-        <option value="{{ cat.id }}" {% if veiculo.categoria.id == cat.id %}selected{% endif %}>
-          {{ cat.nome }}
-        </option>
-      {% endfor %}
-    </select><br><br>
+      <div class="mb-3">
+        <label>Preço por dia (€):</label>
+        <input type="number" step="0.01" name="price_per_day" class="form-control" value="{{ veiculo.price_per_day }}" required>
+      </div>
 
-    <button type="submit">Guardar Alterações</button>
-  </form>
+      <div class="mb-3">
+        <label>Categoria:</label>
+        <select name="categoria" class="form-select">
+          {% for cat in categorias %}
+            <option value="{{ cat.id }}" {% if veiculo.categoria.id == cat.id %}selected{% endif %}>{{ cat.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-  <br>
-  <a href="{{ url_for('admin_veiculos_gestao') }}">← Voltar</a>
+      <div class="mb-4">
+        <label for="descricao" class="form-label">Descrição Detalhada:</label>
+        <textarea name="descricao" class="form-control" rows="5">{{ veiculo.descricao_longa }}</textarea>
+      </div>
+
+      <div class="d-flex justify-content-between">
+        <a href="{{ url_for('admin_veiculos_gestao') }}" class="btn btn-outline-light">← Voltar</a>
+        <button type="submit" class="btn btn-success">Guardar Alterações</button>
+      </div>
+    </form>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
