@@ -28,6 +28,7 @@ class Veiculo(BaseModel):
     status = BooleanField(default=True)
     imagens = TextField(null=True)
     categoria = ForeignKeyField(Categoria, backref='veiculos')
+    descricao_longa = TextField(null=True)
 
 class Cliente(BaseModel):
     nome = CharField()

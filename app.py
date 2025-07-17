@@ -22,8 +22,8 @@ def contacto():
 
 @app.route("/colecao")
 def colecao():
-    tipo = request.args.get("tipo")  # Ex: "CARRO"
-    categoria_id = request.args.get("categoria")  # Ex: "1"
+    tipo = request.args.get("tipo")  
+    categoria_id = request.args.get("categoria")  
 
     query = Veiculo.select().where(Veiculo.status == True)
 
@@ -81,14 +81,15 @@ def add_vehicle():
         return redirect(url_for("admin"))
 
     if request.method == "POST":
-        tipo = request.form.get("type")
+        tipo = request.form.get("tipo")
         brand = request.form.get("brand")
         model = request.form.get("model")
-        year = int(request.form.get("year"))
+        year = int(request.form.get("ano"))
         price_per_day = float(request.form.get("price_per_day"))
-        categoria_id = int(request.form.get("categoria"))
+        categoria = int(request.form.get("categoria"))
+        descricao_longa = request.form.get("descricao")
 
-        categoria = Categoria.get_by_id(categoria_id)
+        categoria = Categoria.get_by_id(categoria)
 
         imagens = []
         files = request.files.getlist("imagens")
@@ -102,13 +103,14 @@ def add_vehicle():
         imagens_str = ",".join(imagens)
 
         Veiculo.create(
-            type=tipo,
+            type=tipo.upper(),
             brand=brand,
             model=model,
             year=year,
             price_per_day=price_per_day,
             imagens=imagens_str,
-            categoria=categoria
+            categoria=categoria,
+            descricao_longa=descricao_longa
         )
 
         flash("Veículo adicionado com sucesso!", "success")

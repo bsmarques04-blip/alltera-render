@@ -46,9 +46,7 @@
               <option value="transferencia">Transferência Bancária</option>
             </select>
           </div>
-
-          <!-- Detalhes dinâmicos por método -->
-          <div id="detalhes_pagamento" class="mb-3"></div>
+            <div id="detalhes_pagamento" class="mb-3"></div>
 
           <div class="mb-3">
             <label for="observacoes">Observações (opcional)</label>
@@ -75,6 +73,17 @@
         <h4>{{ veiculo.brand }} {{ veiculo.model }}</h4>
         <p class="text-muted">{{ veiculo.type|capitalize }}</p>
         <p><strong>{{ veiculo.price_per_day }} €</strong> / dia</p>
+
+        <hr class="border-secondary">
+        <div class="text-start small text-light">
+          {% if veiculo.descricao_longa %}
+            <h6 class="text-uppercase text-muted">Sobre o veículo:</h6>
+            <p>{{ veiculo.descricao_longa }}</p>
+          {% else %}
+            <p class="text-muted">Sem descrição detalhada disponível.</p>
+          {% endif %}
+        </div>
+
         <hr class="border-secondary">
         <p class="small text-muted">O valor será atualizado ao escolher as datas.</p>
       </div>
