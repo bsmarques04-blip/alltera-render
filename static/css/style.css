@@ -316,3 +316,32 @@ label {
 .btn-roxo:hover {
   background-color: #5a32a3;
 }
+
+/* Sobre */
+.sobre-section {
+      background-color: #121212;
+      color: #fff;
+    }
+
+    .sobre-imagem {
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.1);
+      object-fit: cover;
+      width: 100%;
+      height: auto;
+    }
+
+    .sobre-header {
+      background: url("/static/images/bannersobre.jpg") center center / cover no-repeat;
+      height: 50vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-shadow: 0 0 8px #000;
+    }
+
+    .sobre-header h1 {
+      font-size: 3rem;
+      font-weight: 700;
+    }
