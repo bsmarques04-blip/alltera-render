@@ -17,18 +17,29 @@ let currentPlanRows = [];
 let heatLayer = null;
 let planLine = null;
 let orderMarkers = [];
+let territoryLayer = null;
+let smartRouteLine = null;
+let smartRouteMarkers = [];
 let mapInitialFitDone = false;
 let nearbyRadiusKm = DEFAULT_NEARBY_RADIUS_KM;
 let clusterLayer = null;
 let selectedBulkIds = new Set();
 let baseLayer = null;
+let hoveredLeadId = null;
+let leadListMode = "visible";
 
-const map = L.map("map", { zoomControl: true }).setView(defaultCenter, 10);
+const map = L.map("map", {
+    zoomControl: true,
+    zoomSnap: 0.25,
+    zoomDelta: 0.5,
+    wheelPxPerZoomLevel: 90,
+    closePopupOnClick: false,
+}).setView(defaultCenter, 10);
 function applyMapTiles() {
     if (baseLayer) baseLayer.remove();
     baseLayer = L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        { attribution: "&copy; OpenStreetMap &copy; CARTO (light)" }
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        { attribution: "&copy; OpenStreetMap &copy; CARTO", maxZoom: 20 }
     ).addTo(map);
 }
 applyMapTiles();
@@ -40,9 +51,11 @@ const els = {
     commercialFilter: document.getElementById("commercialFilter"),
     stateFilter: document.getElementById("stateFilter"),
     classificationFilter: document.getElementById("classificationFilter"),
+    scheduleFilter: document.getElementById("scheduleFilter"),
     tagFilter: document.getElementById("tagFilter"),
     historyFilter: document.getElementById("historyFilter"),
     heatmapToggle: document.getElementById("heatmapToggle"),
+    territoryMode: document.getElementById("territoryMode"),
     resetFilters: document.getElementById("resetFilters"),
     selectedState: document.getElementById("selectedState"),
     leadDetails: document.getElementById("leadDetails"),
@@ -86,8 +99,14 @@ const els = {
     bulkSetState: document.getElementById("bulkSetState"),
     bulkIgnore: document.getElementById("bulkIgnore"),
     bulkExport: document.getElementById("bulkExport"),
+    bulkRoute: document.getElementById("bulkRoute"),
     bulkPlan: document.getElementById("bulkPlan"),
     nextLeadButton: document.getElementById("nextLeadButton"),
+    mapGeoStats: document.getElementById("mapGeoStats"),
+    mapRouteSummary: document.getElementById("mapRouteSummary"),
+    mapLeadMiniCard: document.getElementById("mapLeadMiniCard"),
+    leadListTabVisible: document.getElementById("leadListTabVisible"),
+    leadListTabAll: document.getElementById("leadListTabAll"),
 };
 
 if (els.planDate) els.planDate.value = todayIso;
@@ -180,16 +199,72 @@ function hasCoordinates(lead) {
 }
 
 function leadName(lead) {
-    return lead.nome_cliente || lead.nome_empresa || "Sem nome";
+    if (!lead || typeof lead !== "object") return "Lead sem nome";
+    if (!window.__allteraLeadNameDebugLogged) {
+        console.log("[mapa] Estrutura de lead (sample):", lead);
+        window.__allteraLeadNameDebugLogged = true;
+    }
+    const fields = [
+        lead.nome,
+        lead.name,
+        lead.empresa,
+        lead.company,
+        lead.cliente,
+        lead.designacao,
+        lead.lead_nome,
+        lead.nome_empresa,
+        lead.nome_cliente,
+    ];
+    for (const value of fields) {
+        const text = String(value ?? "").trim();
+        if (text) return text;
+    }
+    return "Lead sem nome";
 }
+
+function isValidLeadId(lead) {
+    return lead && Number.isFinite(lead.id) && lead.id > 0;
+}
+
+function leadCompany(lead) {
+    return (
+        lead?.empresa ||
+        lead?.nome_empresa ||
+        lead?.area_negocio ||
+        "Sem empresa"
+    );
+}
+
+function leadCityFallback(lead) {
+    return lead?.cidade || lead?.localidade || "Sem cidade";
+}
+
+function leadStateFallback(lead) {
+    // Regra do projeto: fallback do estado para "Por contactar"
+    // (a regra original dizia: lead.estado -> Por contactar)
+    return lead?.estado || "Por contactar";
+}
+
+function safeLeadForCluster(lead, { isDev }) {
+    if (!lead || typeof lead !== "object") return null;
+    if (!isValidLeadId(lead)) {
+        if (isDev) {
+            console.warn("[mapa] Lead inválida no cluster (id ausente/inválido):", lead);
+        }
+        return null;
+    }
+    return lead;
+}
+
 
 function leadArea(lead) {
     return lead.area_negocio || lead.tipo_cliente || "Outro";
 }
 
 function leadCity(lead) {
-    return lead.cidade || lead.localidade || "Sem cidade";
+    return leadCityFallback(lead);
 }
+
 
 function slug(value) {
     return normalize(value)
@@ -250,31 +325,87 @@ function setDrawerOpen(open) {
 }
 
 function markerIcon(lead) {
-    const classes = ["marker-pin"];
+    const classes = ["marker-pin", markerVisualClass(lead)];
+    const isNearby = nearbyLeads.some((item) => item.id === lead.id);
     if (!isActive(lead)) classes.push("inactive");
     if (selectedLead && lead.id === selectedLead.id) classes.push("selected");
-    else if (nearbyLeads.some((item) => item.id === lead.id)) classes.push("nearby");
+    if (hoveredLeadId === lead.id) classes.push("hovered");
+    else if (isNearby) classes.push("nearby");
+    if (selectedLead && lead.id !== selectedLead.id && !isNearby) classes.push("out-of-focus");
     return L.divIcon({
         className: "",
-        html: `<span class="${classes.join(" ")}"></span>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
+        html: `<span class="${classes.join(" ")}"><span class="marker-pin__core"></span></span>`,
+        iconSize: [34, 42],
+        iconAnchor: [17, 38],
+        popupAnchor: [0, -34],
     });
+}
+
+function leadScheduleDate(lead) {
+    return parseDate(lead.data_novo_contacto);
+}
+
+function isScheduledLead(lead) {
+    if (!leadScheduleDate(lead)) return false;
+    const state = normalizeKey(lead.estado);
+    const text = normalizeSearch([
+        lead.estado,
+        lead.classificacao_observacao,
+        lead.observacoes,
+        lead.observacoes_contacto,
+        lead.motivo_classificacao,
+    ].join(" "));
+    return (
+        ["ligardevolta", "adiarcontacto", "seminteresse"].includes(state) ||
+        ["voltar a ligar", "contactar mais tarde", "reagendada", "reagendar", "sem interesse para ja", "aguardar resposta", "ligar depois"].some((token) => text.includes(token))
+    );
+}
+
+function isOverdueLead(lead) {
+    const scheduleDate = leadScheduleDate(lead);
+    if (!scheduleDate || !isScheduledLead(lead)) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    scheduleDate.setHours(0, 0, 0, 0);
+    return scheduleDate < today;
+}
+
+function isFutureScheduledLead(lead) {
+    const scheduleDate = leadScheduleDate(lead);
+    if (!scheduleDate || !isScheduledLead(lead)) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    scheduleDate.setHours(0, 0, 0, 0);
+    return scheduleDate > today;
+}
+
+function markerVisualClass(lead) {
+    const state = normalizeKey(lead.estado);
+    const recency = lastContactInfo(lead);
+    if (state.includes("reuniao") || state.includes("crm") || state.includes("clienteexistente")) return "marker-pin--meeting";
+    if (state.includes("ligardevolta") || state.includes("contactado") || normalizeSearch(lead.observacoes_contacto).includes("nao atendeu")) return "marker-pin--unanswered";
+    if (recency?.avoid) return "marker-pin--forgotten";
+    if (!isActive(lead)) return "marker-pin--inactive";
+    return "marker-pin--active";
 }
 
 function popupHtml(lead) {
     return `
         <div class="lead-popup">
-            <strong>${leadName(lead)}</strong>
+            <div class="lead-popup__header">
+                <strong>${leadName(lead)}</strong>
+                <span class="priority-badge priority-badge--${scoreBand(lead)}">${scoreLabel(lead)}</span>
+            </div>
             <span>${leadArea(lead)}</span>
             <span>${lead.telefone || "—"}</span>
             <span>${leadCity(lead)}</span>
+            <small>${leadCommercialLabel(lead)} · ${lead.estado}</small>
         </div>
     `;
 }
 
 function passesFilters(lead) {
-    if (!passesClassificationFilter(lead)) return false;
+    if (!els.scheduleFilter?.value && !passesClassificationFilter(lead)) return false;
 
     const rawSearch = els.searchInput?.value;
     const text = normalize(rawSearch);
@@ -299,8 +430,18 @@ function passesFilters(lead) {
         (!els.typeFilter?.value || leadArea(lead) === els.typeFilter.value) &&
         (!selectedCommercial || leadCommercialKey(lead) === selectedCommercial) &&
         (!els.stateFilter?.value || lead.estado === els.stateFilter.value) &&
+        passesScheduleFilter(lead) &&
         (!els.tagFilter?.value || (lead.tags || []).includes(els.tagFilter.value))
     );
+}
+
+function passesScheduleFilter(lead) {
+    const value = els.scheduleFilter?.value || "";
+    if (!value) return true;
+    if (value === "now") return isActive(lead) && !isFutureScheduledLead(lead);
+    if (value === "scheduled") return isScheduledLead(lead);
+    if (value === "overdue") return isOverdueLead(lead);
+    return true;
 }
 
 function passesClassificationFilter(lead) {
@@ -330,10 +471,13 @@ function applyFilters() {
     updateNearby();
     renderMarkers();
     renderHeatmap();
+    renderTerritories();
     renderLeadList();
     renderDetails();
     renderMetrics();
     renderOperationalInsights();
+    renderMapGeoStats();
+    renderMapMiniCard();
 }
 
 function renderMetrics() {
@@ -360,19 +504,36 @@ function renderMarkers() {
     const useClusters = window.L && L.markerClusterGroup && visibleLeads.filter(hasCoordinates).length > 25;
     clusterLayer = useClusters ? L.markerClusterGroup({
         showCoverageOnHover: false,
-        maxClusterRadius: 42,
+        zoomToBoundsOnClick: false,
+        spiderfyOnMaxZoom: false,
+        animate: true,
+        animateAddingMarkers: false,
+        maxClusterRadius: 46,
         iconCreateFunction: (cluster) => L.divIcon({
             html: `<span>${cluster.getChildCount()}</span>`,
             className: "alltera-cluster",
-            iconSize: [38, 38],
+            iconSize: [34, 34],
         }),
     }).addTo(map) : null;
+    if (clusterLayer) {
+        clusterLayer.on("clusterclick", (event) => openClusterPopup(event.layer));
+        clusterLayer.on("clusterdblclick", (event) => expandClusterArea(event.layer));
+    }
     visibleLeads.filter(hasCoordinates).forEach((lead) => {
         const zIndex =
             selectedLead && lead.id === selectedLead.id ? 900 : nearbyLeads.some((item) => item.id === lead.id) ? 500 : 0;
         const marker = L.marker([lead.latitude, lead.longitude], { icon: markerIcon(lead), zIndexOffset: zIndex })
-            .bindPopup(popupHtml(lead));
+            .bindPopup(popupHtml(lead))
+            .bindTooltip(tooltipHtml(lead), {
+                direction: "top",
+                offset: [0, -34],
+                opacity: 1,
+                className: "lead-smart-tooltip",
+                sticky: true,
+            });
         marker.on("click", () => selectLead(lead.id));
+        marker.on("mouseover", () => setLeadHover(lead.id, true));
+        marker.on("mouseout", () => setLeadHover(lead.id, false));
         if (clusterLayer) clusterLayer.addLayer(marker);
         else marker.addTo(map);
         markers.set(lead.id, marker);
@@ -402,9 +563,59 @@ function renderHeatmap() {
     }).addTo(map);
 }
 
+function visibleInCurrentBounds() {
+    const bounds = map.getBounds();
+    return visibleLeads.filter((lead) => hasCoordinates(lead) && bounds.contains([lead.latitude, lead.longitude]));
+}
+
+function renderMapGeoStats() {
+    // Removido: overlay de métricas no topo do mapa (Visíveis/Na zona/Reuniões/CRM/Follow-ups)
+    if (!els.mapGeoStats) return;
+    els.mapGeoStats.hidden = true;
+    els.mapGeoStats.innerHTML = "";
+}
+
+
+function renderTerritories() {
+    if (territoryLayer) {
+        territoryLayer.remove();
+        territoryLayer = null;
+    }
+    const mode = els.territoryMode?.value || "";
+    if (!mode) return;
+    const groups = new Map();
+    visibleLeads.filter(hasCoordinates).forEach((lead) => {
+        const key = mode === "cidade" ? leadCity(lead) : mode === "comercial" ? leadCommercialLabel(lead) : lead.estado;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(lead);
+    });
+    territoryLayer = L.layerGroup().addTo(map);
+    Array.from(groups.entries()).forEach(([label, leads], index) => {
+        const lat = leads.reduce((sum, lead) => sum + lead.latitude, 0) / leads.length;
+        const lng = leads.reduce((sum, lead) => sum + lead.longitude, 0) / leads.length;
+        const radius = Math.min(26000, Math.max(2500, Math.sqrt(leads.length) * 3300));
+        const colors = ["#0f766e", "#2563eb", "#c47a2c", "#7c3aed", "#0891b2", "#b42318"];
+        const color = colors[index % colors.length];
+        L.circle([lat, lng], {
+            radius,
+            color,
+            weight: 1.5,
+            opacity: 0.34,
+            fillColor: color,
+            fillOpacity: 0.075,
+            className: "territory-zone",
+        }).bindTooltip(`<strong>${label}</strong><span>${leads.length} leads</span>`, {
+            permanent: leads.length >= 6,
+            direction: "center",
+            className: "territory-label",
+        }).addTo(territoryLayer);
+    });
+}
+
 function renderLeadList() {
-    els.listCount.textContent = visibleLeads.length;
-    els.leadsList.innerHTML = visibleLeads.map((lead) => `
+    const sourceLeads = leadListMode === "all" ? allLeads : visibleLeads;
+    els.listCount.textContent = sourceLeads.length;
+    els.leadsList.innerHTML = sourceLeads.map((lead) => `
         <article class="lead-row lead-row--compact ${selectedLead?.id === lead.id ? "active" : ""} ${!isActive(lead) ? "inactive-row" : ""}" data-id="${lead.id}">
             <div class="row-top">
                 <label class="bulk-check"><input type="checkbox" data-bulk-id="${lead.id}" ${selectedBulkIds.has(lead.id) ? "checked" : ""}></label>
@@ -416,11 +627,13 @@ function renderLeadList() {
                 <span class="muted">${leadCommercialLabel(lead)}</span>
             </div>
             ${lastContactInfo(lead) ? `<span class="contact-recency ${lastContactInfo(lead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(lead).label}</span>` : ""}
-            <span class="muted">${leadArea(lead)} · ${lead.telefone || "—"} · ${leadCity(lead)}</span>
+            <span class="muted">${leadArea(lead)} · ${lead.telefone || "—"} · ${leadCity(lead)}${hasCoordinates(lead) ? "" : " · sem coordenadas"}</span>
         </article>
     `).join("");
     document.querySelectorAll(".lead-row").forEach((row) => {
         row.addEventListener("click", () => selectLead(Number(row.dataset.id)));
+        row.addEventListener("mouseenter", () => setLeadHover(Number(row.dataset.id), true));
+        row.addEventListener("mouseleave", () => setLeadHover(Number(row.dataset.id), false));
     });
     document.querySelectorAll("[data-bulk-id]").forEach((checkbox) => {
         checkbox.addEventListener("click", (event) => event.stopPropagation());
@@ -432,6 +645,21 @@ function renderLeadList() {
         });
     });
     renderBulkActions();
+}
+
+function setLeadListMode(mode) {
+    leadListMode = mode === "all" ? "all" : "visible";
+    if (els.leadListTabVisible) {
+        const isVisible = leadListMode === "visible";
+        els.leadListTabVisible.classList.toggle("is-active", isVisible);
+        els.leadListTabVisible.setAttribute("aria-selected", String(isVisible));
+    }
+    if (els.leadListTabAll) {
+        const isAll = leadListMode === "all";
+        els.leadListTabAll.classList.toggle("is-active", isAll);
+        els.leadListTabAll.setAttribute("aria-selected", String(isAll));
+    }
+    renderLeadList();
 }
 
 function renderBulkActions() {
@@ -451,6 +679,7 @@ function selectLead(id) {
         renderMarkers();
         renderLeadList();
         renderDetails();
+        renderMapMiniCard();
         renderNearbyList();
         requestAnimationFrame(() => map.invalidateSize());
         return;
@@ -463,18 +692,144 @@ function selectLead(id) {
     renderMarkers();
     renderLeadList();
     renderDetails();
+    renderMapMiniCard();
     renderNearbyList();
     if (selectedLead && hasCoordinates(selectedLead)) {
         const target = [selectedLead.latitude, selectedLead.longitude];
         if (map.getZoom() > 12) {
-            map.setView(target, 12, { animate: true });
+            map.flyTo(target, 12, { animate: true, duration: 0.65, easeLinearity: 0.24 });
         } else if (map.getZoom() < 10) {
-            map.setView(target, 10, { animate: true });
+            map.flyTo(target, 10, { animate: true, duration: 0.65, easeLinearity: 0.24 });
         } else {
-            map.panTo(target, { animate: true });
+            map.panTo(target, { animate: true, duration: 0.5, easeLinearity: 0.24 });
         }
+        scrollLeadIntoView(selectedLead.id);
     }
     requestAnimationFrame(() => map.invalidateSize());
+}
+
+function clusterLeadFromMarker(marker) {
+    if (marker?.lead && typeof marker.lead === "object") return marker.lead;
+    if (marker?.options?.lead && typeof marker.options.lead === "object") return marker.options.lead;
+    for (const [id, item] of markers.entries()) {
+        if (item === marker) return allLeads.find((lead) => lead.id === id);
+    }
+    return null;
+}
+
+
+function clusterPopupHtml(cluster) {
+    const allChildMarkers = cluster.getAllChildMarkers();
+    const total = cluster.getChildCount();
+
+    const validLeads = allChildMarkers
+        .map(clusterLeadFromMarker)
+        .map((lead) => safeLeadForCluster(lead, { isDev: false }))
+        .filter(Boolean)
+        .map((lead) => ({
+            id: lead.id || "",
+            nome: leadName(lead),
+        }));
+
+    const rows = validLeads
+        .map(
+            (lead) => `
+        <button
+            class="cluster-lead-item"
+            type="button"
+            data-cluster-lead-id="${lead.id}"
+        >
+            <strong>${lead.nome}</strong>
+        </button>
+    `
+        )
+        .join("");
+
+    return `
+        <section class="cluster-popup">
+            <header>
+                <strong>${total} leads nesta zona</strong>
+                <span>Seleciona uma lead ou expande a área.</span>
+            </header>
+
+            <div class="cluster-leads-list">
+                ${rows}
+            </div>
+
+            <div class="cluster-popup__footer">
+                <button class="cluster-expand-button" type="button">
+                    Expandir área
+                </button>
+            </div>
+        </section>
+    `;
+}
+
+
+
+
+
+function tooltipHtml(lead) {
+    const info = lastContactInfo(lead);
+    return `
+        <div class="lead-hover-preview">
+            <strong>${leadName(lead)}</strong>
+            <span>${leadCity(lead)} · ${lead.estado}</span>
+            <small>${info ? info.label : "Sem interação recente"}</small>
+        </div>
+    `;
+}
+
+function openClusterPopup(cluster) {
+    const popup = L.popup({
+        closeButton: true,
+        autoPan: true,
+        autoPanPadding: [26, 26],
+        className: "cluster-leads-popup",
+        maxWidth: 340,
+    })
+        .setLatLng(cluster.getLatLng())
+        .setContent(clusterPopupHtml(cluster))
+        .openOn(map);
+
+    requestAnimationFrame(() => {
+        const container = popup.getElement();
+        container?.querySelectorAll("[data-cluster-lead-id]").forEach((button) => {
+            button.addEventListener("click", () => selectLead(Number(button.dataset.clusterLeadId)));
+        });
+        container?.querySelector(".cluster-expand-button")?.addEventListener("click", () => expandClusterArea(cluster));
+    });
+}
+
+function expandClusterArea(cluster) {
+    const bounds = cluster.getBounds();
+    if (!bounds || !bounds.isValid()) return;
+    map.closePopup();
+    map.flyToBounds(bounds.pad(0.22), {
+        maxZoom: Math.min(map.getZoom() + 2, 15),
+        duration: 0.65,
+        easeLinearity: 0.24,
+    });
+}
+
+function setLeadHover(id, active) {
+    if (!id) return;
+    hoveredLeadId = active ? id : hoveredLeadId === id ? null : hoveredLeadId;
+    const row = document.querySelector(`.lead-row[data-id="${id}"]`);
+    if (row) row.classList.toggle("is-map-hovered", active);
+    const marker = markers.get(id);
+    const element = marker?.getElement?.();
+    const pin = element?.querySelector?.(".marker-pin");
+    if (pin) pin.classList.toggle("hovered", active);
+    if (marker) {
+        const nearby = nearbyLeads.some((item) => item.id === id);
+        marker.setZIndexOffset(active ? 850 : selectedLead?.id === id ? 900 : nearby ? 500 : 0);
+    }
+}
+
+function scrollLeadIntoView(id) {
+    const row = document.querySelector(`.lead-row[data-id="${id}"]`);
+    if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function updateNearby() {
@@ -509,6 +864,7 @@ function drawRadius() {
         weight: 2,
         fillColor: "#0f766e",
         fillOpacity: 0.075,
+        className: "operational-radius-circle",
     }).addTo(map);
 }
 
@@ -593,6 +949,42 @@ function renderDetails() {
         : "Sem tags.";
     document.querySelectorAll(".removable-tag").forEach((tag) => {
         tag.addEventListener("click", () => tagAction("remove_tag", tag.dataset.tag));
+    });
+}
+
+function renderMapMiniCard() {
+    if (!els.mapLeadMiniCard) return;
+    if (!selectedLead) {
+        els.mapLeadMiniCard.hidden = true;
+        els.mapLeadMiniCard.innerHTML = "";
+        return;
+    }
+    els.mapLeadMiniCard.hidden = false;
+    els.mapLeadMiniCard.innerHTML = `
+        <div class="map-mini-card__header">
+            <div>
+                <strong>${leadName(selectedLead)}</strong>
+                <span>${leadCity(selectedLead)} · ${selectedLead.estado}</span>
+            </div>
+            <button type="button" class="map-mini-card__close" aria-label="Fechar">×</button>
+        </div>
+        <div class="map-mini-card__actions">
+            <a class="link-button" href="${selectedLead.telefone ? `tel:${selectedLead.telefone}` : "#"}">Ligar</a>
+            <button class="link-button" type="button" data-mini-action="adiar">Reagendar</button>
+            <button class="link-button" type="button" data-mini-action="crm">Reunião/CRM</button>
+            <button class="link-button" type="button" data-mini-action="details">Detalhes</button>
+        </div>
+    `;
+    els.mapLeadMiniCard.querySelector(".map-mini-card__close")?.addEventListener("click", () => selectLead(null));
+    els.mapLeadMiniCard.querySelectorAll("[data-mini-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const action = button.dataset.miniAction;
+            if (action === "details") {
+                setDrawerOpen(true);
+                return;
+            }
+            performAction(action);
+        });
     });
 }
 
@@ -994,6 +1386,80 @@ async function exportSelectedLeads() {
     window.URL.revokeObjectURL(url);
 }
 
+function clearSmartRoute() {
+    if (smartRouteLine) smartRouteLine.remove();
+    smartRouteLine = null;
+    smartRouteMarkers.forEach((marker) => marker.remove());
+    smartRouteMarkers = [];
+    if (els.mapRouteSummary) {
+        els.mapRouteSummary.hidden = true;
+        els.mapRouteSummary.innerHTML = "";
+    }
+}
+
+function routeDistanceKm(route) {
+    return route.slice(1).reduce((sum, lead, index) => sum + haversineKm(route[index], lead), 0);
+}
+
+function optimizedRoute(leads) {
+    const pool = leads.filter(hasCoordinates);
+    if (pool.length <= 2) return pool;
+    const startIndex = selectedLead ? Math.max(0, pool.findIndex((lead) => lead.id === selectedLead.id)) : 0;
+    const route = [pool.splice(startIndex, 1)[0]];
+    while (pool.length) {
+        const last = route[route.length - 1];
+        const nextIndex = pool.reduce((best, lead, index) => (
+            haversineKm(last, lead) < haversineKm(last, pool[best]) ? index : best
+        ), 0);
+        route.push(pool.splice(nextIndex, 1)[0]);
+    }
+    return route;
+}
+
+function drawSmartRoute() {
+    const selected = visibleLeads.filter((lead) => selectedBulkIds.has(lead.id) && hasCoordinates(lead));
+    if (selected.length < 2) {
+        alert("Seleciona pelo menos duas leads com coordenadas para desenhar uma rota.");
+        return;
+    }
+    clearSmartRoute();
+    const route = optimizedRoute(selected);
+    const points = route.map((lead) => [lead.latitude, lead.longitude]);
+    smartRouteLine = L.polyline(points, {
+        color: "#0f766e",
+        weight: 4,
+        opacity: 0.82,
+        lineCap: "round",
+        lineJoin: "round",
+        dashArray: "10 8",
+        className: "smart-route-line",
+    }).addTo(map);
+    route.forEach((lead, index) => {
+        const marker = L.marker([lead.latitude, lead.longitude], {
+            icon: L.divIcon({
+                className: "smart-route-step",
+                html: `<span>${index + 1}</span>`,
+                iconSize: [26, 26],
+                iconAnchor: [13, 13],
+            }),
+            zIndexOffset: 1000 + index,
+        }).addTo(map);
+        smartRouteMarkers.push(marker);
+    });
+    const distance = routeDistanceKm(route);
+    const minutes = Math.max(8, Math.round((distance / 35) * 60 + route.length * 5));
+    if (els.mapRouteSummary) {
+        els.mapRouteSummary.hidden = false;
+        els.mapRouteSummary.innerHTML = `
+            <strong>Rota inteligente</strong>
+            <span>${route.length} leads · ${distance.toFixed(1)} km · ~${minutes} min</span>
+            <button type="button" class="link-button" id="clearSmartRoute">Limpar</button>
+        `;
+        document.getElementById("clearSmartRoute")?.addEventListener("click", clearSmartRoute);
+    }
+    map.flyToBounds(L.latLngBounds(points).pad(0.18), { duration: 0.65, easeLinearity: 0.24, maxZoom: 13 });
+}
+
 function resetFilters() {
     els.searchInput.value = "";
     els.localityFilter.value = "";
@@ -1001,6 +1467,8 @@ function resetFilters() {
     if (els.commercialFilter) els.commercialFilter.value = "";
     els.stateFilter.value = "";
     els.classificationFilter.value = "ativos";
+    if (els.scheduleFilter) els.scheduleFilter.value = "";
+    if (els.territoryMode) els.territoryMode.value = "";
     els.tagFilter.value = "";
     els.historyFilter.checked = false;
     mapInitialFitDone = false;
@@ -1029,7 +1497,9 @@ function bindEvents() {
         els.commercialFilter,
         els.stateFilter,
         els.classificationFilter,
+        els.scheduleFilter,
         els.tagFilter,
+        els.territoryMode,
         els.historyFilter,
         els.heatmapToggle,
     ].filter(Boolean).forEach((element) => {
@@ -1056,6 +1526,7 @@ function bindEvents() {
     if (els.bulkSetState) els.bulkSetState.addEventListener("click", () => bulkAction("set_state", { estado: els.bulkState.value }));
     if (els.bulkIgnore) els.bulkIgnore.addEventListener("click", () => bulkAction("ignore_map"));
     if (els.bulkExport) els.bulkExport.addEventListener("click", exportSelectedLeads);
+    if (els.bulkRoute) els.bulkRoute.addEventListener("click", drawSmartRoute);
     if (els.bulkPlan) {
         els.bulkPlan.addEventListener("click", () => {
             const first = Array.from(selectedBulkIds)[0];
@@ -1063,6 +1534,8 @@ function bindEvents() {
         });
     }
     if (els.nextLeadButton) els.nextLeadButton.addEventListener("click", goToNextLead);
+    if (els.leadListTabVisible) els.leadListTabVisible.addEventListener("click", () => setLeadListMode("visible"));
+    if (els.leadListTabAll) els.leadListTabAll.addEventListener("click", () => setLeadListMode("all"));
     if (els.operationalMode) els.operationalMode.addEventListener("click", () => setMode("operational"));
     if (els.presentationMode) els.presentationMode.addEventListener("click", () => setMode("presentation"));
     if (els.addTag) els.addTag.addEventListener("click", () => tagAction("add_tag", els.tagSelect.value));
@@ -1071,6 +1544,7 @@ function bindEvents() {
     });
     if (els.drawerClose) els.drawerClose.addEventListener("click", () => selectLead(null));
     if (els.drawerBackdrop) els.drawerBackdrop.addEventListener("click", () => selectLead(null));
+    map.on("moveend zoomend", renderMapGeoStats);
 }
 
 async function loadLeads() {

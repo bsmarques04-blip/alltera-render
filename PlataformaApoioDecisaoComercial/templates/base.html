@@ -1,9 +1,19 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-title" content="Alltera">
+    <meta name="application-name" content="Alltera">
     <title>{% block title %}Alltera Leads{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" media="(prefers-color-scheme: dark)" href="{{ url_for('static', filename='favicon-dark-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" media="(prefers-color-scheme: dark)" href="{{ url_for('static', filename='favicon-dark-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,13 +23,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <aside class="sidebar" aria-label="Navegação principal">
+    <aside class="sidebar" aria-label="NavegaÃ§Ã£o principal">
         <div class="sidebar__aura" aria-hidden="true"></div>
         <div class="sidebar__brand">
-            <div class="sidebar__logo" aria-hidden="true">A</div>
+            <div class="sidebar__logo" aria-hidden="true">
+                <img src="{{ url_for('static', filename='favicon-main.png') }}" alt="">
+            </div>
             <div class="sidebar__brand-text">
                 <div class="sidebar__name">Alltera</div>
-                <div class="sidebar__subtitle">Planeamento comercial geográfico</div>
+                <div class="sidebar__subtitle">Planeamento comercial geogrÃ¡fico</div>
             </div>
         </div>
 
@@ -54,9 +66,16 @@
                 <span class="sidebar__icon" aria-hidden="true"></span>
                 <span>Leads Esquecidas</span>
             </a>
-            <a class="sidebar__link" data-tooltip="Histórico" href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>
+            <a class="sidebar__link" data-tooltip="Agendadas" href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>
                 <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Histórico</span>
+                <span>Agendadas</span>
+                {% if scheduled_sidebar_count %}
+                <strong class="sidebar__badge">{{ scheduled_sidebar_count }}</strong>
+                {% endif %}
+            </a>
+            <a class="sidebar__link" data-tooltip="HistÃ³rico" href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>HistÃ³rico</span>
             </a>
         </nav>
 
@@ -78,19 +97,26 @@
         <header class="topbar topbar--minimal" aria-label="Barra superior">
             <div class="topbar__title">{% block header_title %}Alltera Lead Planner{% endblock %}</div>
 
-            {# Pesquisa contextual apenas em páginas que fazem sentido #}
+            {# Pesquisa contextual apenas em pÃ¡ginas que fazem sentido #}
             {% set ep = request.endpoint %}
-            {% if ep in ["mapa_leads", "esquecidas", "sem_coordenadas", "historico"] %}
-                {# Nota: a pesquisa usa #globalSearchInput e #globalSearchResults; o JS já trata ausencia via optional chaining #}
+            {% if ep in ["mapa_leads", "esquecidas", "sem_coordenadas", "agendadas", "historico"] %}
+                {# Nota: a pesquisa usa #globalSearchInput e #globalSearchResults; o JS jÃ¡ trata ausencia via optional chaining #}
                 <div class="global-search" role="search">
                     <div class="global-search__icon" aria-hidden="true"></div>
-                    <input id="globalSearchInput" type="search" placeholder="Pesquisar…" autocomplete="off" aria-label="Pesquisa">
+                    <input id="globalSearchInput" type="search" placeholder="Pesquisarâ€¦" autocomplete="off" aria-label="Pesquisa">
                     <div class="global-search__results" id="globalSearchResults" hidden></div>
                 </div>
             {% endif %}
 
             <div class="topbar__spacer"></div>
-            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar modo escuro">Modo escuro</button>
+            <div class="topbar__actions">
+                <a class="topbar-icon-button" href="{{ url_for('todas_leads') }}" title="Todas as Leads" aria-label="Todas as Leads" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>
+                    <span aria-hidden="true">👤</span>
+                </a>
+                <button class="theme-toggle topbar-icon-button" id="themeToggle" type="button" title="Alternar modo escuro" aria-label="Alternar modo escuro">
+                    <span class="theme-icon" aria-hidden="true">◐</span>
+                </button>
+            </div>
         </header>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -129,13 +155,16 @@
             const themeKey = "alltera.theme";
 
             const globalSearch = document.querySelector(".global-search");
-            // Controla acessibilidade/consistência: se não houver pesquisa no DOM, evita handlers desnecessários.
-            // (Quando a pesquisa estiver desativada por pagina, estes elementos não existem.)
+            // Controla acessibilidade/consistÃªncia: se nÃ£o houver pesquisa no DOM, evita handlers desnecessÃ¡rios.
+            // (Quando a pesquisa estiver desativada por pagina, estes elementos nÃ£o existem.)
             const themeButton = document.getElementById("themeToggle");
             const applyTheme = (theme) => {
                 const dark = theme === "dark";
                 document.body.classList.toggle("dark-mode", dark);
-                if (themeButton) themeButton.textContent = dark ? "Modo claro" : "Modo escuro";
+                if (themeButton) {
+                    themeButton.innerHTML = `<span class="theme-icon" aria-hidden="true">${dark ? "☀" : "◐"}</span>`;
+                    themeButton.setAttribute("title", dark ? "Ativar modo claro" : "Ativar modo escuro");
+                }
                 window.dispatchEvent(new CustomEvent("alltera:theme", { detail: { theme } }));
             };
             applyTheme(localStorage.getItem(themeKey) || "light");
@@ -161,7 +190,7 @@
                     <a class="global-search__item" href="${item.url}">
                         <strong>${item.title || "Sem nome"}</strong>
                         <span>${item.subtitle || ""}</span>
-                        <small>${item.phone || "Sem telefone"} · ${item.commercial || "Sem comercial"}</small>
+                        <small>${item.phone || "Sem telefone"} Â· ${item.commercial || "Sem comercial"}</small>
                     </a>
                 `).join("");
                 searchResults.hidden = false;
@@ -212,3 +241,4 @@
     <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
 </body>
 </html>
+

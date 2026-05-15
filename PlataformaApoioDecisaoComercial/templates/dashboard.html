@@ -17,26 +17,27 @@
         </div>
     </section>
 
-    <section class="metric-grid dashboard-metrics">
-        <article><span>Total leads</span><strong data-count-to="{{ metrics.total }}">{{ metrics.total }}</strong></article>
-        <article><span>Ativas</span><strong data-count-to="{{ metrics.active }}">{{ metrics.active }}</strong></article>
-        <article><span>Esquecidas</span><strong data-count-to="{{ metrics.forgotten }}">{{ metrics.forgotten }}</strong></article>
-        <article><span>Sem coordenadas</span><strong data-count-to="{{ metrics.without_coordinates }}">{{ metrics.without_coordinates }}</strong></article>
-        <article><span>Sem comercial</span><strong data-count-to="{{ metrics.without_commercial }}">{{ metrics.without_commercial }}</strong></article>
-        <article><span>Contactos hoje</span><strong data-count-to="{{ metrics.contacts_today }}">{{ metrics.contacts_today }}</strong></article>
-        <article><span>Sem resposta</span><strong data-count-to="{{ metrics.unanswered }}">{{ metrics.unanswered }}</strong></article>
-        <article><span>Reuniões / CRM</span><strong data-count-to="{{ metrics.meetings }}">{{ metrics.meetings }}</strong></article>
+    <section class="metric-grid dashboard-metrics" data-dashboard-sortable="metrics">
+        <article data-dashboard-card="metric-total"><span>Total leads</span><strong data-count-to="{{ metrics.total }}">{{ metrics.total }}</strong></article>
+        <article data-dashboard-card="metric-active"><span>Ativas</span><strong data-count-to="{{ metrics.active }}">{{ metrics.active }}</strong></article>
+        <article data-dashboard-card="metric-forgotten"><span>Esquecidas</span><strong data-count-to="{{ metrics.forgotten }}">{{ metrics.forgotten }}</strong></article>
+        <article data-dashboard-card="metric-without-coordinates"><span>Sem coordenadas</span><strong data-count-to="{{ metrics.without_coordinates }}">{{ metrics.without_coordinates }}</strong></article>
+        <article data-dashboard-card="metric-without-commercial"><span>Sem comercial</span><strong data-count-to="{{ metrics.without_commercial }}">{{ metrics.without_commercial }}</strong></article>
+        <article data-dashboard-card="metric-contacts-today"><span>Contactos hoje</span><strong data-count-to="{{ metrics.contacts_today }}">{{ metrics.contacts_today }}</strong></article>
+        <article data-dashboard-card="metric-unanswered"><span>Sem resposta</span><strong data-count-to="{{ metrics.unanswered }}">{{ metrics.unanswered }}</strong></article>
+        <article data-dashboard-card="metric-meetings"><span>Reuniões / CRM</span><strong data-count-to="{{ metrics.meetings }}">{{ metrics.meetings }}</strong></article>
+        <article data-dashboard-card="metric-followups"><span>Follow-ups hoje</span><strong data-count-to="{{ metrics.followups_today }}">{{ metrics.followups_today }}</strong></article>
     </section>
 
-    <section class="dashboard-masonry">
-        <article class="panel dashboard-card dashboard-card--featured">
+    <section class="dashboard-masonry" data-dashboard-sortable="widgets">
+        <article class="panel dashboard-card dashboard-card--featured" data-dashboard-card="best-zone">
             <p class="eyebrow">Melhor zona hoje</p>
             <strong>{{ best_zone.name }}</strong>
             <span>{{ best_zone.count }} leads ativas com coordenadas</span>
             <a class="link-button" href="{{ url_for('mapa_leads') }}">Abrir no mapa</a>
         </article>
 
-        <article class="panel dashboard-card dashboard-card--list">
+        <article class="panel dashboard-card dashboard-card--list" data-dashboard-card="recent-leads">
             <p class="eyebrow">Leads recentes</p>
             <div class="dashboard-list">
                 {% for lead in recent_leads %}
@@ -50,7 +51,7 @@
             </div>
         </article>
 
-        <article class="panel dashboard-card dashboard-card--list">
+        <article class="panel dashboard-card dashboard-card--list" data-dashboard-card="recent-imports">
             <p class="eyebrow">Importações recentes</p>
             <div class="dashboard-list">
                 {% for item in recent_imports %}
@@ -64,7 +65,7 @@
             </div>
         </article>
 
-        <article class="panel dashboard-card dashboard-card--list">
+        <article class="panel dashboard-card dashboard-card--list" data-dashboard-card="commercial-counts">
             <p class="eyebrow">Leads por comercial</p>
             <div class="dashboard-list">
                 {% for commercial, count in commercial_counts %}
@@ -74,6 +75,26 @@
                 {% endfor %}
             </div>
         </article>
+
+        <article class="panel dashboard-card dashboard-card--list followups-card" data-dashboard-card="followups-today">
+            <p class="eyebrow">Follow-ups de hoje</p>
+            <strong>{{ metrics.followups_today }} agendadas{% if followups_overdue_count %} · {{ followups_overdue_count }} atrasadas{% endif %}</strong>
+            <div class="dashboard-list">
+                {% for lead in followups_today %}
+                <a href="{{ url_for('mapa_leads', lead_id=lead.id) }}">
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.telefone or "Sem telefone" }} · {{ lead.cidade or lead.localidade or "Sem cidade" }}</span>
+                </a>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem follow-ups agendados para hoje.</p>
+                {% endfor %}
+            </div>
+            <a class="link-button" href="{{ url_for('agendadas') }}">Ver agendadas</a>
+        </article>
     </section>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 {% endblock %}

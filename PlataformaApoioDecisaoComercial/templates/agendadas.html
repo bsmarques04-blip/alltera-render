@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Agendadas | Alltera{% endblock %}
+{% block header_title %}Agendadas{% endblock %}
+
+{% macro empty_state(title, subtitle) %}
+<div class="scheduled-empty">
+    <div class="scheduled-empty__icon" aria-hidden="true"></div>
+    <strong>{{ title }}</strong>
+    <span>{{ subtitle }}</span>
+</div>
+{% endmacro %}
+
+{% macro scheduled_card(lead, tone="default") %}
+{% set name = lead.nome_cliente or lead.nome_empresa %}
+<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}">
+    <div class="scheduled-lead-card__top">
+        <div class="scheduled-avatar" aria-hidden="true">{{ name[:1]|upper }}</div>
+        <div class="scheduled-lead-card__identity">
+            <strong>{{ name }}</strong>
+            <span>{{ lead.empresa or lead.nome_empresa }}</span>
+        </div>
+        <span class="scheduled-date-pill">{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-" }}</span>
+    </div>
+
+    <div class="scheduled-lead-card__details">
+        <span>{{ lead.telefone or lead.contacto or "Sem telefone" }}</span>
+        <span>{{ lead.cidade or lead.localidade or "Sem cidade" }}</span>
+        <span>{{ lead.comercial_responsavel or "Sem comercial" }}</span>
+    </div>
+
+    <div class="scheduled-note">
+        {{ lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.estado }}
+    </div>
+
+    <div class="scheduled-lead-card__actions">
+        <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir no mapa</a>
+        <form method="post">
+            <input type="hidden" name="lead_id" value="{{ lead.id }}">
+            <input type="hidden" name="action" value="contactada">
+            <button class="link-button" type="submit">Contactada</button>
+        </form>
+        <form method="post" class="scheduled-reschedule-form">
+            <input type="hidden" name="lead_id" value="{{ lead.id }}">
+            <input type="hidden" name="action" value="reagendar">
+            <input type="date" name="data_novo_contacto" value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else today.isoformat() }}" required>
+            <button class="link-button" type="submit">Reagendar</button>
+        </form>
+    </div>
+</article>
+{% endmacro %}
+
+{% macro scheduled_section(title, subtitle, count, items, tone, empty_title, empty_subtitle) %}
+<section class="scheduled-section-card scheduled-section-card--{{ tone }}">
+    <header class="scheduled-section-card__header">
+        <div>
+            <p class="eyebrow">{{ subtitle }}</p>
+            <h2>{{ title }}</h2>
+        </div>
+        <span class="scheduled-count scheduled-count--{{ tone }}">{{ count }}</span>
+    </header>
+    <div class="scheduled-section-card__body">
+        {% for lead in items %}
+            {{ scheduled_card(lead, tone) }}
+        {% else %}
+            {{ empty_state(empty_title, empty_subtitle) }}
+        {% endfor %}
+    </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+<main class="page-shell scheduled-page">
+    <section class="scheduled-hero-v2">
+        <div class="scheduled-hero-v2__copy">
+            <p class="eyebrow">Operação comercial</p>
+            <h1>Leads agendadas</h1>
+            <p>Follow-ups, contactos adiados e oportunidades a retomar no momento certo.</p>
+        </div>
+        <div class="scheduled-hero-stats">
+            <article><span>Hoje</span><strong>{{ scheduled.today_count }}</strong></article>
+            <article class="is-warning"><span>Atrasadas</span><strong>{{ scheduled.overdue_count }}</strong></article>
+            <article><span>Total em agenda</span><strong>{{ scheduled.today|length + scheduled.overdue|length + scheduled.next7|length + scheduled.future|length }}</strong></article>
+        </div>
+    </section>
+
+    <section class="scheduled-grid-v2">
+        {{ scheduled_section(
+            "Agendadas para hoje",
+            "Prioridade do dia",
+            scheduled.today|length,
+            scheduled.today,
+            "today",
+            "Sem leads agendadas para hoje",
+            "Tudo em dia."
+        ) }}
+
+        {{ scheduled_section(
+            "Atrasadas",
+            "Requer atenção",
+            scheduled.overdue|length,
+            scheduled.overdue,
+            "overdue",
+            "Sem leads atrasadas",
+            "Nenhum follow-up ficou para trás."
+        ) }}
+
+        {{ scheduled_section(
+            "Próximos 7 dias",
+            "Semana operacional",
+            scheduled.next7|length,
+            scheduled.next7,
+            "next",
+            "Sem agendamentos próximos",
+            "A semana está livre nesta fila."
+        ) }}
+
+        {{ scheduled_section(
+            "Futuras",
+            "Mais à frente",
+            scheduled.future|length,
+            scheduled.future,
+            "future",
+            "Sem leads futuras",
+            "Ainda não existem contactos planeados para depois."
+        ) }}
+    </section>
+</main>
+{% endblock %}

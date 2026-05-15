@@ -1,0 +1,19 @@
+{
+  "name": "Alltera Lead Planner",
+  "short_name": "Alltera",
+  "icons": [
+    {
+      "src": "/static/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0f766e",
+  "background_color": "#111827",
+  "display": "standalone"
+}

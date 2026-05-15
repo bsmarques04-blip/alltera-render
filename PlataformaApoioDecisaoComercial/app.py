@@ -49,6 +49,7 @@ LEAD_STATES = [
     "Sem interesse",
 ]
 ACTIVE_STATES = ["Por contactar", "Ligar de volta"]
+SCHEDULED_STATES = {"Ligar de volta", "Adiar contacto", "Sem interesse"}
 CLASSIFICATION_FILTERS = [
     ("ativos", "Todos ativos"),
     ("por_contactar", "Por contactar"),
@@ -705,6 +706,8 @@ def is_active_lead(lead, today=None):
     state = normalize_legacy_state(lead.estado)
     if state == "Já tratado / no CRM" or state == "Sem interesse":
         return False
+    if is_scheduled_lead(lead) and lead.data_novo_contacto > today:
+        return False
     if lead.estado in ACTIVE_STATES:
         return True
     if lead.estado == "Adiar contacto" and lead.data_novo_contacto and lead.data_novo_contacto <= today:
@@ -723,6 +726,63 @@ def is_inactive_lead(lead, today=None):
     if lead.classificacao_observacao == "Adiar contacto" and lead.data_novo_contacto and lead.data_novo_contacto > today:
         return True
     return False
+
+
+def is_scheduled_lead(lead):
+    if not lead or not lead.data_novo_contacto:
+        return False
+    state = normalize_legacy_state(lead.estado)
+    text = normalize_lookup(" ".join([
+        lead.estado or "",
+        lead.classificacao_observacao or "",
+        lead.observacoes or "",
+        lead.observacoes_contacto or "",
+        lead.motivo_classificacao or "",
+    ]))
+    if state in SCHEDULED_STATES:
+        return True
+    return any(token in text for token in [
+        "voltar a ligar",
+        "contactar mais tarde",
+        "reagendada",
+        "reagendar",
+        "sem interesse para ja",
+        "aguardar resposta",
+        "ligar depois",
+        "voltar a contactar",
+    ])
+
+
+def scheduled_bucket(lead, today=None):
+    today = today or date.today()
+    if not is_scheduled_lead(lead):
+        return ""
+    if lead.data_novo_contacto < today:
+        return "overdue"
+    if lead.data_novo_contacto == today:
+        return "today"
+    if lead.data_novo_contacto <= today + timedelta(days=7):
+        return "next7"
+    return "future"
+
+
+def scheduled_leads_context(limit_today=None):
+    today = date.today()
+    buckets = {"today": [], "overdue": [], "next7": [], "future": []}
+    for lead in Lead.query.order_by(Lead.data_novo_contacto.asc(), Lead.nome_empresa.asc()).all():
+        bucket = scheduled_bucket(lead, today)
+        if bucket:
+            buckets[bucket].append(lead)
+    today_items = buckets["today"][:limit_today] if limit_today else buckets["today"]
+    return {
+        "today": today_items,
+        "overdue": buckets["overdue"],
+        "next7": buckets["next7"],
+        "future": buckets["future"],
+        "today_count": len(buckets["today"]),
+        "overdue_count": len(buckets["overdue"]),
+        "badge_count": len(buckets["today"]) + len(buckets["overdue"]),
+    }
 
 
 def classify_observations(observacoes="", observacoes_contacto=""):
@@ -2172,10 +2232,12 @@ def invalid_location_value(value):
 
 
 def needs_coordinate_review(lead):
+    if valid_coordinates(lead.latitude, lead.longitude):
+        return False
     return (
-        not valid_coordinates(lead.latitude, lead.longitude)
-        or invalid_location_value(lead.cidade or lead.localidade)
+        invalid_location_value(lead.cidade or lead.localidade)
         or "Ignorar mapa" in lead.tag_list()
+        or not valid_coordinates(lead.latitude, lead.longitude)
     )
 
 
@@ -2329,6 +2391,7 @@ def dashboard_context():
     leads = Lead.query.order_by(Lead.updated_at.desc()).all()
     no_coords = [lead for lead in leads if needs_coordinate_review(lead)]
     active = [lead for lead in leads if is_active_lead(lead)]
+    scheduled = scheduled_leads_context(limit_today=5)
     zone_counts = Counter((lead.cidade or lead.localidade or "Sem cidade") for lead in active if valid_coordinates(lead.latitude, lead.longitude))
     best_zone = zone_counts.most_common(1)[0] if zone_counts else ("Sem zona ativa", 0)
     today = date.today()
@@ -2345,12 +2408,16 @@ def dashboard_context():
             "contacts_today": sum(1 for item in today_history if "contact" in normalize_lookup(item.acao) or "ligar" in normalize_lookup(item.acao)),
             "meetings": sum(1 for lead in leads if "reun" in normalize_lookup(lead.estado)),
             "unanswered": sum(1 for lead in leads if "nao atendeu" in normalize_lookup(" ".join([lead.observacoes or "", lead.observacoes_contacto or ""]))),
+            "followups_today": scheduled["today_count"],
+            "followups_overdue": scheduled["overdue_count"],
         },
         "best_zone": {"name": best_zone[0], "count": best_zone[1]},
         "recent_leads": leads[:6],
         "recent_imports": recent_imports,
         "commercial_counts": commercial_counts.most_common(5),
         "score_preview": sorted([(lead, operational_score(lead)) for lead in leads if lead.latitude is not None or lead.longitude is not None], key=lambda item: item[1], reverse=True)[:6],
+        "followups_today": scheduled["today"],
+        "followups_overdue_count": scheduled["overdue_count"],
     }
 
 
@@ -2716,6 +2783,10 @@ def run_import_job(app, job_id, filename, file_bytes, auto_geocode, sheet_name=N
 
 
 def register_routes(app):
+    @app.context_processor
+    def inject_sidebar_counts():
+        return {"scheduled_sidebar_count": scheduled_leads_context()["badge_count"]}
+
     @app.route("/")
     def dashboard():
         return render_template("dashboard.html", **dashboard_context())
@@ -2723,6 +2794,67 @@ def register_routes(app):
     @app.route("/mapa")
     def mapa_leads():
         return render_template("mapa.html", options=get_options(), metrics=minimal_metrics())
+
+    @app.route("/todas-leads")
+    def todas_leads():
+        leads = Lead.query.order_by(Lead.nome_empresa.asc()).all()
+        total = len(leads)
+        with_coords = sum(1 for lead in leads if valid_coordinates(lead.latitude, lead.longitude))
+        scheduled = sum(1 for lead in leads if is_scheduled_lead(lead))
+        payload = []
+        tags = set()
+        states = set()
+        for lead in leads:
+            item = lead.to_dict(include_history=False)
+            item["estado"] = normalize_legacy_state(item["estado"])
+            item["ativa"] = is_active_lead(lead)
+            item["agendada"] = is_scheduled_lead(lead)
+            item["tem_coordenadas"] = valid_coordinates(lead.latitude, lead.longitude)
+            item["comercial_responsavel"] = display_commercial(item.get("comercial_responsavel"))
+            payload.append(item)
+            states.add(item["estado"])
+            for tag in item.get("tags", []):
+                if tag:
+                    tags.add(tag)
+        return render_template(
+            "todas_leads.html",
+            leads=payload,
+            summary={
+                "total": total,
+                "with_coords": with_coords,
+                "without_coords": total - with_coords,
+                "scheduled": scheduled,
+            },
+            filters={"states": sorted(states), "tags": sorted(tags)},
+        )
+
+    @app.route("/agendadas", methods=["GET", "POST"])
+    def agendadas():
+        if request.method == "POST":
+            lead = Lead.query.get_or_404(int(request.form.get("lead_id")))
+            action = request.form.get("action")
+            note = clean_text(request.form.get("observacao"))
+            if action == "contactada":
+                lead.estado = "Ligar de volta"
+                lead.estado_lead = lead.estado
+                lead.data_novo_contacto = None
+                add_history(lead, "Lead contactada", note or "Follow-up marcado como contactado.")
+                flash("Lead marcada como contactada.", "success")
+            elif action == "reagendar":
+                new_date = parse_date(request.form.get("data_novo_contacto"))
+                if not new_date:
+                    flash("Escolhe uma data valida para reagendar.", "error")
+                    return redirect(url_for("agendadas"))
+                lead.estado = "Adiar contacto"
+                lead.estado_lead = lead.estado
+                lead.data_novo_contacto = new_date
+                lead.motivo_classificacao = note or "Lead reagendada manualmente."
+                add_history(lead, "Lead reagendada", f"Novo contacto: {new_date}. {note}")
+                flash("Lead reagendada.", "success")
+            db.session.commit()
+            return redirect(url_for("agendadas"))
+
+        return render_template("agendadas.html", scheduled=scheduled_leads_context(), today=date.today())
 
     @app.route("/leads/nova", methods=["GET", "POST"])
     def adicionar_lead():
@@ -3147,6 +3279,8 @@ def register_routes(app):
             item["comercial_responsavel"] = display_commercial(item.get("comercial_responsavel"))
             item["comercial_key"] = normalize_commercial_key(item.get("comercial_responsavel"))
             item["ativa"] = is_active_lead(lead)
+            item["agendada"] = is_scheduled_lead(lead)
+            item["agenda_bucket"] = scheduled_bucket(lead)
             item["tem_coordenadas"] = lead.latitude is not None and lead.longitude is not None
             payload.append(item)
         return jsonify(payload)
@@ -3209,6 +3343,8 @@ def register_routes(app):
 
         if action in {"contactado", "ligar_volta"}:
             lead.estado = "Ligar de volta"
+            if action == "contactado":
+                lead.data_novo_contacto = None
             add_history(lead, "Estado alterado", observation or "Lead marcada para ligar de volta.", commercial)
         elif action == "corrigir_estado":
             new_state = clean_text(data.get("estado"))

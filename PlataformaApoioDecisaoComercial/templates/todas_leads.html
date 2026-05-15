@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Todas as Leads | Alltera{% endblock %}
+{% block header_title %}Todas as Leads{% endblock %}
+
+{% block content %}
+<main class="page-shell all-leads-page">
+    <section class="panel all-leads-hero">
+        <div>
+            <p class="eyebrow">Operação comercial</p>
+            <h1>Todas as Leads</h1>
+            <p>Consulta global com pesquisa rápida, filtros e ações operacionais.</p>
+        </div>
+    </section>
+
+    <section class="metric-grid dashboard-metrics">
+        <article><span>Total de leads</span><strong>{{ summary.total }}</strong></article>
+        <article><span>Com localização</span><strong>{{ summary.with_coords }}</strong></article>
+        <article><span>Sem localização</span><strong>{{ summary.without_coords }}</strong></article>
+        <article><span>Agendadas</span><strong>{{ summary.scheduled }}</strong></article>
+    </section>
+
+    <section class="panel all-leads-toolbar">
+        <label>Pesquisar
+            <input id="allLeadsSearch" type="search" placeholder="Nome, empresa, cidade, telefone">
+        </label>
+        <label>Estado
+            <select id="allLeadsState">
+                <option value="">Todos</option>
+                {% for state in filters.states %}<option value="{{ state }}">{{ state }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Tag
+            <select id="allLeadsTag">
+                <option value="">Todas</option>
+                {% for tag in filters.tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Localização
+            <select id="allLeadsCoords">
+                <option value="">Todas</option>
+                <option value="with">Com localização</option>
+                <option value="without">Sem localização</option>
+            </select>
+        </label>
+    </section>
+
+    <section class="panel table-card all-leads-table-wrap">
+        <div class="all-leads-table" id="allLeadsTable"></div>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const allLeads = {{ leads|tojson }};
+    const els = {
+        table: document.getElementById("allLeadsTable"),
+        search: document.getElementById("allLeadsSearch"),
+        state: document.getElementById("allLeadsState"),
+        tag: document.getElementById("allLeadsTag"),
+        coords: document.getElementById("allLeadsCoords"),
+    };
+    const norm = (v) => String(v || "").toLowerCase();
+    const leadName = (lead) => lead.nome_cliente || lead.nome || lead.empresa || lead.nome_empresa || "Lead sem nome";
+    const badge = (text, cls) => `<span class="tag all-leads-tag ${cls || ""}">${text}</span>`;
+    const leadNotes = (lead) => String(
+        lead.observacoes ||
+        lead.observacao ||
+        lead.notes ||
+        lead.nota ||
+        lead.comentarios ||
+        lead.observacoes_contacto ||
+        ""
+    ).trim() || "Sem observações";
+
+    function matches(lead) {
+        const q = norm(els.search.value).trim();
+        if (q) {
+            const hay = norm([leadName(lead), lead.nome_empresa, lead.cidade, lead.localidade, lead.telefone].join(" "));
+            if (!hay.includes(q)) return false;
+        }
+        if (els.state.value && lead.estado !== els.state.value) return false;
+        if (els.tag.value && !(lead.tags || []).includes(els.tag.value)) return false;
+        if (els.coords.value === "with" && !lead.tem_coordenadas) return false;
+        if (els.coords.value === "without" && lead.tem_coordenadas) return false;
+        return true;
+    }
+
+    function actions(lead) {
+        const mapUrl = lead.tem_coordenadas ? `/mapa?lead_id=${lead.id}` : "";
+        return `
+            <div class="all-leads-actions">
+                ${lead.tem_coordenadas ? `<a class="button secondary" href="${mapUrl}">Ver no mapa</a>` : `<span class="tag">Sem mapa</span>`}
+                <a class="button secondary" href="/adicionar">Abrir/editar</a>
+            </div>
+        `;
+    }
+
+    function render() {
+        const rows = allLeads.filter(matches);
+        els.table.innerHTML = rows.map((lead) => `
+            <article class="all-leads-row">
+                <div class="all-leads-main">
+                    <strong>${leadName(lead)}</strong>
+                    <p>${lead.nome_empresa || "Sem empresa"} · ${lead.cidade || lead.localidade || "Sem cidade"} · ${lead.telefone || "Sem telefone"}</p>
+                    <small class="all-leads-notes">${leadNotes(lead)}</small>
+                </div>
+                <div class="all-leads-badges">
+                    ${badge(lead.tem_coordenadas ? "Com localização" : "Sem localização", lead.tem_coordenadas ? "tag--ok" : "tag--warn")}
+                    ${lead.agendada ? badge("Agendada", "tag--info") : ""}
+                    ${lead.estado === "Por contactar" ? badge("Por contactar", "tag--soft") : ""}
+                    ${lead.ativa ? "" : badge("Inativa", "tag--danger")}
+                </div>
+                ${actions(lead)}
+            </article>
+        `).join("") || `<p class="empty-state">Sem leads para os filtros aplicados.</p>`;
+    }
+
+    [els.search, els.state, els.tag, els.coords].forEach((el) => el?.addEventListener("input", render));
+    [els.state, els.tag, els.coords].forEach((el) => el?.addEventListener("change", render));
+    render();
+})();
+</script>
+{% endblock %}
