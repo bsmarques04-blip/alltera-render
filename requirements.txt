@@ -1,5 +1,7 @@
 Flask
 Flask-SQLAlchemy
+SQLAlchemy
+Werkzeug
 openpyxl
 requests
 gunicorn
