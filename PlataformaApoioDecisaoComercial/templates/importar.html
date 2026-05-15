@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Leads | Alltera{% endblock %}
+
+{% block header_title %}Importar Leads{% endblock %}
+
+{% block content %}
+<main class="page-shell">
+    <section class="panel import-hero import-hero--premium">
+        <div>
+            <p class="eyebrow">Ingestão de dados</p>
+            <h1>Importar leads da Alltera</h1>
+            <p>Consolida ficheiros Excel ou CSV, normaliza cidades e prepara as leads para planeamento geográfico no mapa comercial.</p>
+        </div>
+        <div class="import-hero__signal" aria-hidden="true">
+            <span></span>
+            <strong>City-based mapping</strong>
+        </div>
+    </section>
+
+    <section class="import-grid">
+        <form class="panel import-form import-dropzone" id="importForm" method="post" enctype="multipart/form-data">
+            <div class="upload-icon" aria-hidden="true"></div>
+            <h2>Carregar ficheiro</h2>
+            <p class="hint">Arrasta o ficheiro para esta zona ou seleciona manualmente.</p>
+            <label>Ficheiro .xlsx ou .csv<input type="file" name="ficheiro" accept=".xlsx,.csv" required></label>
+<label class="check-row"><input type="checkbox" name="auto_geocode" value="1"> Obter coordenadas pela cidade automaticamente</label>
+            <p class="hint" style="margin-top:-6px;">Por defeito, a importacao nao faz geocoding. As leads sem coordenadas nao aparecem no mapa ate um geocoding posterior.</p>
+            <p class="hint" style="margin-top:-2px;">Importação em curso: se o geocoding automatico estiver ativo, pode demorar.</p>
+            <button class="button" id="importButton" type="submit">Analisar ficheiro</button>
+            <p class="hint" id="importLoading" hidden>A importar ficheiro...</p>
+        </form>
+
+        <section class="panel accepted-columns-panel">
+            <h2>Colunas aceites</h2>
+            <p class="hint">Formato real da folha Alltera:</p>
+            <div class="columns-list">{% for column in real_columns %}<code>{{ column }}</code>{% endfor %}</div>
+            <p class="hint">Se algumas colunas nao existirem, a importacao continua e guarda o que estiver disponivel.</p>
+            <p class="hint">O mapa usa <strong>Cidade</strong> para posicionamento aproximado. Nao e necessario preencher morada, codigo postal, latitude ou longitude.</p>
+        </section>
+    </section>
+
+    <section class="panel sheet-picker" id="sheetPicker" hidden>
+        <div class="panel-head">
+            <h2>Selecionar folha para importar</h2>
+            <span class="tag" id="sheetFileName">Excel</span>
+        </div>
+        <p class="hint">Escolhe a folha correta antes de importar. Apenas a folha selecionada será processada.</p>
+        <div class="sheet-options" id="sheetOptions"></div>
+        <div class="sheet-actions">
+            <button class="button" id="continueImportButton" type="button">Importar folha selecionada</button>
+            <button class="button secondary" id="cancelSheetButton" type="button">Cancelar</button>
+        </div>
+    </section>
+
+    <section class="panel import-progress-panel" id="asyncImportProgress" hidden>
+        <div class="panel-head">
+            <h2>Progresso da importacao</h2>
+            <span class="tag" id="progressPercent">0%</span>
+        </div>
+        <div class="import-progress-bar" aria-hidden="true">
+            <span id="progressBar"></span>
+        </div>
+        <div class="import-progress-status">
+            <strong id="progressPhase">Preparar ficheiro...</strong>
+            <p class="hint"><span id="progressElapsed">0s decorridos</span> · <span id="progressEta">a calcular...</span></p>
+            <p class="hint" id="progressCity"></p>
+        </div>
+        <section class="metric-grid import-metrics import-progress-metrics">
+            <article><span>Linhas</span><strong><span id="progressRowsDone">0</span>/<span id="progressRowsTotal">0</span></strong></article>
+            <article><span>Cidades geocodificadas</span><strong><span id="progressCitiesDone">0</span>/<span id="progressCitiesTotal">0</span></strong></article>
+            <article><span>Leads criadas</span><strong id="progressImported">0</strong></article>
+            <article><span>Leads atualizadas</span><strong id="progressUpdated">0</strong></article>
+            <article><span>Duplicados</span><strong id="progressDuplicates">0</strong></article>
+            <article><span>Erros</span><strong id="progressErrors">0</strong></article>
+        </section>
+    </section>
+
+    <section class="panel import-result" id="asyncImportResult" hidden></section>
+
+    {% if latest_import %}
+    <section class="panel latest-import-card">
+        <span>Última importação</span>
+        <strong>{{ latest_import.created_at.strftime("%d %b · %H:%M") }}</strong>
+        <p>{{ latest_import.imported }} leads adicionadas · {{ latest_import.duplicates }} duplicados ignorados</p>
+    </section>
+    {% endif %}
+
+    {% if summary %}
+    <section class="panel import-result">
+        <div class="panel-head"><h2>Resumo da importacao</h2><span class="tag">{{ summary.read }} lidas</span></div>
+        <section class="metric-grid import-metrics">
+            <article><span>Leads importadas</span><strong>{{ summary.imported }}</strong></article>
+            <article><span>Leads com coordenadas</span><strong>{{ summary.with_coordinates or (summary.read - summary.without_coordinates) }}</strong></article>
+            <article><span>Leads sem coordenadas</span><strong>{{ summary.without_coordinates }}</strong></article>
+            <article><span>Leads atualizadas</span><strong>{{ summary.updated }}</strong></article>
+            <article><span>Duplicados ignorados</span><strong>{{ summary.duplicates }}</strong></article>
+            <article><span>Erros</span><strong>{{ summary.errors|length }}</strong></article>
+            <article><span>Cidades únicas</span><strong>{{ summary.unique_cities or 0 }}</strong></article>
+            <article><span>Cidades geocodificadas</span><strong>{{ summary.cities_geocoded|length }}</strong></article>
+            <article><span>Cidades por fallback</span><strong>{{ summary.cities_fallback|length }}</strong></article>
+            <article><span>Cidades sem coordenadas</span><strong>{{ summary.cities_not_found|length }}</strong></article>
+        </section>
+        {% if summary.sheets_imported %}
+        <p class="hint">Folhas importadas: {{ summary.sheets_imported|join(', ') }}</p>
+        {% endif %}
+        {% if summary.without_coordinates %}
+        <p class="message inline-message">{{ summary.without_coordinates }} leads foram importadas sem coordenadas e nao aparecem no mapa ate a cidade ser corrigida.</p>
+        <p class="hint"><a href="{{ url_for('sem_coordenadas') }}">Ver leads sem coordenadas</a></p>
+        {% endif %}
+        {% if summary.cities_geocoded %}
+        <p class="hint">Cidades geocodificadas: {{ summary.cities_geocoded|join(', ') }}</p>
+        {% endif %}
+        {% if summary.cities_not_found %}
+        <p class="hint">Cidades nao encontradas: {{ summary.cities_not_found|join(', ') }}</p>
+        {% endif %}
+        <section class="metric-grid import-metrics import-metrics--secondary">
+            <article><span>Ligar de volta</span><strong>{{ summary.classification_counts['Ligar de volta'] }}</strong></article>
+            <article><span>Adiar contacto</span><strong>{{ summary.classification_counts['Adiar contacto'] }}</strong></article>
+            <article><span>Sem interesse</span><strong>{{ summary.classification_counts['Sem interesse definitivo'] }}</strong></article>
+            <article><span>Reuniao marcada</span><strong>{{ summary.classification_counts['Reunião marcada'] }}</strong></article>
+            <article><span>Rever manualmente</span><strong>{{ summary.classification_counts['Rever manualmente'] }}</strong></article>
+        </section>
+        {% if summary.city_normalization %}
+        <details class="panel panel--inset import-technical">
+            <summary>Detalhes de normalização e geocoding</summary>
+        <div class="errors-table">
+            {% for item in summary.city_normalization %}
+            <article>
+                <strong class="cadeia-geo">{{ item.cadeia }}</strong>
+                <p class="hint hint--tight">Extraída: {{ item.extraida }} · Normalizada: {{ item.normalizada }}</p>
+                <p>Geocoding: {{ item.geocoding }} <span class="tag">{{ item.resultado }}</span></p>
+            </article>
+            {% endfor %}
+        </div>
+        </details>
+        {% endif %}
+        {% if summary.geocoding_errors %}
+        <details class="panel panel--inset import-technical">
+            <summary>Erros técnicos de geocoding</summary>
+        <div class="errors-table">
+            {% for error in summary.geocoding_errors %}
+            <article><strong>Geocoding - Linha {{ error.line }} - {{ error.name }}</strong><p>Query: {{ error.query or '-' }}</p><p>{{ error.error }}</p></article>
+            {% endfor %}
+        </div>
+        </details>
+        {% endif %}
+        {% if summary.errors %}
+        <details class="panel panel--inset import-technical">
+            <summary>Erros de importacao</summary>
+        <div class="errors-table">
+            {% for error in summary.errors %}
+            <article><strong>Linha {{ error.line }}</strong><p>{{ error.error }}</p></article>
+            {% endfor %}
+        </div>
+        </details>
+        {% endif %}
+    </section>
+    {% endif %}
+</main>
+<script>
+    const importForm = document.getElementById("importForm");
+    const importButton = document.getElementById("importButton");
+    const importLoading = document.getElementById("importLoading");
+    const asyncProgress = document.getElementById("asyncImportProgress");
+    const asyncResult = document.getElementById("asyncImportResult");
+    const progressBar = document.getElementById("progressBar");
+    const progressPercent = document.getElementById("progressPercent");
+    const progressPhase = document.getElementById("progressPhase");
+    const progressElapsed = document.getElementById("progressElapsed");
+    const progressEta = document.getElementById("progressEta");
+    const progressCity = document.getElementById("progressCity");
+    const progressRowsDone = document.getElementById("progressRowsDone");
+    const progressRowsTotal = document.getElementById("progressRowsTotal");
+    const progressCitiesDone = document.getElementById("progressCitiesDone");
+    const progressCitiesTotal = document.getElementById("progressCitiesTotal");
+    const progressImported = document.getElementById("progressImported");
+    const progressUpdated = document.getElementById("progressUpdated");
+    const progressDuplicates = document.getElementById("progressDuplicates");
+    const progressErrors = document.getElementById("progressErrors");
+    const fileInput = importForm?.querySelector('input[name="ficheiro"]');
+    const sheetPicker = document.getElementById("sheetPicker");
+    const sheetOptions = document.getElementById("sheetOptions");
+    const sheetFileName = document.getElementById("sheetFileName");
+    const continueImportButton = document.getElementById("continueImportButton");
+    const cancelSheetButton = document.getElementById("cancelSheetButton");
+    let pendingUploadId = "";
+    let selectedSheetName = "";
+
+    function secondsLabel(value) {
+        const seconds = Math.max(0, Math.round(Number(value) || 0));
+        if (seconds < 60) return `${seconds}s decorridos`;
+        const minutes = Math.floor(seconds / 60);
+        const rest = seconds % 60;
+        return `${minutes}m ${rest}s decorridos`;
+    }
+
+    function setProgress(job) {
+        const percent = Math.max(0, Math.min(100, Math.round(job.percent || 0)));
+        progressBar.style.width = `${percent}%`;
+        progressPercent.textContent = `${percent}%`;
+        progressPhase.textContent = job.phase || "A importar ficheiro...";
+        progressElapsed.textContent = secondsLabel(job.elapsed);
+        progressEta.textContent = job.status === "done" ? "concluido" : `~${job.eta || "a calcular"} restantes`;
+        progressCity.textContent = job.current_city ? `Geocodificar ${job.current_city}...` : "";
+        progressRowsDone.textContent = job.processed_rows || 0;
+        progressRowsTotal.textContent = job.total_rows || 0;
+        progressCitiesDone.textContent = job.cities_geocoded || 0;
+        progressCitiesTotal.textContent = job.cities_total || 0;
+        progressImported.textContent = job.imported || 0;
+        progressUpdated.textContent = job.updated || 0;
+        progressDuplicates.textContent = job.duplicates || 0;
+        progressErrors.textContent = job.errors || 0;
+    }
+
+    function renderFinal(job) {
+        const summary = job.summary || {};
+        const error = job.error || "";
+        asyncResult.hidden = false;
+        asyncResult.classList.toggle("import-result--error", job.status === "error");
+        asyncResult.innerHTML = job.status === "error"
+            ? `<div class="panel-head"><h2>Importacao com erro</h2><span class="tag">Erro</span></div><p class="message inline-message">${error}</p>`
+            : `
+                <div class="panel-head"><h2>Importacao concluida</h2><span class="tag">${secondsLabel(job.elapsed).replace(" decorridos", "")}</span></div>
+                <section class="metric-grid import-metrics">
+                    <article><span>Folha importada</span><strong>${(summary.sheets_imported || [])[0] || "CSV"}</strong></article>
+                    <article><span>Linhas lidas</span><strong>${summary.read || 0}</strong></article>
+                    <article><span>Leads criadas</span><strong>${summary.imported || 0}</strong></article>
+                    <article><span>Leads com coordenadas</span><strong>${summary.with_coordinates || 0}</strong></article>
+                    <article><span>Leads sem coordenadas</span><strong>${summary.without_coordinates || 0}</strong></article>
+                    <article><span>Leads atualizadas</span><strong>${summary.updated || 0}</strong></article>
+                    <article><span>Duplicados ignorados</span><strong>${summary.duplicates || 0}</strong></article>
+                    <article><span>Cidades únicas</span><strong>${summary.unique_cities || 0}</strong></article>
+                    <article><span>Cidades geocodificadas</span><strong>${(summary.cities_geocoded || []).length}</strong></article>
+                    <article><span>Cidades por fallback</span><strong>${(summary.cities_fallback || []).length}</strong></article>
+                    <article><span>Cidades sem coordenadas</span><strong>${(summary.cities_not_found || []).length}</strong></article>
+                    <article><span>Erros</span><strong>${(summary.errors || []).length}</strong></article>
+                </section>
+                ${(summary.without_coordinates || 0) > 0 ? `<p class="hint"><a href="{{ url_for('sem_coordenadas') }}">Ver leads sem coordenadas</a></p>` : ""}
+            `;
+    }
+
+    async function pollJob(jobId) {
+        const response = await fetch(`/api/import/progress/${jobId}`);
+        const job = await response.json();
+        if (!response.ok) throw new Error(job.error || "Nao foi possivel obter progresso.");
+        setProgress(job);
+        if (job.status === "done" || job.status === "error") {
+            importButton.disabled = false;
+            importButton.textContent = "Analisar ficheiro";
+            importLoading.hidden = true;
+            renderFinal(job);
+            return;
+        }
+        window.setTimeout(() => pollJob(jobId).catch(showImportError), 700);
+    }
+
+    function showImportError(error) {
+        importButton.disabled = false;
+        importButton.textContent = "Analisar ficheiro";
+        importLoading.hidden = true;
+        asyncResult.hidden = false;
+        asyncResult.classList.add("import-result--error");
+        asyncResult.innerHTML = `<div class="panel-head"><h2>Importacao com erro</h2><span class="tag">Erro</span></div><p class="message inline-message">${error.message}</p>`;
+    }
+
+    function renderSheetPicker(payload) {
+        pendingUploadId = payload.upload_id;
+        selectedSheetName = "";
+        sheetFileName.textContent = payload.filename || "Excel";
+        sheetOptions.innerHTML = (payload.sheets || []).map((sheet, index) => {
+            const badge = sheet.kind === "recommended"
+                ? `<span class="tag">Recomendado</span>`
+                : sheet.kind === "warning"
+                    ? `<span class="tag tag--soft">Provavelmente não é folha de leads</span>`
+                    : "";
+            const disabled = sheet.valid ? "" : "disabled";
+            const checked = !selectedSheetName && sheet.valid && sheet.kind === "recommended" ? "checked" : "";
+            if (checked) selectedSheetName = sheet.name;
+            const columns = (sheet.columns || []).length ? sheet.columns.join(" | ") : "Sem cabeçalho detetado";
+            return `
+                <label class="sheet-option ${sheet.valid ? "" : "sheet-option--disabled"}">
+                    <input type="radio" name="sheet_choice" value="${sheet.name.replace(/"/g, "&quot;")}" ${checked} ${disabled}>
+                    <span>
+                        <strong>${sheet.name}</strong>
+                        <small>${sheet.rows || 0} linhas · ${columns}</small>
+                    </span>
+                    ${badge}
+                </label>
+            `;
+        }).join("");
+        const firstValid = sheetOptions.querySelector('input[name="sheet_choice"]:not(:disabled)');
+        if (!selectedSheetName && firstValid) {
+            firstValid.checked = true;
+            selectedSheetName = firstValid.value;
+        }
+        sheetOptions.querySelectorAll('input[name="sheet_choice"]').forEach((input) => {
+            input.addEventListener("change", () => selectedSheetName = input.value);
+        });
+        sheetPicker.hidden = false;
+        sheetPicker.scrollIntoView({ behavior: "smooth", block: "start" });
+        asyncProgress.hidden = true;
+        importButton.disabled = false;
+        importButton.textContent = "Analisar ficheiro";
+        importLoading.hidden = true;
+    }
+
+    async function startImport(formData) {
+        importButton.disabled = true;
+        importButton.textContent = "A importar...";
+        importLoading.hidden = false;
+        asyncProgress.hidden = false;
+        asyncResult.hidden = true;
+        sheetPicker.hidden = true;
+        setProgress({ percent: 1, phase: "Preparar ficheiro...", elapsed: 0, eta: "a calcular" });
+        const response = await fetch("/api/import/start", {
+            method: "POST",
+            body: formData,
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Erro ao iniciar importacao.");
+        pollJob(payload.job_id).catch(showImportError);
+    }
+
+    continueImportButton?.addEventListener("click", async () => {
+        if (!pendingUploadId || !selectedSheetName) {
+            showImportError(new Error("Seleciona uma folha para continuar."));
+            return;
+        }
+        const formData = new FormData();
+        formData.append("upload_id", pendingUploadId);
+        formData.append("sheet_name", selectedSheetName);
+        if (importForm.querySelector('input[name="auto_geocode"]')?.checked) {
+            formData.append("auto_geocode", "1");
+        }
+        try {
+            await startImport(formData);
+        } catch (error) {
+            showImportError(error);
+        }
+    });
+
+    cancelSheetButton?.addEventListener("click", () => {
+        pendingUploadId = "";
+        selectedSheetName = "";
+        sheetPicker.hidden = true;
+    });
+
+    fileInput?.addEventListener("change", () => {
+        pendingUploadId = "";
+        selectedSheetName = "";
+        sheetPicker.hidden = true;
+        asyncResult.hidden = true;
+        importButton.textContent = fileInput.files?.[0]?.name?.toLowerCase().endsWith(".csv")
+            ? "Importar CSV"
+            : "Analisar ficheiro";
+    });
+
+    if (importForm && importButton && importLoading) {
+        importForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            importButton.disabled = true;
+            importButton.textContent = "A analisar...";
+            importLoading.hidden = false;
+            asyncResult.hidden = true;
+            sheetPicker.hidden = true;
+            try {
+                const file = fileInput?.files?.[0];
+                if (file && file.name.toLowerCase().endsWith(".xlsx")) {
+                    const response = await fetch("/api/import/sheets", {
+                        method: "POST",
+                        body: new FormData(importForm),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error || "Erro ao listar folhas.");
+                    renderSheetPicker(payload);
+                } else {
+                    await startImport(new FormData(importForm));
+                }
+            } catch (error) {
+                showImportError(error);
+            }
+        });
+    }
+</script>
+{% endblock %}

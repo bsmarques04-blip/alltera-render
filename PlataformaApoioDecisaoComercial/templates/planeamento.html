@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Planeamento | Alltera{% endblock %}
+{% block header_title %}Plano operacional{% endblock %}
+
+{% block content %}
+<main class="page-shell planning-page">
+    <section class="panel import-hero planning-hero">
+        <div>
+            <p class="eyebrow">Planeamento geográfico</p>
+            <h1>Plano do dia</h1>
+            <p>Gera uma lista operacional para um único dia, usando uma lead ou zona base. O comercial contacta leads suas ou sem responsável naquela zona.</p>
+        </div>
+        <div class="planning-hero__badge">
+            <span><strong id="planningRadiusValue">{{ filters.raio|int }}</strong> km</span>
+            <strong>raio operacional</strong>
+        </div>
+    </section>
+
+    <section class="panel planning-section">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow">Contactos por zona</p>
+                <h2>Gerar plano do dia</h2>
+            </div>
+        </div>
+        <form method="post" class="form-row">
+            <label>Comercial
+                <select name="comercial">
+                    {% for item in planning_comerciais %}
+                    <option value="{{ item }}" {% if filters.comercial == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Lead base
+                <select name="lead_base">
+                    <option value="">Escolher pela zona</option>
+                    {% for lead in planning_base_leads %}
+                    <option value="{{ lead.id }}" {% if filters.lead_base == lead.id %}selected{% endif %}>{{ lead.nome_cliente or lead.nome_empresa }} · {{ lead.cidade or lead.localidade }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Zona base
+                <select name="cidade">
+                    <option value="">Zona com mais leads</option>
+                    {% for item in options.localidades %}
+                    <option value="{{ item }}" {% if filters.cidade == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Área de negócio
+                <select name="tipo">
+                    <option value="">Todas</option>
+                    {% for item in options.tipos %}
+                    <option value="{{ item }}" {% if filters.tipo == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Raio km<input id="planningRadiusInput" name="raio" type="number" min="1" max="50" value="{{ filters.raio|int }}"></label>
+            <label>Limite contactos<input name="limite" type="number" min="1" max="50" value="{{ filters.limite }}"></label>
+            <button class="button" type="submit">Gerar plano do dia</button>
+        </form>
+    </section>
+
+    {% if plan_summary %}
+    <section class="panel metric-grid import-metrics">
+        <article><span>Leads elegíveis</span><strong>{{ plan_summary.total_leads }}</strong></article>
+        <article><span>Contactos sugeridos</span><strong>{{ plan_summary.suggested_count }}</strong></article>
+        <article><span>Km estimados</span><strong>{{ plan_summary.estimated_km }}</strong></article>
+        <article><span>Cidades abrangidas</span><strong>{{ plan_summary.cities_count }}</strong></article>
+    </section>
+    {% if plan_summary.excluded_other_count %}
+    <section class="panel planning-discreet-warning">
+        Existem {{ plan_summary.excluded_other_count }} leads elegíveis atribuídas a outro comercial, não incluídas neste plano.
+    </section>
+    {% endif %}
+    {% endif %}
+
+    {% if day_plan %}
+    <section class="panel day-contact-card">
+        <div class="panel-head">
+            <div>
+                <p class="eyebrow">Plano do dia</p>
+                <h2>{{ day_plan.zone }}</h2>
+            </div>
+            <span class="tag">{{ day_plan.radius|int }} km</span>
+        </div>
+        <section class="plan-summary plan-summary--compact">
+            <article><span>Comercial</span><strong>{{ day_plan.commercial }}</strong></article>
+            <article><span>Zona aproximada</span><strong>{{ day_plan.zone }}</strong></article>
+            <article><span>Raio usado</span><strong>{{ day_plan.radius|int }} km</strong></article>
+            <article><span>Total sugerido</span><strong>{{ day_plan.rows|length }}</strong></article>
+        </section>
+        {% if day_plan.too_many %}
+        <p class="message inline-message">Existem muitas leads nesta zona. Considera dividir em 2 dias.</p>
+        <button class="button secondary" type="button" disabled>Criar segundo dia</button>
+        {% endif %}
+        <div class="day-lead-list">
+            {% for row in day_plan.rows %}
+            {% set lead = row.lead %}
+            <div class="day-lead-row">
+                <div>
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.empresa or lead.nome_empresa }} · {{ lead.area_negocio or lead.tipo_cliente }}</span>
+                    <small>{{ lead.telefone or "-" }} · {{ lead.cidade or lead.localidade }}</small>
+                </div>
+                <span class="tag distance-badge">{{ row.distance }} km</span>
+                <span class="tag planning-owner-badge">{{ planning_ownership_label(lead, filters.comercial) }}</span>
+                <a class="link-button" href="{{ url_for('mapa_leads') }}?lead_id={{ lead.id }}">Ver no mapa</a>
+            </div>
+            {% else %}
+            <p class="empty-state empty-state--quiet">Sem contactos elegíveis para esta zona.</p>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+    <section class="panel">
+        <p class="empty-state">Escolhe comercial, lead base ou zona base e gera um plano do dia.</p>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/planeamento.js') }}"></script>
+{% endblock %}

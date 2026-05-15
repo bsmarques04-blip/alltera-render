@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Historico | Alltera{% endblock %}
+
+{% block header_title %}Histórico{% endblock %}
+
+{% block content %}
+<main class="page-shell history-page">
+    <section class="panel import-hero history-hero">
+        <div>
+            <p class="eyebrow">Rastreabilidade</p>
+            <h1>Histórico operacional</h1>
+            <p>Consulta contactos, reuniões, adiamentos e alterações de estado com uma leitura rápida e auditável.</p>
+        </div>
+        <div class="history-hero__meta">
+            <span>{{ entries|length }}</span>
+            <strong>registos</strong>
+        </div>
+    </section>
+    <section class="panel history-toolbar">
+        <div>
+            <label class="history-filter-label">Tipo de ação
+                <select id="historyActionFilter">
+                    <option value="">Todos os eventos</option>
+                    <option value="import">Importação</option>
+                    <option value="reun">Reunião marcada</option>
+                    <option value="adi">Contacto adiado</option>
+                    <option value="estado">Estado alterado</option>
+                    <option value="plano">Plano criado</option>
+                </select>
+            </label>
+            <span class="tag tag--soft">Ordenação cronológica</span>
+        </div>
+        <p class="hint">Histórico criado automaticamente pelas ações da aplicação.</p>
+    </section>
+    <section class="panel history-panel">
+        <div class="history-table">
+            {% for entry in entries %}
+            <article class="history-entry" data-action-text="{{ entry.acao|lower }}">
+                <div class="history-entry__date">
+                    <strong>{{ entry.created_at.strftime("%d/%m") }}</strong>
+                    <span>{{ entry.created_at.strftime("%H:%M") }}</span>
+                </div>
+                <div class="history-entry__body">
+                    <div class="history-entry__top">
+                        <strong>{{ entry.acao }}</strong>
+                        <span class="tag action-badge">{{ entry.comercial_responsavel or "Sem comercial" }}</span>
+                    </div>
+                    <span>{{ entry.lead.nome_empresa }}</span>
+                    <p>{{ entry.observacao or "Sem observacao" }}</p>
+                </div>
+            </article>
+            {% else %}
+            <p class="empty-state">Ainda nao existem registos de historico.</p>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const filter = document.getElementById("historyActionFilter");
+        const rows = Array.from(document.querySelectorAll(".history-entry"));
+        const classify = (text) => {
+            if (text.includes("import")) return "import";
+            if (text.includes("reuni")) return "reun";
+            if (text.includes("adi")) return "adi";
+            if (text.includes("estado") || text.includes("corrig")) return "estado";
+            if (text.includes("plano")) return "plano";
+            return "";
+        };
+        rows.forEach((row) => {
+            const kind = classify(row.dataset.actionText || "");
+            row.dataset.actionKind = kind;
+            row.querySelector(".action-badge")?.classList.add(`action-badge--${kind || "default"}`);
+        });
+        filter?.addEventListener("change", () => {
+            rows.forEach((row) => {
+                row.hidden = Boolean(filter.value) && row.dataset.actionKind !== filter.value;
+            });
+        });
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,1139 @@
+const defaultCenter = [38.62, -9.03];
+const todayIso = new Date().toISOString().slice(0, 10);
+
+/** Raio fixo para “mesmo dia” e plano de contactos (km). */
+const DEFAULT_NEARBY_RADIUS_KM = 10;
+
+/** Estados excluídos do plano de contactos do dia e da lista de próximas. */
+const STATES_EXCLUDED_DAY_CONTACT = ["Já tratado / no CRM", "Sem interesse", "Reunião marcada", "Sem interesse definitivo", "Cliente existente"];
+
+let allLeads = [];
+let visibleLeads = [];
+let nearbyLeads = [];
+let selectedLead = null;
+let markers = new Map();
+let radiusCircle = null;
+let currentPlanRows = [];
+let heatLayer = null;
+let planLine = null;
+let orderMarkers = [];
+let mapInitialFitDone = false;
+let nearbyRadiusKm = DEFAULT_NEARBY_RADIUS_KM;
+let clusterLayer = null;
+let selectedBulkIds = new Set();
+let baseLayer = null;
+
+const map = L.map("map", { zoomControl: true }).setView(defaultCenter, 10);
+function applyMapTiles() {
+    if (baseLayer) baseLayer.remove();
+    baseLayer = L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        { attribution: "&copy; OpenStreetMap &copy; CARTO (light)" }
+    ).addTo(map);
+}
+applyMapTiles();
+
+const els = {
+    searchInput: document.getElementById("searchInput"),
+    localityFilter: document.getElementById("localityFilter"),
+    typeFilter: document.getElementById("typeFilter"),
+    commercialFilter: document.getElementById("commercialFilter"),
+    stateFilter: document.getElementById("stateFilter"),
+    classificationFilter: document.getElementById("classificationFilter"),
+    tagFilter: document.getElementById("tagFilter"),
+    historyFilter: document.getElementById("historyFilter"),
+    heatmapToggle: document.getElementById("heatmapToggle"),
+    resetFilters: document.getElementById("resetFilters"),
+    selectedState: document.getElementById("selectedState"),
+    leadDetails: document.getElementById("leadDetails"),
+    leadHistory: document.getElementById("leadHistory"),
+    tagSelect: document.getElementById("tagSelect"),
+    addTag: document.getElementById("addTag"),
+    tagList: document.getElementById("tagList"),
+    nearbyCount: document.getElementById("nearbyCount"),
+    nearbyList: document.getElementById("nearbyList"),
+    planCommercial: document.getElementById("planCommercial"),
+    planDate: document.getElementById("planDate"),
+    planMax: document.getElementById("planMax"),
+    generatePlan: document.getElementById("generatePlan"),
+    exportPlan: document.getElementById("exportPlan"),
+    planSummary: document.getElementById("planSummary"),
+    visitPlan: document.getElementById("visitPlan"),
+    leadsList: document.getElementById("leadsList"),
+    listCount: document.getElementById("listCount"),
+    leadDrawer: document.getElementById("leadDrawer"),
+    drawerClose: document.getElementById("drawerClose"),
+    drawerBackdrop: document.getElementById("drawerBackdrop"),
+    dayContactPlan: document.getElementById("dayContactPlan"),
+    nearbyRadius: document.getElementById("nearbyRadius"),
+    nearbyRadiusValue: document.getElementById("nearbyRadiusValue"),
+    nearbyRadiusText: document.getElementById("nearbyRadiusText"),
+    nearbyTitle: document.getElementById("nearbyTitle"),
+    recommendedZone: document.getElementById("recommendedZone"),
+    forgottenAlert: document.getElementById("forgottenAlert"),
+    operationalMode: document.getElementById("operationalMode"),
+    presentationMode: document.getElementById("presentationMode"),
+    metricTotal: document.getElementById("metricTotal"),
+    metricActive: document.getElementById("metricActive"),
+    metricCrm: document.getElementById("metricCrm"),
+    metricPostponed: document.getElementById("metricPostponed"),
+    mapBulkActions: document.getElementById("mapBulkActions"),
+    bulkSelectedCount: document.getElementById("bulkSelectedCount"),
+    bulkCommercial: document.getElementById("bulkCommercial"),
+    bulkState: document.getElementById("bulkState"),
+    bulkAssign: document.getElementById("bulkAssign"),
+    bulkClearCommercial: document.getElementById("bulkClearCommercial"),
+    bulkSetState: document.getElementById("bulkSetState"),
+    bulkIgnore: document.getElementById("bulkIgnore"),
+    bulkExport: document.getElementById("bulkExport"),
+    bulkPlan: document.getElementById("bulkPlan"),
+    nextLeadButton: document.getElementById("nextLeadButton"),
+};
+
+if (els.planDate) els.planDate.value = todayIso;
+
+function haversineKm(a, b) { /* unchanged */
+    const earthRadiusKm = 6371;
+    const dLat = toRadians(b.latitude - a.latitude);
+    const dLon = toRadians(b.longitude - a.longitude);
+    const lat1 = toRadians(a.latitude);
+    const lat2 = toRadians(b.latitude);
+    const value =
+        Math.sin(dLat / 2) ** 2 +
+        Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+    return earthRadiusKm * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function toRadians(value) {
+    return (value * Math.PI) / 180;
+}
+
+function normalize(value) {
+    return String(value || "").toLowerCase();
+}
+
+function normalizeSearch(text) {
+    if (text === null || text === undefined) return "";
+    return String(text)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+}
+
+
+function normalizeKey(value) {
+    return normalize(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "");
+}
+
+function commercialKey(value) {
+    const key = normalizeKey(value);
+    if (!key || key === "outro" || key === "semcomercial" || key === "semcomercialatribuido") return "sem_comercial";
+    if (key === "ines" || key === "ins") return "ines";
+    if (key === "flavia" || key === "flvia") return "flavia";
+    if (["bruno", "miriam", "setil"].includes(key)) return key;
+    return key;
+}
+
+function leadCommercialKey(lead) {
+    return lead.comercial_key || commercialKey(lead.comercial_responsavel);
+}
+
+function leadCommercialLabel(lead) {
+    return leadCommercialKey(lead) === "sem_comercial" ? "Sem comercial" : (lead.comercial_responsavel || "Sem comercial");
+}
+
+function leadScore(lead) {
+    return Number(lead.score ?? 0);
+}
+
+function scoreBand(lead) {
+    const score = leadScore(lead);
+    if (score >= 70) return "high";
+    if (score >= 40) return "medium";
+    return "low";
+}
+
+function scoreLabel(lead) {
+    return `${leadScore(lead)}/100`;
+}
+
+function commercialSuggestion(lead) {
+    if (!lead || leadCommercialKey(lead) !== "sem_comercial" || !hasCoordinates(lead)) return null;
+    const counts = new Map();
+    allLeads.forEach((item) => {
+        const key = leadCommercialKey(item);
+        if (item.id === lead.id || key === "sem_comercial" || !hasCoordinates(item)) return;
+        if (haversineKm(lead, item) <= 8) counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    const best = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0];
+    if (!best || best[1] < 2) return null;
+    const labels = { ines: "Inês", bruno: "Bruno", flavia: "Flávia", miriam: "Miriam", setil: "Setil" };
+    return { key: best[0], label: labels[best[0]] || best[0], count: best[1] };
+}
+
+function hasCoordinates(lead) {
+    return Number.isFinite(lead.latitude) && Number.isFinite(lead.longitude);
+}
+
+function leadName(lead) {
+    return lead.nome_cliente || lead.nome_empresa || "Sem nome";
+}
+
+function leadArea(lead) {
+    return lead.area_negocio || lead.tipo_cliente || "Outro";
+}
+
+function leadCity(lead) {
+    return lead.cidade || lead.localidade || "Sem cidade";
+}
+
+function slug(value) {
+    return normalize(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") || "default";
+}
+
+function statusClass(status) {
+    return `status-badge status-badge--${slug(status)}`;
+}
+
+function parseDate(value) {
+    if (!value) return null;
+    const date = new Date(String(value).replace(" ", "T"));
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function lastContactInfo(lead) {
+    const contactActions = ["Contactado", "Reunião marcada", "Adiar contacto", "Sem interesse definitivo", "Cliente existente", "Estado corrigido manualmente"];
+    const dates = (lead.historico || [])
+        .filter((item) => contactActions.some((action) => normalize(item.acao).includes(normalize(action))))
+        .map((item) => parseDate(item.created_at))
+        .filter(Boolean)
+        .sort((a, b) => b - a);
+    const latest = dates[0];
+    if (!latest) return null;
+    const days = Math.floor((Date.now() - latest.getTime()) / 86400000);
+    if (days <= 0) return { days, label: "Contactada hoje", avoid: true };
+    if (days <= 2) return { days, label: `Contactada há ${days} dias`, avoid: true };
+    if (days <= 7) return { days, label: "Evitar novo contacto", avoid: true };
+    return { days, label: `Último contacto há ${days} dias`, avoid: false };
+}
+
+function isForgotten(lead) {
+    if (!isActive(lead)) return false;
+    const info = lastContactInfo(lead);
+    if (!info) return true;
+    return info.days >= 30;
+}
+
+function isActive(lead) {
+    return lead.ativa === true;
+}
+
+function excludedFromDayContact(lead) {
+    return STATES_EXCLUDED_DAY_CONTACT.includes(lead.estado);
+}
+
+function eligibleForDayContactPlan(lead) {
+    return lead && hasCoordinates(lead) && !excludedFromDayContact(lead);
+}
+
+function setDrawerOpen(open) {
+    if (els.leadDrawer) els.leadDrawer.classList.toggle("drawer-open", open);
+    document.body.classList.toggle("map-drawer-open", open);
+}
+
+function markerIcon(lead) {
+    const classes = ["marker-pin"];
+    if (!isActive(lead)) classes.push("inactive");
+    if (selectedLead && lead.id === selectedLead.id) classes.push("selected");
+    else if (nearbyLeads.some((item) => item.id === lead.id)) classes.push("nearby");
+    return L.divIcon({
+        className: "",
+        html: `<span class="${classes.join(" ")}"></span>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+    });
+}
+
+function popupHtml(lead) {
+    return `
+        <div class="lead-popup">
+            <strong>${leadName(lead)}</strong>
+            <span>${leadArea(lead)}</span>
+            <span>${lead.telefone || "—"}</span>
+            <span>${leadCity(lead)}</span>
+        </div>
+    `;
+}
+
+function passesFilters(lead) {
+    if (!passesClassificationFilter(lead)) return false;
+
+    const rawSearch = els.searchInput?.value;
+    const text = normalize(rawSearch);
+
+    const searchable = normalizeSearch([
+        lead.nome_cliente,
+        lead.nome_empresa,
+        lead.telefone,
+        lead.cidade,
+        lead.localidade,
+        lead.tipo_cliente,
+        lead.area_negocio,
+        lead.comercial_responsavel,
+    ].join(" "));
+
+
+    const selectedCommercial = els.commercialFilter?.value || "";
+
+    return (
+        (!text || searchable.includes(text)) &&
+        (!els.localityFilter?.value || leadCity(lead) === els.localityFilter.value) &&
+        (!els.typeFilter?.value || leadArea(lead) === els.typeFilter.value) &&
+        (!selectedCommercial || leadCommercialKey(lead) === selectedCommercial) &&
+        (!els.stateFilter?.value || lead.estado === els.stateFilter.value) &&
+        (!els.tagFilter?.value || (lead.tags || []).includes(els.tagFilter.value))
+    );
+}
+
+function passesClassificationFilter(lead) {
+    const value = els.classificationFilter.value || "ativos";
+    if (value === "ativos") {
+        if (els.historyFilter.checked) {
+            return !["Sem interesse", "Sem interesse definitivo"].includes(lead.estado);
+        }
+        return isActive(lead);
+    }
+    if (value === "por_contactar") return lead.estado === "Por contactar";
+    if (value === "ligar_volta") return lead.estado === "Ligar de volta";
+    if (value === "adiados") return lead.estado === "Adiar contacto";
+    if (value === "com_observacoes") return Boolean(lead.observacoes || lead.observacoes_contacto);
+    if (value === "contactados") return lead.estado === "Ligar de volta";
+    if (value === "reuniao" || value === "crm") return ["Já tratado / no CRM", "Reunião marcada", "Cliente existente"].includes(lead.estado);
+    if (value === "sem_interesse") return ["Sem interesse", "Sem interesse definitivo"].includes(lead.estado);
+    return true;
+}
+
+function applyFilters() {
+    visibleLeads = allLeads.filter(passesFilters);
+    if (selectedLead && !visibleLeads.some((lead) => lead.id === selectedLead.id)) {
+        selectLead(null);
+        return;
+    }
+    updateNearby();
+    renderMarkers();
+    renderHeatmap();
+    renderLeadList();
+    renderDetails();
+    renderMetrics();
+    renderOperationalInsights();
+}
+
+function renderMetrics() {
+    if (els.metricTotal) els.metricTotal.textContent = visibleLeads.length;
+    if (els.metricActive) els.metricActive.textContent = visibleLeads.filter(isActive).length;
+    if (els.metricCrm) els.metricCrm.textContent = visibleLeads.filter((lead) => normalizeKey(lead.estado) === "jatratadonocrm").length;
+    if (els.metricPostponed) {
+        els.metricPostponed.textContent = visibleLeads.filter((lead) => {
+            if (lead.estado !== "Adiar contacto" || !lead.data_novo_contacto) return false;
+            const date = parseDate(lead.data_novo_contacto);
+            return date && date > new Date();
+        }).length;
+    }
+}
+
+function renderMarkers() {
+    markers.forEach((marker) => marker.remove());
+    markers = new Map();
+    if (clusterLayer) {
+        clusterLayer.remove();
+        clusterLayer = null;
+    }
+    if (els.heatmapToggle.checked) return;
+    const useClusters = window.L && L.markerClusterGroup && visibleLeads.filter(hasCoordinates).length > 25;
+    clusterLayer = useClusters ? L.markerClusterGroup({
+        showCoverageOnHover: false,
+        maxClusterRadius: 42,
+        iconCreateFunction: (cluster) => L.divIcon({
+            html: `<span>${cluster.getChildCount()}</span>`,
+            className: "alltera-cluster",
+            iconSize: [38, 38],
+        }),
+    }).addTo(map) : null;
+    visibleLeads.filter(hasCoordinates).forEach((lead) => {
+        const zIndex =
+            selectedLead && lead.id === selectedLead.id ? 900 : nearbyLeads.some((item) => item.id === lead.id) ? 500 : 0;
+        const marker = L.marker([lead.latitude, lead.longitude], { icon: markerIcon(lead), zIndexOffset: zIndex })
+            .bindPopup(popupHtml(lead));
+        marker.on("click", () => selectLead(lead.id));
+        if (clusterLayer) clusterLayer.addLayer(marker);
+        else marker.addTo(map);
+        markers.set(lead.id, marker);
+    });
+    if (markers.size > 0 && !mapInitialFitDone) {
+        const group = L.featureGroup(Array.from(markers.values()));
+        map.fitBounds(group.getBounds().pad(0.12), { maxZoom: 12 });
+        mapInitialFitDone = true;
+    }
+}
+
+function renderHeatmap() {
+    if (heatLayer) {
+        heatLayer.remove();
+        heatLayer = null;
+    }
+    if (!els.heatmapToggle.checked) return;
+    const points = visibleLeads
+        .filter((lead) => isActive(lead) && hasCoordinates(lead))
+        .map((lead) => [lead.latitude, lead.longitude, 0.65]);
+    heatLayer = L.heatLayer(points, {
+        radius: 34,
+        blur: 22,
+        maxZoom: 13,
+        minOpacity: 0.24,
+        gradient: { 0.25: "#7dd3fc", 0.5: "#0f766e", 0.75: "#c47a2c", 1: "#b42318" },
+    }).addTo(map);
+}
+
+function renderLeadList() {
+    els.listCount.textContent = visibleLeads.length;
+    els.leadsList.innerHTML = visibleLeads.map((lead) => `
+        <article class="lead-row lead-row--compact ${selectedLead?.id === lead.id ? "active" : ""} ${!isActive(lead) ? "inactive-row" : ""}" data-id="${lead.id}">
+            <div class="row-top">
+                <label class="bulk-check"><input type="checkbox" data-bulk-id="${lead.id}" ${selectedBulkIds.has(lead.id) ? "checked" : ""}></label>
+                <strong>${leadName(lead)}</strong>
+                <span class="tag ${statusClass(lead.estado)}">${lead.estado}</span>
+            </div>
+            <div class="row-top row-top--secondary">
+                <span class="priority-badge priority-badge--${scoreBand(lead)}">Score ${scoreLabel(lead)}</span>
+                <span class="muted">${leadCommercialLabel(lead)}</span>
+            </div>
+            ${lastContactInfo(lead) ? `<span class="contact-recency ${lastContactInfo(lead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(lead).label}</span>` : ""}
+            <span class="muted">${leadArea(lead)} · ${lead.telefone || "—"} · ${leadCity(lead)}</span>
+        </article>
+    `).join("");
+    document.querySelectorAll(".lead-row").forEach((row) => {
+        row.addEventListener("click", () => selectLead(Number(row.dataset.id)));
+    });
+    document.querySelectorAll("[data-bulk-id]").forEach((checkbox) => {
+        checkbox.addEventListener("click", (event) => event.stopPropagation());
+        checkbox.addEventListener("change", () => {
+            const id = Number(checkbox.dataset.bulkId);
+            if (checkbox.checked) selectedBulkIds.add(id);
+            else selectedBulkIds.delete(id);
+            renderBulkActions();
+        });
+    });
+    renderBulkActions();
+}
+
+function renderBulkActions() {
+    const count = selectedBulkIds.size;
+    if (els.mapBulkActions) els.mapBulkActions.hidden = count === 0;
+    if (els.bulkSelectedCount) els.bulkSelectedCount.textContent = count;
+}
+
+function selectLead(id) {
+    if (id == null || id === undefined) {
+        selectedLead = null;
+        currentPlanRows = [];
+        els.exportPlan.disabled = true;
+        nearbyLeads = [];
+        setDrawerOpen(false);
+        drawRadius();
+        renderMarkers();
+        renderLeadList();
+        renderDetails();
+        renderNearbyList();
+        requestAnimationFrame(() => map.invalidateSize());
+        return;
+    }
+    selectedLead = allLeads.find((lead) => lead.id === id) || null;
+    currentPlanRows = [];
+    els.exportPlan.disabled = true;
+    setDrawerOpen(Boolean(selectedLead));
+    updateNearby();
+    renderMarkers();
+    renderLeadList();
+    renderDetails();
+    renderNearbyList();
+    if (selectedLead && hasCoordinates(selectedLead)) {
+        const target = [selectedLead.latitude, selectedLead.longitude];
+        if (map.getZoom() > 12) {
+            map.setView(target, 12, { animate: true });
+        } else if (map.getZoom() < 10) {
+            map.setView(target, 10, { animate: true });
+        } else {
+            map.panTo(target, { animate: true });
+        }
+    }
+    requestAnimationFrame(() => map.invalidateSize());
+}
+
+function updateNearby() {
+    if (!selectedLead || !hasCoordinates(selectedLead)) {
+        nearbyLeads = [];
+        drawRadius();
+        renderNearbyList();
+        return;
+    }
+    nearbyLeads = visibleLeads
+        .filter(
+            (lead) =>
+                lead.id !== selectedLead.id &&
+                hasCoordinates(lead) &&
+                isActive(lead) &&
+                !excludedFromDayContact(lead)
+        )
+        .map((lead) => ({ ...lead, distanceKm: haversineKm(selectedLead, lead) }))
+        .filter((lead) => lead.distanceKm <= nearbyRadiusKm)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+    drawRadius();
+    renderNearbyList();
+}
+
+function drawRadius() {
+    if (radiusCircle) radiusCircle.remove();
+    radiusCircle = null;
+    if (!selectedLead || !hasCoordinates(selectedLead)) return;
+    radiusCircle = L.circle([selectedLead.latitude, selectedLead.longitude], {
+        radius: nearbyRadiusKm * 1000,
+        color: "#0f766e",
+        weight: 2,
+        fillColor: "#0f766e",
+        fillOpacity: 0.075,
+    }).addTo(map);
+}
+
+function renderDetails() {
+    document.querySelectorAll("[data-action]").forEach((button) => {
+        button.disabled = !selectedLead;
+    });
+    if (els.generatePlan) els.generatePlan.disabled = !selectedLead || !isActive(selectedLead) || !hasCoordinates(selectedLead);
+    if (els.dayContactPlan) els.dayContactPlan.disabled = !selectedLead || !hasCoordinates(selectedLead);
+
+    if (!selectedLead) {
+        els.selectedState.textContent = "—";
+        els.selectedState.className = "tag tag--estado";
+        const accEmpty = document.getElementById("actionsAccordion");
+        if (accEmpty) accEmpty.open = false;
+        els.leadDetails.innerHTML = `
+            <section class="empty-lead-state">
+                <div class="empty-lead-state__icon" aria-hidden="true"></div>
+                <strong>Seleciona uma lead no mapa para ver contactos próximos.</strong>
+                <p>Usa o raio operacional para encontrar leads na mesma zona.</p>
+            </section>
+        `;
+        els.leadDetails.classList.add("empty-state");
+        els.leadHistory.innerHTML = "—";
+        els.tagList.innerHTML = "—";
+        els.addTag.disabled = true;
+        return;
+    }
+    els.leadDetails.classList.remove("empty-state");
+    els.addTag.disabled = false;
+    const acc = document.getElementById("actionsAccordion");
+    if (acc) acc.open = Boolean(selectedLead);
+    els.selectedState.textContent = selectedLead.estado;
+    els.selectedState.className = `tag tag--estado ${statusClass(selectedLead.estado)}`;
+    const suggestion = commercialSuggestion(selectedLead);
+    els.leadDetails.innerHTML = `
+        <section class="lead-hero">
+            <div class="lead-avatar" aria-hidden="true">${leadName(selectedLead).slice(0, 1).toUpperCase()}</div>
+            <div>
+                <h3>${leadName(selectedLead)}</h3>
+                <p>${leadArea(selectedLead)} · ${selectedLead.telefone || "—"} · ${leadCity(selectedLead)}</p>
+                <div class="lead-score-row">
+                    <span class="priority-badge priority-badge--${scoreBand(selectedLead)}">Score ${scoreLabel(selectedLead)}</span>
+                    <span class="tag">${leadCommercialLabel(selectedLead)}</span>
+                </div>
+                ${lastContactInfo(selectedLead) ? `<span class="contact-recency ${lastContactInfo(selectedLead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(selectedLead).label}</span>` : ""}
+            </div>
+        </section>
+        <dl class="lead-details-dl">
+            ${detailLine("Nome Cliente", leadName(selectedLead))}
+            ${detailLine("Área de negócio", leadArea(selectedLead))}
+            ${detailLine("Contacto telefónico", selectedLead.telefone || "—")}
+            ${detailLine("Cidade", leadCity(selectedLead))}
+            ${detailLine("Empresa", selectedLead.empresa || selectedLead.nome_empresa || "—")}
+            ${detailLine("Email", selectedLead.email || "—")}
+            ${detailLine("Observações", selectedLead.observacoes || "—")}
+            ${detailLine("Observações do contacto", selectedLead.observacoes_contacto || "—")}
+            ${detailLine("Classificação", selectedLead.classificacao_observacao || "—")}
+            ${detailLine("Motivo", selectedLead.motivo_classificacao || "—")}
+            ${detailLine("Estado", selectedLead.estado)}
+        </dl>
+        ${suggestion ? `<section class="commercial-suggestion">
+            <strong>Esta lead está próxima de várias leads da ${suggestion.label}.</strong>
+            <button class="button secondary" id="assignSuggestedCommercial" type="button">Atribuir à ${suggestion.label}</button>
+        </section>` : ""}
+    `;
+    if (suggestion) {
+        document.getElementById("assignSuggestedCommercial")?.addEventListener("click", () => {
+            bulkAction("assign_commercial", { ids: [selectedLead.id], comercial: suggestion.key });
+        });
+    }
+    els.leadHistory.innerHTML = selectedLead.historico?.length
+        ? selectedLead.historico
+              .map(
+                  (item) =>
+                      `<article class="history-item"><strong>${item.created_at} · ${item.acao}</strong><p>${item.observacao || ""}</p></article>`
+              )
+              .join("")
+        : "Sem histórico.";
+    els.tagList.innerHTML = selectedLead.tags?.length
+        ? selectedLead.tags.map((tag) => `<span class="tag removable-tag" data-tag="${tag}">${tag} ×</span>`).join("")
+        : "Sem tags.";
+    document.querySelectorAll(".removable-tag").forEach((tag) => {
+        tag.addEventListener("click", () => tagAction("remove_tag", tag.dataset.tag));
+    });
+}
+
+function detailLine(label, value) {
+    return `<div class="detail-line"><dt>${label}</dt><dd>${value}</dd></div>`;
+}
+
+function renderNearbyList() {
+    els.nearbyCount.textContent = nearbyLeads.length;
+    if (!selectedLead) {
+        els.nearbyList.innerHTML = "Selecione uma lead com localização no mapa.";
+        els.nearbyList.classList.add("empty-state");
+        return;
+    }
+    if (!hasCoordinates(selectedLead)) {
+        els.nearbyList.innerHTML = "Esta lead não tem coordenadas — não é possível calcular proximidades.";
+        els.nearbyList.classList.add("empty-state");
+        return;
+    }
+    els.nearbyList.classList.remove("empty-state");
+    if (nearbyLeads.length === 0) {
+        els.nearbyList.innerHTML = `
+            <section class="empty-nearby-state">
+                <strong>Sem leads próximas neste raio.</strong>
+                <p>Experimenta aumentar para ${Math.min(50, Math.max(20, nearbyRadiusKm + 5))} km.</p>
+            </section>
+        `;
+        return;
+    }
+    els.nearbyList.innerHTML = nearbyLeads.map((lead) => `
+        <article class="nearby-row nearby-row--compact">
+            <div class="row-top">
+                <strong>${leadName(lead)}</strong>
+                <span class="tag distance-badge">${lead.distanceKm.toFixed(1)} km</span>
+            </div>
+            <div class="nearby-meta">
+                <span>${leadArea(lead)}</span>
+                <span>${lead.telefone || "—"}</span>
+                <span>${leadCity(lead)}</span>
+            </div>
+            <button class="link-button nearby-add" type="button">Adicionar ao plano</button>
+        </article>
+    `).join("");
+}
+
+function updateRadiusUi() {
+    if (els.nearbyRadius) els.nearbyRadius.value = nearbyRadiusKm;
+    if (els.nearbyRadiusValue) els.nearbyRadiusValue.textContent = nearbyRadiusKm;
+    if (els.nearbyTitle) els.nearbyTitle.textContent = `Leads próximas em ${nearbyRadiusKm} km`;
+    if (els.nearbyRadiusText) {
+        els.nearbyRadiusText.innerHTML = `Raio de <strong>${nearbyRadiusKm} km</strong> em torno da lead selecionada. Inclui contactos a retomar (ex.: não atendeu, ligar depois).`;
+    }
+}
+
+function renderOperationalInsights() {
+    if (els.recommendedZone) {
+        const groups = new Map();
+        allLeads.filter((lead) => isActive(lead) && !excludedFromDayContact(lead) && hasCoordinates(lead)).forEach((lead) => {
+            const city = leadCity(lead);
+            groups.set(city, (groups.get(city) || 0) + 1);
+        });
+        const best = Array.from(groups.entries()).sort((a, b) => b[1] - a[1])[0];
+        els.recommendedZone.querySelector("strong").textContent = best ? `${best[0]} · ${best[1]} leads próximas` : "Sem zona ativa";
+    }
+    if (els.forgottenAlert) {
+        const count = allLeads.filter(isForgotten).length;
+        els.forgottenAlert.hidden = count === 0;
+        els.forgottenAlert.textContent = `${count} leads sem contacto recente`;
+    }
+}
+
+function generatePlan() {
+    if (!selectedLead) return;
+    const max = planLimit(12);
+    const planLeads = [selectedLead, ...nearbyLeads].slice(0, max);
+    const dominantLocality = dominant(planLeads.map((lead) => leadCity(lead)));
+    els.planSummary.innerHTML = `
+        <section class="plan-created-card">
+            <strong>Lista criada</strong>
+            <p>${planLeads.length} contactos preparados no raio de ${nearbyRadiusKm} km.</p>
+        </section>
+        <section class="plan-summary plan-summary--compact">
+            <article><span>Total</span><strong>${planLeads.length}</strong></article>
+            <article><span>Zona</span><strong>${dominantLocality}</strong></article>
+        </section>
+    `;
+    els.visitPlan.innerHTML = planLeads.map((lead, index) => `
+        <article class="visit-row visit-row--compact">
+            <div class="row-top">
+                <strong>${index + 1}. ${leadName(lead)}</strong>
+                <span class="tag">${index === 0 ? "Base" : `${(lead.distanceKm ?? haversineKm(selectedLead, lead)).toFixed(1)} km`}</span>
+            </div>
+            <span class="muted">${leadArea(lead)} · ${lead.telefone || "—"} · ${leadCity(lead)} · ${leadCommercialLabel(lead)}</span>
+        </article>
+    `).join("");
+    currentPlanRows = planLeads.map((lead, index) => ({
+        comercial: planOwnerValue(),
+        data: planDateValue(),
+        raio_km: nearbyRadiusKm,
+        nome_empresa: leadName(lead),
+        tipo_cliente: leadArea(lead),
+        morada: lead.morada,
+        codigo_postal: lead.codigo_postal,
+        localidade: leadCity(lead),
+        contacto: leadName(lead),
+        telefone: lead.telefone,
+        email: lead.email,
+        estado: lead.estado,
+        observacoes: lead.observacoes_contacto || lead.observacoes,
+        distancia_km: index === 0 ? "0.0" : (lead.distanceKm ?? haversineKm(selectedLead, lead)).toFixed(1),
+    }));
+    els.exportPlan.disabled = currentPlanRows.length === 0;
+    drawPlanLine(planLeads);
+    document.getElementById("planPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function generateDayContactPlan() {
+    if (!selectedLead || !hasCoordinates(selectedLead)) return;
+    const head = eligibleForDayContactPlan(selectedLead) ? [selectedLead] : [];
+    const nearbyEligible = nearbyLeads.filter(eligibleForDayContactPlan);
+    if (nearbyEligible.length === 0) {
+        els.planSummary.innerHTML = `
+            <section class="plan-warning-card">
+                <strong>Sem leads próximas para adicionar.</strong>
+                <p>A lead base foi selecionada, mas não existem outras leads ativas num raio de ${nearbyRadiusKm} km.</p>
+            </section>
+        `;
+        els.visitPlan.innerHTML = head.length
+            ? `<article class="visit-row visit-row--compact">
+                <div class="row-top">
+                    <strong>1. ${leadName(selectedLead)}</strong>
+                    <span class="tag">Base</span>
+                </div>
+                <div class="nearby-meta">
+                    <span>${leadArea(selectedLead)}</span>
+                    <span>${selectedLead.telefone || "—"}</span>
+                    <span>${leadCity(selectedLead)}</span>
+                </div>
+            </article>`
+            : "";
+    currentPlanRows = head.map((lead) => ({
+        comercial: planOwnerValue(),
+        data: planDateValue(),
+        raio_km: nearbyRadiusKm,
+            nome_empresa: leadName(lead),
+            tipo_cliente: leadArea(lead),
+            morada: lead.morada,
+            codigo_postal: lead.codigo_postal,
+            localidade: leadCity(lead),
+            contacto: leadName(lead),
+            telefone: lead.telefone,
+            email: lead.email,
+            estado: lead.estado,
+            observacoes: lead.observacoes_contacto || lead.observacoes,
+            distancia_km: "0.0",
+        }));
+        els.exportPlan.disabled = currentPlanRows.length === 0;
+        drawPlanLine(head);
+        document.getElementById("planPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+    }
+    const pool = [...head, ...nearbyEligible];
+    const seen = new Set();
+    const unique = [];
+    for (const lead of pool) {
+        if (seen.has(lead.id)) continue;
+        seen.add(lead.id);
+        unique.push(lead);
+    }
+    if (unique.length === 0) {
+        els.planSummary.innerHTML =
+            '<p class="empty-state empty-state--quiet">Não há leads elegíveis no raio (ou a lead base está excluída do plano de contactos).</p>';
+        els.visitPlan.innerHTML = "";
+        currentPlanRows = [];
+        els.exportPlan.disabled = true;
+        if (planLine) planLine.remove();
+        planLine = null;
+        orderMarkers.forEach((marker) => marker.remove());
+        orderMarkers = [];
+        return;
+    }
+    const max = Math.min(planLimit(15), unique.length);
+    const planLeads = unique.slice(0, max).map((lead, index) => ({
+        ...lead,
+        distanceKm: index === 0 ? 0 : haversineKm(selectedLead, lead),
+    }));
+
+    const dominantLocality = dominant(planLeads.map((lead) => leadCity(lead)));
+    els.planSummary.innerHTML = `
+        <section class="plan-created-card">
+            <strong>Lista criada</strong>
+            <p>${planLeads.length} contactos preparados no raio de ${nearbyRadiusKm} km. Podes exportar a lista em Excel.</p>
+        </section>
+        <section class="plan-summary plan-summary--compact">
+            <article><span>Lista</span><strong>Contactos da zona</strong></article>
+            <article><span>Leads</span><strong>${planLeads.length}</strong></article>
+            <article><span>Raio</span><strong>${nearbyRadiusKm} km</strong></article>
+            <article><span>Zona</span><strong>${dominantLocality}</strong></article>
+        </section>
+    `;
+    els.visitPlan.innerHTML = planLeads.map((lead, index) => `
+        <article class="visit-row visit-row--compact">
+            <div class="row-top">
+                <strong>${index + 1}. ${leadName(lead)}</strong>
+                <span class="tag">${index === 0 ? "Base" : `${lead.distanceKm.toFixed(1)} km`}</span>
+            </div>
+            <div class="nearby-meta">
+                <span>${leadArea(lead)}</span>
+                <span>${lead.telefone || "—"}</span>
+                <span>${leadCity(lead)}</span>
+            </div>
+        </article>
+    `).join("");
+
+    currentPlanRows = planLeads.map((lead, index) => ({
+        comercial: planOwnerValue(),
+        data: planDateValue(),
+        raio_km: nearbyRadiusKm,
+        nome_empresa: leadName(lead),
+        tipo_cliente: leadArea(lead),
+        morada: lead.morada,
+        codigo_postal: lead.codigo_postal,
+        localidade: leadCity(lead),
+        contacto: leadName(lead),
+        telefone: lead.telefone,
+        email: lead.email,
+        estado: lead.estado,
+        observacoes: lead.observacoes_contacto || lead.observacoes,
+        distancia_km: index === 0 ? "0.0" : lead.distanceKm.toFixed(1),
+    }));
+    els.exportPlan.disabled = currentPlanRows.length === 0;
+    drawPlanLine(planLeads);
+    document.getElementById("planPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function drawPlanLine(planLeads) {
+    if (planLine) planLine.remove();
+    orderMarkers.forEach((marker) => marker.remove());
+    orderMarkers = [];
+    const points = planLeads.filter(hasCoordinates).map((lead) => [lead.latitude, lead.longitude]);
+    if (points.length > 1) {
+        planLine = L.polyline(points, { color: "#0f766e", weight: 3, dashArray: "8 6" }).addTo(map);
+    }
+    planLeads.filter(hasCoordinates).forEach((lead, index) => {
+        const marker = L.marker([lead.latitude, lead.longitude], {
+            icon: L.divIcon({
+                className: "order-marker",
+                html: `<span>${index + 1}</span>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+            }),
+        }).addTo(map);
+        orderMarkers.push(marker);
+    });
+}
+
+function dominant(values) {
+    const counts = values.reduce((acc, value) => {
+        acc[value] = (acc[value] || 0) + 1;
+        return acc;
+    }, {});
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+}
+
+function planLimit(defaultValue = 12) {
+    return Math.min(25, Math.max(1, Number(els.planMax?.value) || defaultValue));
+}
+
+function planDateValue() {
+    return els.planDate?.value || todayIso;
+}
+
+function planOwnerValue() {
+    return "Alltera";
+}
+
+async function goToNextLead() {
+    const commercial = els.commercialFilter?.value || (selectedLead ? leadCommercialKey(selectedLead) : "");
+    const params = new URLSearchParams();
+    if (selectedLead?.id) params.set("base_id", String(selectedLead.id));
+    if (commercial) params.set("commercial", commercial);
+    const response = await fetch(`/api/leads/next?${params.toString()}`);
+    const payload = await response.json();
+    if (payload.lead?.id) {
+        selectLead(payload.lead.id);
+        const row = document.querySelector(`.lead-row[data-id="${payload.lead.id}"]`);
+        row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+}
+
+async function performAction(action) {
+    if (!selectedLead) return;
+    const confirmations = {
+        crm: "Confirmar que esta lead já foi tratada no CRM? A lead sai da lista ativa.",
+        sem_interesse: "Confirmar Sem interesse? A lead deixa de aparecer na lista ativa.",
+    };
+    if (confirmations[action] && !confirm(confirmations[action])) return;
+    const payload = { action, comercial_responsavel: selectedLead.comercial_responsavel, observacao: "" };
+    if (action === "update_coordinates") {
+        payload.latitude = prompt("Latitude:", selectedLead.latitude || "");
+        payload.longitude = prompt("Longitude:", selectedLead.longitude || "");
+    } else if (action === "corrigir_estado") {
+        payload.estado = prompt("Novo estado:", selectedLead.estado) || selectedLead.estado;
+        payload.observacao = prompt("Motivo da correcao:", "") || "";
+    }
+    if (action === "adiar") {
+        payload.data_novo_contacto = prompt("Data de novo contacto (AAAA-MM-DD):", todayIso);
+        payload.observacao = prompt("Motivo/observacao:", "Ligar mais tarde") || "";
+    } else if (!["update_coordinates", "corrigir_estado"].includes(action)) {
+        payload.observacao = prompt("Observacao opcional:", "") || "";
+    }
+
+    const response = await fetch(`/api/leads/${selectedLead.id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        alert("Nao foi possivel atualizar a lead.");
+        return;
+    }
+    await loadLeads();
+}
+
+async function tagAction(action, tag) {
+    if (!selectedLead || !tag) return;
+    await fetch(`/api/leads/${selectedLead.id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, tag, comercial_responsavel: selectedLead.comercial_responsavel }),
+    });
+    await loadLeads();
+}
+
+async function bulkAction(action, extra = {}) {
+    const ids = extra.ids || Array.from(selectedBulkIds);
+    if (!ids.length) return;
+    const response = await fetch("/api/leads/bulk-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ids, ...extra }),
+    });
+    if (!response.ok) {
+        alert("Não foi possível aplicar a ação em lote.");
+        return;
+    }
+    selectedBulkIds = new Set();
+    await loadLeads();
+}
+
+async function exportPlan() {
+    if (currentPlanRows.length === 0) return;
+    const response = await fetch("/api/export-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: currentPlanRows }),
+    });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "plano_contactos_alltera.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+}
+
+async function exportSelectedLeads() {
+    const rows = allLeads
+        .filter((lead) => selectedBulkIds.has(lead.id))
+        .map((lead) => ({
+            nome_empresa: leadName(lead),
+            tipo_cliente: leadArea(lead),
+            morada: lead.morada,
+            codigo_postal: lead.codigo_postal,
+            localidade: leadCity(lead),
+            contacto: leadName(lead),
+            telefone: lead.telefone,
+            email: lead.email,
+            estado: lead.estado,
+            observacoes: lead.observacoes_contacto || lead.observacoes,
+            distancia_km: "",
+        }));
+    if (!rows.length) return;
+    const response = await fetch("/api/export-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+    });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "leads_selecionadas_alltera.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+}
+
+function resetFilters() {
+    els.searchInput.value = "";
+    els.localityFilter.value = "";
+    els.typeFilter.value = "";
+    if (els.commercialFilter) els.commercialFilter.value = "";
+    els.stateFilter.value = "";
+    els.classificationFilter.value = "ativos";
+    els.tagFilter.value = "";
+    els.historyFilter.checked = false;
+    mapInitialFitDone = false;
+    applyFilters();
+}
+
+function setMode(mode) {
+    if (mode === "operational") {
+        document.body.classList.toggle("operational-mode");
+        if (document.body.classList.contains("operational-mode")) {
+            document.body.classList.add("sidebar-collapsed");
+            localStorage.setItem("alltera.sidebar.collapsed", "1");
+        }
+    }
+    if (mode === "presentation") {
+        document.body.classList.toggle("presentation-mode");
+    }
+    setTimeout(() => map.invalidateSize(), 220);
+}
+
+function bindEvents() {
+    [
+        els.searchInput,
+        els.localityFilter,
+        els.typeFilter,
+        els.commercialFilter,
+        els.stateFilter,
+        els.classificationFilter,
+        els.tagFilter,
+        els.historyFilter,
+        els.heatmapToggle,
+    ].filter(Boolean).forEach((element) => {
+        element.addEventListener("input", applyFilters);
+    });
+    [els.historyFilter, els.heatmapToggle].filter(Boolean).forEach((element) => {
+        element.addEventListener("change", applyFilters);
+    });
+    if (els.nearbyRadius) {
+        els.nearbyRadius.addEventListener("input", () => {
+            nearbyRadiusKm = Math.min(50, Math.max(1, Number(els.nearbyRadius.value) || DEFAULT_NEARBY_RADIUS_KM));
+            updateRadiusUi();
+            updateNearby();
+            renderMarkers();
+            renderDetails();
+        });
+    }
+    els.resetFilters.addEventListener("click", resetFilters);
+    if (els.generatePlan) els.generatePlan.addEventListener("click", generatePlan);
+    if (els.exportPlan) els.exportPlan.addEventListener("click", exportPlan);
+    if (els.dayContactPlan) els.dayContactPlan.addEventListener("click", generateDayContactPlan);
+    if (els.bulkAssign) els.bulkAssign.addEventListener("click", () => bulkAction("assign_commercial", { comercial: els.bulkCommercial.value }));
+    if (els.bulkClearCommercial) els.bulkClearCommercial.addEventListener("click", () => bulkAction("clear_commercial"));
+    if (els.bulkSetState) els.bulkSetState.addEventListener("click", () => bulkAction("set_state", { estado: els.bulkState.value }));
+    if (els.bulkIgnore) els.bulkIgnore.addEventListener("click", () => bulkAction("ignore_map"));
+    if (els.bulkExport) els.bulkExport.addEventListener("click", exportSelectedLeads);
+    if (els.bulkPlan) {
+        els.bulkPlan.addEventListener("click", () => {
+            const first = Array.from(selectedBulkIds)[0];
+            if (first) window.location.href = `/planeamento?lead_base=${first}`;
+        });
+    }
+    if (els.nextLeadButton) els.nextLeadButton.addEventListener("click", goToNextLead);
+    if (els.operationalMode) els.operationalMode.addEventListener("click", () => setMode("operational"));
+    if (els.presentationMode) els.presentationMode.addEventListener("click", () => setMode("presentation"));
+    if (els.addTag) els.addTag.addEventListener("click", () => tagAction("add_tag", els.tagSelect.value));
+    document.querySelectorAll("[data-action]").forEach((button) => {
+        button.addEventListener("click", () => performAction(button.dataset.action));
+    });
+    if (els.drawerClose) els.drawerClose.addEventListener("click", () => selectLead(null));
+    if (els.drawerBackdrop) els.drawerBackdrop.addEventListener("click", () => selectLead(null));
+}
+
+async function loadLeads() {
+    const urlLeadId = Number(new URLSearchParams(window.location.search).get("lead_id"));
+    const currentId = selectedLead?.id || (Number.isFinite(urlLeadId) && urlLeadId > 0 ? urlLeadId : null);
+    const response = await fetch("/api/leads?history=1");
+    allLeads = await response.json();
+    applyCityOffsets();
+    selectedLead = currentId ? allLeads.find((lead) => lead.id === currentId) || null : selectedLead;
+    setDrawerOpen(Boolean(selectedLead));
+    applyFilters();
+}
+
+function applyCityOffsets() {
+    const groups = new Map();
+    allLeads.filter(hasCoordinates).forEach((lead) => {
+        const key = `${leadCity(lead)}|${lead.latitude}|${lead.longitude}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(lead);
+    });
+    groups.forEach((items) => {
+        if (items.length <= 1) return;
+        items.forEach((lead, index) => {
+            const angle = (Math.PI * 2 * index) / items.length;
+            const radius = 0.00035 + Math.floor(index / 8) * 0.00018;
+            lead.latitude = lead.latitude + Math.cos(angle) * radius;
+            lead.longitude = lead.longitude + Math.sin(angle) * radius;
+        });
+    });
+}
+
+async function init() {
+    updateRadiusUi();
+    bindEvents();
+
+    // Integra a pesquisa global do header (base.html) com os filtros do mapa.
+    // O mapa usa els.searchInput (id="searchInput").
+    const globalSearchInput = document.getElementById("globalSearchInput");
+    const setSearchInputValue = (value) => {
+        if (!els.searchInput) return;
+        // evita loop desnecessário: só atribui se mudou
+        if (els.searchInput.value !== value) {
+            els.searchInput.value = value;
+            // aplica filtro em tempo real
+            applyFilters();
+        }
+    };
+
+    if (globalSearchInput && els.searchInput) {
+        globalSearchInput.addEventListener("input", () => {
+            setSearchInputValue(globalSearchInput.value);
+        });
+
+        // “X” não existe no HTML; mas isto cobre o caso de limpar via tecla/backspace.
+        globalSearchInput.addEventListener("search", () => {
+            setSearchInputValue(globalSearchInput.value);
+        });
+
+        // inicializa coerência (caso venha com value pré-definido)
+        setSearchInputValue(globalSearchInput.value || "");
+    }
+
+    await loadLeads();
+}
+
+init();

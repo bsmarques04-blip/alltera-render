@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Alltera Leads{% endblock %}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <aside class="sidebar" aria-label="Navegação principal">
+        <div class="sidebar__aura" aria-hidden="true"></div>
+        <div class="sidebar__brand">
+            <div class="sidebar__logo" aria-hidden="true">A</div>
+            <div class="sidebar__brand-text">
+                <div class="sidebar__name">Alltera</div>
+                <div class="sidebar__subtitle">Planeamento comercial geográfico</div>
+            </div>
+        </div>
+
+        <div class="sidebar__divider"></div>
+
+        <nav class="sidebar__nav" aria-label="Menu">
+            <a class="sidebar__link" data-tooltip="Dashboard" href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Dashboard</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Mapa de Leads" href="{{ url_for('mapa_leads') }}" {% if request.endpoint == 'mapa_leads' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Mapa de Leads</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Planeamento" href="{{ url_for('planeamento') }}" {% if request.endpoint == 'planeamento' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Planeamento</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Importar Leads" href="{{ url_for('importar_leads') }}" {% if request.endpoint == 'importar_leads' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Importar Leads</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Sem Coordenadas" href="{{ url_for('sem_coordenadas') }}" {% if request.endpoint == 'sem_coordenadas' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Sem Coordenadas</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Leads Inativas" href="{{ url_for('leads_inativas') }}" {% if request.endpoint == 'leads_inativas' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Leads Inativas</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Leads Esquecidas" href="{{ url_for('esquecidas') }}" {% if request.endpoint == 'esquecidas' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Leads Esquecidas</span>
+            </a>
+            <a class="sidebar__link" data-tooltip="Histórico" href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>
+                <span class="sidebar__icon" aria-hidden="true"></span>
+                <span>Histórico</span>
+            </a>
+        </nav>
+
+        <div class="sidebar__footer" aria-hidden="true">
+            <div class="sidebar__mini-card">
+                <div class="sidebar__pulse"></div>
+                <div>
+                    <strong>Alltera Field Planning</strong>
+                    <span>Sistema operacional comercial</span>
+                </div>
+            </div>
+        </div>
+        <button class="sidebar__collapse" id="sidebarToggle" type="button" aria-label="Recolher menu" aria-expanded="true">
+            <span aria-hidden="true"></span>
+        </button>
+    </aside>
+
+    <div class="app-shell">
+        <header class="topbar topbar--minimal" aria-label="Barra superior">
+            <div class="topbar__title">{% block header_title %}Alltera Lead Planner{% endblock %}</div>
+
+            {# Pesquisa contextual apenas em páginas que fazem sentido #}
+            {% set ep = request.endpoint %}
+            {% if ep in ["mapa_leads", "esquecidas", "sem_coordenadas", "historico"] %}
+                {# Nota: a pesquisa usa #globalSearchInput e #globalSearchResults; o JS já trata ausencia via optional chaining #}
+                <div class="global-search" role="search">
+                    <div class="global-search__icon" aria-hidden="true"></div>
+                    <input id="globalSearchInput" type="search" placeholder="Pesquisar…" autocomplete="off" aria-label="Pesquisa">
+                    <div class="global-search__results" id="globalSearchResults" hidden></div>
+                </div>
+            {% endif %}
+
+            <div class="topbar__spacer"></div>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Alternar modo escuro">Modo escuro</button>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <section class="toast-wrap" aria-live="polite" aria-relevant="additions">
+            {% for category, message in messages %}
+            <div class="toast toast--{{ category }}" role="status">
+                <div class="toast__dot" aria-hidden="true"></div>
+                <div class="toast__text">{{ message }}</div>
+                <button type="button" class="toast__close" aria-label="Fechar">&times;</button>
+            </div>
+            <script>
+                (function(){
+                    const closeBtn = document.currentScript.previousElementSibling;
+                    if(!closeBtn) return;
+                    const toastEl = closeBtn.closest('.toast');
+                    if(!toastEl) return;
+                    const hide = () => { toastEl.classList.add('toast--hide'); setTimeout(()=>toastEl.remove(), 220); };
+                    closeBtn.addEventListener('click', hide);
+                    setTimeout(hide, 4000);
+                })();
+            </script>
+            {% endfor %}
+        </section>
+        {% endif %}
+        {% endwith %}
+
+        <div class="app-shell__content">
+            {% block content %}{% endblock %}
+        </div>
+
+        {% block scripts %}{% endblock %}
+    </div>
+    <script>
+        (function () {
+            const themeKey = "alltera.theme";
+
+            const globalSearch = document.querySelector(".global-search");
+            // Controla acessibilidade/consistência: se não houver pesquisa no DOM, evita handlers desnecessários.
+            // (Quando a pesquisa estiver desativada por pagina, estes elementos não existem.)
+            const themeButton = document.getElementById("themeToggle");
+            const applyTheme = (theme) => {
+                const dark = theme === "dark";
+                document.body.classList.toggle("dark-mode", dark);
+                if (themeButton) themeButton.textContent = dark ? "Modo claro" : "Modo escuro";
+                window.dispatchEvent(new CustomEvent("alltera:theme", { detail: { theme } }));
+            };
+            applyTheme(localStorage.getItem(themeKey) || "light");
+            if (themeButton) {
+                themeButton.addEventListener("click", () => {
+                    const next = document.body.classList.contains("dark-mode") ? "light" : "dark";
+                    localStorage.setItem(themeKey, next);
+                    applyTheme(next);
+                });
+            }
+
+            const searchInput = globalSearch ? document.getElementById("globalSearchInput") : null;
+            const searchResults = globalSearch ? document.getElementById("globalSearchResults") : null;
+            let searchTimer = null;
+            const renderResults = (items) => {
+                if (!searchResults) return;
+                if (!items.length) {
+                    searchResults.hidden = true;
+                    searchResults.innerHTML = "";
+                    return;
+                }
+                searchResults.innerHTML = items.map((item) => `
+                    <a class="global-search__item" href="${item.url}">
+                        <strong>${item.title || "Sem nome"}</strong>
+                        <span>${item.subtitle || ""}</span>
+                        <small>${item.phone || "Sem telefone"} · ${item.commercial || "Sem comercial"}</small>
+                    </a>
+                `).join("");
+                searchResults.hidden = false;
+            };
+            if (searchInput) {
+                searchInput.addEventListener("input", () => {
+                    const query = searchInput.value.trim();
+                    clearTimeout(searchTimer);
+                    if (query.length < 2) {
+                        renderResults([]);
+                        return;
+                    }
+                    searchTimer = setTimeout(async () => {
+                        try {
+                            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                            const payload = await response.json();
+                            renderResults(payload.results || []);
+                        } catch (_error) {
+                            renderResults([]);
+                        }
+                    }, 160);
+                });
+                document.addEventListener("click", (event) => {
+                    if (!event.target.closest(".global-search")) renderResults([]);
+                });
+            }
+
+            const key = "alltera.sidebar.collapsed";
+            const button = document.getElementById("sidebarToggle");
+            const apply = (collapsed) => {
+                document.body.classList.toggle("sidebar-collapsed", collapsed);
+                if (button) {
+                    button.setAttribute("aria-expanded", String(!collapsed));
+                    button.setAttribute("aria-label", collapsed ? "Expandir menu" : "Recolher menu");
+                }
+            };
+            apply(localStorage.getItem(key) === "1");
+            if (button) {
+                button.addEventListener("click", () => {
+                    const collapsed = !document.body.classList.contains("sidebar-collapsed");
+                    localStorage.setItem(key, collapsed ? "1" : "0");
+                    apply(collapsed);
+                    window.dispatchEvent(new Event("resize"));
+                });
+            }
+        })();
+    </script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Sem Coordenadas | Alltera{% endblock %}
+
+{% block content %}
+<main class="page-shell history-page">
+    <section class="panel import-hero history-hero">
+        <div>
+            <p class="eyebrow">Qualidade de dados</p>
+            <h1>Leads sem coordenadas</h1>
+            <p>Revê leads importadas que ainda não têm localização suficiente para aparecer no mapa.</p>
+        </div>
+        <div class="history-hero__meta">
+            <span>{{ rows|length }}</span>
+            <strong>por rever</strong>
+        </div>
+    </section>
+
+    <section class="panel history-toolbar">
+        <div>
+            <form method="post">
+                <input type="hidden" name="action" value="geocode_all">
+                <button class="button" type="submit">Tentar geocodificar novamente</button>
+            </form>
+            <span class="tag tag--soft">Sem bloquear importações</span>
+        </div>
+        <p class="hint">As leads continuam guardadas e disponíveis nas listas normais. Só não aparecem no mapa enquanto não tiverem coordenadas.</p>
+    </section>
+
+    <section class="metric-grid dashboard-metrics">
+        <article><span>Geocodificadas</span><strong>{{ quality.geocoded_percent }}%</strong></article>
+        <article><span>Com coordenadas</span><strong>{{ quality.with_coords }}</strong></article>
+        <article><span>Com erro</span><strong>{{ quality.total_errors }}</strong></article>
+        <article><span>Sem coordenadas</span><strong>{{ quality.without_coords }}</strong></article>
+    </section>
+
+    <section class="dashboard-grid">
+        <article class="panel dashboard-card">
+            <p class="eyebrow">Cidades problemáticas</p>
+            <div class="dashboard-list">
+                {% for city, count in quality.problem_cities %}
+                <span><strong>{{ city }}</strong><small>{{ count }} leads</small></span>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem falhas por cidade.</p>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="panel dashboard-card">
+            <p class="eyebrow">Top falhas</p>
+            <div class="dashboard-list">
+                {% for reason, count in quality.top_failures %}
+                <span><strong>{{ reason }}</strong><small>{{ count }} casos</small></span>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem falhas.</p>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="panel dashboard-card">
+            <p class="eyebrow">Sugestões automáticas</p>
+            <div class="dashboard-list">
+                {% for suggestion in quality.suggestions %}
+                <span><strong>{{ suggestion.lead.cidade or suggestion.lead.localidade }}</strong><small>Sugerido: {{ suggestion.suggested }}</small></span>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem sugestões pendentes.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+
+    <section class="panel history-toolbar">
+        <form id="bulkCoordsForm" method="post"></form>
+        <div class="bulk-actions">
+            <button class="button secondary" form="bulkCoordsForm" name="action" value="bulk_retry" type="submit">Geocodificar selecionadas</button>
+            <button class="button secondary" form="bulkCoordsForm" name="action" value="bulk_ignore" type="submit">Ignorar selecionadas</button>
+            <button class="button secondary" form="bulkCoordsForm" name="action" value="bulk_resolved" type="submit">Marcar resolvidas</button>
+        </div>
+        <form class="inactive-filters" method="get">
+            <label class="history-filter-label">Estado operacional
+                <select name="estado" onchange="this.form.submit()">
+                    <option value="todas" {% if status_filter == 'todas' %}selected{% endif %}>Todas</option>
+                    <option value="ativas" {% if status_filter == 'ativas' %}selected{% endif %}>Ativas</option>
+                    <option value="inativas" {% if status_filter == 'inativas' %}selected{% endif %}>Inativas</option>
+                </select>
+            </label>
+        </form>
+    </section>
+
+    <section class="panel no-coords-panel">
+        {% for item in rows %}
+        {% set lead = item.lead %}
+        <article class="no-coords-row">
+            <div class="no-coords-main">
+                <label class="check-row"><input form="bulkCoordsForm" type="checkbox" name="lead_ids" value="{{ lead.id }}"> Selecionar</label>
+                <div>
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.nome_empresa }}</span>
+                </div>
+                <p>{{ lead.observacoes or lead.observacoes_contacto or "Sem observações" }}</p>
+                <div class="no-coords-grid">
+                    <span><b>Cidade</b>{{ lead.cidade or lead.localidade or "-" }}</span>
+                    <span><b>Morada</b>{{ lead.morada or "-" }}</span>
+                    <span><b>Código Postal</b>{{ lead.codigo_postal or "-" }}</span>
+                    <span><b>Telefone</b>{{ lead.telefone or "-" }}</span>
+                    <span><b>Motivo</b>{{ item.motivo }}</span>
+                    {% if item.sugestao %}<span><b>Sugestão</b>{{ item.sugestao }}</span>{% endif %}
+                </div>
+            </div>
+
+            <form class="no-coords-form" method="post">
+                <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                <input type="hidden" name="action" value="update_location">
+                <label>Cidade/localidade<input name="cidade" value="{{ lead.cidade or lead.localidade or '' }}"></label>
+                <label>Morada<input name="morada" value="{{ lead.morada or '' }}"></label>
+                <label>Código postal<input name="codigo_postal" value="{{ lead.codigo_postal or '' }}"></label>
+                <button class="button secondary" type="submit">Guardar</button>
+            </form>
+
+            <div class="no-coords-actions">
+                <form method="post">
+                    <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                    <input type="hidden" name="action" value="retry_geocode">
+                    <button class="button" type="submit">Tentar geocodificar</button>
+                </form>
+                <form method="post">
+                    <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                    <input type="hidden" name="action" value="ignore_map">
+                    <button class="button secondary" type="submit">Ignorar no mapa</button>
+                </form>
+            </div>
+        </article>
+        {% else %}
+        <p class="empty-state">Não existem leads sem coordenadas para rever.</p>
+        {% endfor %}
+    </section>
+</main>
+{% endblock %}

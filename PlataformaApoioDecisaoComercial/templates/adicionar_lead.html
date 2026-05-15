@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Adicionar Lead | Alltera{% endblock %}
+
+{% block content %}
+<main class="page-shell">
+    <section class="panel import-hero import-hero--premium">
+        <div>
+            <p class="eyebrow">Entrada manual</p>
+            <h1>Adicionar lead</h1>
+            <p>Regista uma oportunidade pontual para aparecer no mapa e apoiar a decisão de contactos por zona.</p>
+        </div>
+        <a class="button secondary" href="{{ url_for('mapa_leads') }}">Voltar ao mapa</a>
+    </section>
+
+    <form class="panel manual-lead-form" method="post">
+        {% if duplicate %}
+        <p class="message inline-message">Já existe uma lead com dados equivalentes: {{ duplicate.nome_cliente or duplicate.nome_empresa }}.</p>
+        {% endif %}
+
+        <section class="manual-lead-grid">
+            <label>Nome Cliente
+                <input name="nome_cliente" value="{{ form.get('nome_cliente', '') }}" placeholder="Nome do contacto">
+            </label>
+            <label>Empresa
+                <input name="empresa" value="{{ form.get('empresa', '') }}" placeholder="Nome da empresa">
+            </label>
+            <label>Área de negócio
+                <input name="area_negocio" value="{{ form.get('area_negocio', '') }}" placeholder="Restaurante, hotel, horeca...">
+            </label>
+            <label>Contacto telefónico
+                <input name="telefone" value="{{ form.get('telefone', '') }}" placeholder="+351 912 345 678">
+            </label>
+            <label>Email
+                <input name="email" type="email" value="{{ form.get('email', '') }}" placeholder="email@empresa.pt">
+            </label>
+            <label>Cidade
+                <input name="cidade" value="{{ form.get('cidade', '') }}" placeholder="Lisboa">
+            </label>
+            <label>Morada
+                <input name="morada" value="{{ form.get('morada', '') }}" placeholder="Rua, avenida ou zona">
+            </label>
+            <label>Código Postal
+                <input name="codigo_postal" value="{{ form.get('codigo_postal', '') }}" placeholder="1000-000">
+            </label>
+        </section>
+
+        <label>Observações
+            <textarea name="observacoes" rows="4" placeholder="Notas gerais">{{ form.get('observacoes', '') }}</textarea>
+        </label>
+        <label>Observações do contacto
+            <textarea name="observacoes_contacto" rows="4" placeholder="Contexto do contacto">{{ form.get('observacoes_contacto', '') }}</textarea>
+        </label>
+
+        <div class="sheet-actions">
+            <button class="button" type="submit">Guardar lead</button>
+            <a class="button secondary" href="{{ url_for('mapa_leads') }}">Cancelar</a>
+        </div>
+        <p class="hint">Obrigatório: Nome Cliente ou Empresa; e Cidade, Morada ou Código Postal. O telefone é normalizado e usado para evitar duplicados.</p>
+    </form>
+</main>
+{% endblock %}

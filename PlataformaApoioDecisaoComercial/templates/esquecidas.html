@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Leads Esquecidas | Alltera{% endblock %}
+
+{% block header_title %}Leads esquecidas{% endblock %}
+
+{% block content %}
+<main class="page-shell history-page">
+    <section class="panel import-hero history-hero">
+        <div>
+            <p class="eyebrow">Recuperação operacional</p>
+            <h1>Leads esquecidas</h1>
+            <p>Leads ativas sem contacto ou atualização recente, prontas para voltar ao radar do comercial.</p>
+        </div>
+        <div class="history-hero__meta">
+            <span>{{ forgotten|length }}</span>
+            <strong>por retomar</strong>
+        </div>
+    </section>
+
+    <section class="panel history-toolbar">
+        <form class="inactive-filters" method="get">
+            <label class="history-filter-label">Período
+                <select name="dias" onchange="this.form.submit()">
+                    {% for value in [30, 60, 90] %}
+                    <option value="{{ value }}" {% if filters.dias == value %}selected{% endif %}>+{{ value }} dias</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Comercial
+                <select name="comercial" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    {% for item in options.mapa_comerciais %}
+                    {% if item.value %}
+                    <option value="{{ item.value }}" {% if filters.comercial == item.value %}selected{% endif %}>{{ item.label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Cidade
+                <select name="cidade" onchange="this.form.submit()">
+                    <option value="">Todas</option>
+                    {% for item in options.localidades %}
+                    <option value="{{ item }}" {% if filters.cidade == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Texto
+                <input name="q" value="{{ filters.q }}" placeholder="Nome, telefone, email">
+            </label>
+            <button class="button secondary" type="submit">Filtrar</button>
+        </form>
+    </section>
+
+    <section class="panel forgotten-grid">
+        {% for lead, latest, age in forgotten %}
+        <article class="forgotten-card">
+            <div>
+                <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                <span>{{ lead.cidade or lead.localidade or "-" }} · {{ lead.telefone or "-" }}</span>
+            </div>
+            <div class="forgotten-card__meta">
+                <span><b>Comercial</b>{{ lead.comercial_responsavel or "Sem comercial" }}</span>
+                <span><b>Último contacto</b>{{ latest.strftime("%d/%m/%Y") if latest else "Nunca" }}</span>
+                <span><b>Dias</b>{{ age }}</span>
+                <span><b>Estado</b>{{ lead.estado }}</span>
+            </div>
+            <div class="forgotten-card__actions">
+                <a class="button secondary" href="{{ url_for('planeamento', lead_base=lead.id, comercial=lead.comercial_responsavel or 'Bruno') }}">Adicionar ao plano do dia</a>
+                <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Ver no mapa</a>
+            </div>
+        </article>
+        {% else %}
+        <p class="empty-state">Não existem leads esquecidas para os filtros atuais.</p>
+        {% endfor %}
+    </section>
+</main>
+{% endblock %}

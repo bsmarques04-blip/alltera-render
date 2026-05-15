@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Mapa de Leads | Alltera{% endblock %}
+
+{% block header_title %}Mapa de Leads{% endblock %}
+
+{% block content %}
+<main class="sales-layout sales-layout--map-primary">
+    <aside class="filters-panel filters-panel--compact">
+        <section class="panel intro-panel intro-panel--compact">
+            <p class="eyebrow">Operação comercial</p>
+            <h1>Mapa de Leads</h1>
+            <p class="intro-lead">Mapa principal para contacto e planeamento por proximidade.</p>
+            <div class="smart-zone-card" id="recommendedZone">
+                <span>Zona recomendada hoje</span>
+                <strong>—</strong>
+            </div>
+            <div class="forgotten-alert" id="forgottenAlert" hidden></div>
+            <a class="button full import-excel-button" href="{{ url_for('importar_leads') }}">
+                <span class="import-excel-button__icon" aria-hidden="true"></span>
+                Importar Excel
+            </a>
+            <a class="button secondary full add-lead-button" href="{{ url_for('adicionar_lead') }}">
+                <span class="add-lead-button__icon" aria-hidden="true"></span>
+                Adicionar Lead
+            </a>
+            <button class="button secondary full" id="nextLeadButton" type="button">Próxima lead</button>
+        </section>
+
+        <section class="panel metric-grid metric-grid--compact">
+            <article><span>Total</span><strong id="metricTotal">{{ metrics.total }}</strong></article>
+            <article><span>Ativas</span><strong id="metricActive">{{ metrics.active }}</strong></article>
+            <article><span>No CRM</span><strong id="metricCrm">{{ metrics.crm }}</strong></article>
+            <article><span>Adiadas</span><strong id="metricPostponed">{{ metrics.postponed_future }}</strong></article>
+        </section>
+
+        <section class="panel panel--filters">
+            <div class="panel-head">
+                <h2>Filtros</h2>
+                <button class="link-button" id="resetFilters" type="button">Limpar</button>
+            </div>
+
+            <label>Pesquisar<input id="searchInput" type="search" placeholder="Nome cliente…"></label>
+            <label>Cidade
+                <select id="localityFilter"><option value="">Todas</option>{% for item in options.localidades %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            </label>
+            <label>Área de negócio
+                <select id="typeFilter"><option value="">Todas</option>{% for item in options.tipos %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            </label>
+            <label>Comercial
+                <select id="commercialFilter">
+                    {% for item in options.mapa_comerciais %}
+                    <option value="{{ item.value }}">{{ item.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Estado
+                <select id="stateFilter"><option value="">Todos</option>{% for item in options.estados %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            </label>
+            <label>Vista
+                <select id="classificationFilter">{% for value, label in options.classificacoes %}<option value="{{ value }}" {% if value == 'ativos' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            </label>
+            <label>Tag
+                <select id="tagFilter"><option value="">Todas</option>{% for item in options.tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            </label>
+            <label class="check-row"><input id="historyFilter" type="checkbox"> Incluir histórico / inativas</label>
+            <label class="check-row"><input id="heatmapToggle" type="checkbox"> Mapa de calor</label>
+        </section>
+
+        <section class="panel leads-list-panel leads-list-panel--sticky">
+            <div class="panel-head">
+                <h2>Lista</h2>
+                <span class="tag" id="listCount">0</span>
+            </div>
+            <div class="map-bulk-actions" id="mapBulkActions" hidden>
+                <span class="tag"><strong id="bulkSelectedCount">0</strong> selecionadas</span>
+                <select id="bulkCommercial">
+                    {% for item in options.mapa_comerciais %}
+                    {% if item.value %}
+                    <option value="{{ item.value }}">{{ item.label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <select id="bulkState">
+                    {% for item in options.estados %}
+                    <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                </select>
+                <button class="link-button" id="bulkAssign" type="button">Atribuir</button>
+                <button class="link-button" id="bulkClearCommercial" type="button">Remover comercial</button>
+                <button class="link-button" id="bulkSetState" type="button">Estado</button>
+                <button class="link-button" id="bulkIgnore" type="button">Ignorar</button>
+                <button class="link-button" id="bulkExport" type="button">Exportar</button>
+                <button class="link-button" id="bulkPlan" type="button">Plano do dia</button>
+            </div>
+            <div id="leadsList" class="lead-list lead-list--compact"></div>
+        </section>
+    </aside>
+
+    <section class="map-panel map-panel--primary">
+        {% if metrics.total == 0 %}
+        <div class="map-empty-state">
+            <strong>Ainda não existem leads importadas.</strong>
+            <p>Importa um ficheiro Excel para começar a visualizar leads no mapa.</p>
+            <a class="button import-excel-button" href="{{ url_for('importar_leads') }}">
+                <span class="import-excel-button__icon" aria-hidden="true"></span>
+                Importar Excel
+            </a>
+            <a class="button secondary add-lead-button" href="{{ url_for('adicionar_lead') }}">
+                <span class="add-lead-button__icon" aria-hidden="true"></span>
+                Adicionar Lead
+            </a>
+        </div>
+        {% endif %}
+        <div id="map" class="map-canvas" role="application" aria-label="Mapa de leads"></div>
+        <div class="map-legend" aria-label="Legenda do mapa">
+            <span><i class="legend-dot legend-dot--active"></i>Ativa</span>
+            <span><i class="legend-dot legend-dot--selected"></i>Selecionada</span>
+            <span><i class="legend-dot legend-dot--nearby"></i>Próxima</span>
+            <span><i class="legend-dot legend-dot--inactive"></i>Histórico</span>
+        </div>
+    </section>
+
+    <aside class="details-panel details-drawer" id="leadDrawer" aria-label="Detalhe da lead">
+        <button type="button" class="drawer-backdrop" id="drawerBackdrop" tabindex="-1" aria-hidden="true"></button>
+        <div class="drawer-scroll">
+            <div class="drawer-header">
+                <h2 class="drawer-title">Lead selecionada</h2>
+                <button type="button" class="drawer-close" id="drawerClose" title="Fechar painel" aria-label="Fechar painel">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <section class="panel panel--inset selected-card" id="selectedCard">
+                <div class="panel-head panel-head--tight">
+                    <span class="tag tag--estado" id="selectedState">—</span>
+                </div>
+                <div id="leadDetails" class="lead-details-compact empty-state">Clique num pin ou numa linha da lista para abrir o painel.</div>
+
+                <details class="accordion" id="actionsAccordion">
+                    <summary>Ações rápidas</summary>
+                    <div class="actions-grid actions-grid--compact">
+                        <button class="button secondary" data-action="ligar_volta" disabled>Ligar de volta</button>
+                        <button class="button secondary" data-action="adiar" disabled>Adiar</button>
+                        <button class="button secondary" data-action="sem_interesse" disabled>Sem interesse</button>
+                        <button class="button secondary" data-action="crm" disabled>Já tratado / no CRM</button>
+                        <button class="button secondary" data-action="corrigir_estado" disabled>Corrigir estado</button>
+                        <button class="button secondary" data-action="update_coordinates" disabled>Coordenadas</button>
+                    </div>
+                </details>
+            </section>
+
+            <section class="panel panel--inset nearby-panel">
+                <div class="panel-head panel-head--tight">
+                    <h3 id="nearbyTitle">Leads próximas em 10 km</h3>
+                    <span class="tag" id="nearbyCount">0</span>
+                </div>
+                <label class="range-control">Raio de proximidade
+                    <span><strong id="nearbyRadiusValue">10</strong> km</span>
+                    <input id="nearbyRadius" type="range" min="1" max="50" value="10">
+                </label>
+                <p class="hint hint--tight" id="nearbyRadiusText">Raio de <strong>10 km</strong> em torno da lead selecionada. Inclui contactos a retomar (ex.: não atendeu, ligar depois).</p>
+                <div id="nearbyList" class="nearby-list nearby-list--compact empty-state">Selecione uma lead com localização no mapa.</div>
+                <button type="button" class="button full" id="dayContactPlan" disabled>Criar lista de contactos da zona</button>
+            </section>
+
+            <details class="accordion panel panel--inset">
+                <summary>Tags</summary>
+                <label class="label-inline">Adicionar
+                    <select id="tagSelect">{% for item in options.tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+                </label>
+                <button class="button secondary full" id="addTag" type="button" disabled>Adicionar tag</button>
+                <div id="tagList" class="tag-list tag-list--compact empty-state">—</div>
+            </details>
+
+            <section class="panel panel--inset plan-controls plan-controls--legacy">
+                <div class="panel-head panel-head--tight">
+                    <h3>Lista de contactos da zona</h3>
+                </div>
+                <label>Máx. leads<input id="planMax" type="number" min="1" max="25" value="12"></label>
+                <button class="button secondary full" id="generatePlan" type="button" disabled>Criar lista de contactos</button>
+                <button class="button secondary full" id="exportPlan" type="button" disabled>Exportar Excel</button>
+            </section>
+
+            <section class="panel panel--inset" id="planPanel">
+                <div class="panel-head panel-head--tight"><h3>Resumo do plano</h3></div>
+                <div id="planSummary" class="empty-state empty-state--quiet">—</div>
+                <div id="visitPlan" class="visit-plan visit-plan--compact"></div>
+            </section>
+
+            <details class="accordion panel panel--inset">
+                <summary>Histórico</summary>
+                <div id="leadHistory" class="history-list history-list--compact empty-state">—</div>
+            </details>
+        </div>
+    </aside>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="{{ url_for('static', filename='js/mapa.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Alltera{% endblock %}
+
+{% block content %}
+<main class="page-shell dashboard-page">
+    <section class="panel import-hero dashboard-hero">
+        <div>
+            <p class="eyebrow">Operação no terreno</p>
+            <h1>Dashboard Alltera</h1>
+            <p>Visão rápida para importar, organizar e encontrar oportunidades próximas no mapa.</p>
+        </div>
+        <div class="dashboard-actions">
+            <a class="button" href="{{ url_for('importar_leads') }}">Importar Excel</a>
+            <a class="button secondary" href="{{ url_for('adicionar_lead') }}">Adicionar lead</a>
+            <a class="button secondary" href="{{ url_for('mapa_leads') }}">Abrir mapa</a>
+        </div>
+    </section>
+
+    <section class="metric-grid dashboard-metrics">
+        <article><span>Total leads</span><strong data-count-to="{{ metrics.total }}">{{ metrics.total }}</strong></article>
+        <article><span>Ativas</span><strong data-count-to="{{ metrics.active }}">{{ metrics.active }}</strong></article>
+        <article><span>Esquecidas</span><strong data-count-to="{{ metrics.forgotten }}">{{ metrics.forgotten }}</strong></article>
+        <article><span>Sem coordenadas</span><strong data-count-to="{{ metrics.without_coordinates }}">{{ metrics.without_coordinates }}</strong></article>
+        <article><span>Sem comercial</span><strong data-count-to="{{ metrics.without_commercial }}">{{ metrics.without_commercial }}</strong></article>
+        <article><span>Contactos hoje</span><strong data-count-to="{{ metrics.contacts_today }}">{{ metrics.contacts_today }}</strong></article>
+        <article><span>Sem resposta</span><strong data-count-to="{{ metrics.unanswered }}">{{ metrics.unanswered }}</strong></article>
+        <article><span>Reuniões / CRM</span><strong data-count-to="{{ metrics.meetings }}">{{ metrics.meetings }}</strong></article>
+    </section>
+
+    <section class="dashboard-masonry">
+        <article class="panel dashboard-card dashboard-card--featured">
+            <p class="eyebrow">Melhor zona hoje</p>
+            <strong>{{ best_zone.name }}</strong>
+            <span>{{ best_zone.count }} leads ativas com coordenadas</span>
+            <a class="link-button" href="{{ url_for('mapa_leads') }}">Abrir no mapa</a>
+        </article>
+
+        <article class="panel dashboard-card dashboard-card--list">
+            <p class="eyebrow">Leads recentes</p>
+            <div class="dashboard-list">
+                {% for lead in recent_leads %}
+                <a href="{{ url_for('mapa_leads', lead_id=lead.id) }}">
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.cidade or lead.localidade or "-" }} · {{ lead.estado }}</span>
+                </a>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Ainda não existem leads.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel dashboard-card dashboard-card--list">
+            <p class="eyebrow">Importações recentes</p>
+            <div class="dashboard-list">
+                {% for item in recent_imports %}
+                <span>
+                    <strong>{{ item.created_at.strftime("%d/%m %H:%M") }}</strong>
+                    <small>{{ item.observacao or item.acao }}</small>
+                </span>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem importações recentes.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel dashboard-card dashboard-card--list">
+            <p class="eyebrow">Leads por comercial</p>
+            <div class="dashboard-list">
+                {% for commercial, count in commercial_counts %}
+                <span><strong>{{ commercial }}</strong><small>{{ count }} leads ativas</small></span>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Ainda sem distribuição por comercial.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+</main>
+{% endblock %}

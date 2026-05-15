@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Leads Inativas | Alltera{% endblock %}
+
+{% block content %}
+<main class="page-shell history-page">
+    <section class="panel import-hero history-hero">
+        <div>
+            <p class="eyebrow">Auditoria comercial</p>
+            <h1>Leads inativas</h1>
+            <p>Revê leads retiradas da lista ativa e corrige classificações automáticas quando necessário.</p>
+        </div>
+        <div class="history-hero__meta">
+            <span>{{ leads|length }}</span>
+            <strong>inativas</strong>
+        </div>
+    </section>
+
+    <section class="panel history-toolbar">
+        <form class="inactive-filters" method="get">
+            <label class="history-filter-label">Estado
+                <select name="estado">
+                    <option value="">Todos</option>
+                    {% for estado in options.estados %}
+                    <option value="{{ estado }}" {% if filters.estado == estado %}selected{% endif %}>{{ estado }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Cidade
+                <select name="cidade">
+                    <option value="">Todas</option>
+                    {% for cidade in options.cidades %}
+                    <option value="{{ cidade }}" {% if filters.cidade == cidade %}selected{% endif %}>{{ cidade }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Comercial
+                <select name="comercial">
+                    <option value="">Todos</option>
+                    {% for comercial in options.comerciais %}
+                    <option value="{{ comercial }}" {% if filters.comercial == comercial %}selected{% endif %}>{{ comercial }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Motivo
+                <select name="motivo">
+                    <option value="">Todos</option>
+                    {% for motivo in options.motivos %}
+                    <option value="{{ motivo }}" {% if filters.motivo == motivo %}selected{% endif %}>{{ motivo }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="history-filter-label">Texto livre
+                <input name="texto" value="{{ filters.texto }}" placeholder="Nome, telefone, email, observações">
+            </label>
+            <button class="button" type="submit">Filtrar</button>
+        </form>
+    </section>
+
+    <section class="panel no-coords-panel">
+        {% for lead in leads %}
+        <article class="no-coords-row inactive-row">
+            <div class="no-coords-main">
+                <div>
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.nome_empresa }}</span>
+                </div>
+                <div class="no-coords-grid">
+                    <span><b>Área de negócio</b>{{ lead.area_negocio or lead.tipo_cliente or "-" }}</span>
+                    <span><b>Cidade</b>{{ lead.cidade or lead.localidade or "-" }}</span>
+                    <span><b>Telefone</b>{{ lead.telefone or "-" }}</span>
+                    <span><b>Email</b>{{ lead.email or "-" }}</span>
+                    <span><b>Estado atual</b>{{ lead.estado }}</span>
+                    <span><b>Comercial</b>{{ lead.comercial_responsavel or "-" }}</span>
+                    <span><b>Data reunião</b>{{ lead.data_reuniao.strftime("%d/%m/%Y") if lead.data_reuniao else "-" }}</span>
+                    <span><b>Novo contacto</b>{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-" }}</span>
+                </div>
+                <p><strong>Motivo:</strong> {{ lead.motivo_classificacao or lead.classificacao_observacao or "Sem motivo registado" }}</p>
+                <p><strong>Observações:</strong> {{ lead.observacoes or "Sem observações" }}</p>
+                <p><strong>Observações do contacto:</strong> {{ lead.observacoes_contacto or "Sem observações do contacto" }}</p>
+            </div>
+
+            <div class="no-coords-actions">
+                <form method="post">
+                    <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                    <input type="hidden" name="action" value="reativar">
+                    <button class="button" type="submit">Reativar lead</button>
+                </form>
+                <form method="post">
+                    <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                    <input type="hidden" name="action" value="corrigir_estado">
+                    <label>Corrigir estado
+                        <select name="estado">
+                            {% for estado in estados %}
+                            <option value="{{ estado }}" {% if lead.estado == estado %}selected{% endif %}>{{ estado }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button class="button secondary" type="submit">Guardar estado</button>
+                </form>
+                <form method="post">
+                    <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                    <input type="hidden" name="action" value="adiar">
+                    <label>Nova data<input type="date" name="data_novo_contacto" value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else '' }}"></label>
+                    <button class="button secondary" type="submit">Adiar contacto</button>
+                </form>
+                <a class="button secondary" href="{{ url_for('historico', lead_id=lead.id) }}">Ver histórico</a>
+            </div>
+        </article>
+        {% else %}
+        <p class="empty-state">Não existem leads inativas para rever.</p>
+        {% endfor %}
+    </section>
+</main>
+{% endblock %}
