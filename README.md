@@ -1,9 +1,8 @@
 # Projecto-AC-DAW2425
-Projecto de Avaliação Contínua de DAW 2425.
+Projecto de Avaliação Contínua de DAW 2025. (Nova Realização)
 
 ## Constituição do Grupo
 - Frederik Carrapato
-- Bernardo Marques
 - L1
 
 ## Professor
@@ -16,15 +15,12 @@ Projecto de Avaliação Contínua de DAW 2425.
 
 - pip install -r requirements.txt
 
-- python .\App\app.py
+- python app.py
 
 ## A aplicação inclui um painel de administração acessível com credenciais predefinidas:
 
-- URL: /admin
-Exemplo: http://localhost:8000/admin
+- Utilizador: "admin@gmail.com"
 
-- Email: admin@gmail.com
-
-- Password: secret
+- Password: "1234"
 
 

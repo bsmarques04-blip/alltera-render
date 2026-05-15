@@ -1,0 +1,347 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #000;
+  color: white;
+  overflow-x: hidden;
+  padding-top: 80px;
+}
+
+/* Navbar personalizada com Bootstrap */
+.navbar-nav .nav-link {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.dropdown-menu {
+  font-size: 15px;
+}
+
+.dropdown-toggle::after {
+  display: none;
+}
+
+/* Hero Section */
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 80px 60px;
+  min-height: 90vh;
+}
+
+.hero-text {
+  max-width: 600px;
+}
+
+.hero-text span {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-size: 14px;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 6px 14px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+}
+
+.hero-text h1 {
+  font-size: 48px;
+  line-height: 1.2;
+  margin-bottom: 20px;
+}
+
+.hero-text p {
+  color: #ccc;
+  margin-bottom: 40px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.hero-text .buttons a {
+  display: inline-block;
+  margin-right: 15px;
+  padding: 12px 24px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 30px;
+  transition: all 0.3s ease;
+}
+
+.btn-primario {
+  background: #6f42c1;
+  color: #fff;
+}
+
+.btn-secundario {
+  border: 1px solid #666;
+  color: #fff;
+}
+
+.btn-primario:hover {
+  background: #8a57e3;
+}
+
+.btn-secundario:hover {
+  border-color: #aaa;
+  color: #6f42c1;
+}
+
+/* Spline */
+.spline-container {
+  width: 1000px;
+  height: 600px;
+}
+
+spline-viewer {
+  width: 100%;
+  height: 100%;
+}
+
+/* Responsivo */
+@media (max-width: 1024px) {
+  .hero {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .spline-container {
+    width: 100%;
+    height: 350px;
+    margin-top: 40px;
+  }
+}
+
+/* Painel Admin */
+.admin-dashboard {
+  background-color: #000;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  padding: 80px 40px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.admin-container {
+  max-width: 900px;
+  width: 100%;
+}
+
+.admin-container h1 {
+  font-size: 38px;
+  margin-bottom: 10px;
+}
+
+.admin-container .subinfo {
+  color: #bbb;
+  margin-bottom: 40px;
+  font-size: 16px;
+}
+
+.admin-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.admin-card {
+  background: #111;
+  padding: 30px;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+  font-weight: 600;
+  font-size: 18px;
+  border: 1px solid #222;
+  transition: 0.3s;
+  text-decoration: none;
+}
+
+.admin-card:hover {
+  background: #6f42c1;
+  color: #000;
+}
+
+.admin-card.logout:hover {
+  background: #ff4d4d;
+  color: white;
+}
+
+/* Gestão de veículos Admin */
+.admin-body {
+  background-color: #0f0f0f;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  padding: 40px;
+  min-height: 100vh;
+}
+
+.admin-container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.admin-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #1a1a1a;
+  color: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 14px 12px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+.admin-table th {
+  background-color: #222;
+  text-transform: uppercase;
+  font-size: 14px;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn.edit {
+  background-color: #6f42c1;
+  color: white;
+}
+
+.btn.delete {
+  background-color: #ff4444;
+  color: white;
+}
+
+.btn-primario {
+  background-color: #6f42c1;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-secundario {
+  border: 1px solid #aaa;
+  color: #aaa;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-primario:hover {
+  background-color: #8a57e3;
+}
+
+.btn-secundario:hover {
+  border-color: white;
+  color: white;
+}
+
+/* Reservas */
+.reserva-body {
+  background-color: #000;
+  color: white;
+  font-family: 'Inter', sans-serif;
+  padding-top: 60px;
+}
+
+.reserva-card {
+  background-color: #111;
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.resumo-card {
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.form-control,
+.form-select {
+  background-color: #222;
+  border: 1px solid #444;
+  color: white;
+}
+
+.form-control::placeholder {
+  color: #aaa;
+}
+
+label {
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+.btn-roxo {
+  background-color: #6f42c1;
+  color: white;
+}
+
+.btn-roxo:hover {
+  background-color: #5e37a8;
+}
+
+/* Perfil */
+.btn-roxo {
+  background-color: #6f42c1;
+  color: white;
+  font-weight: 600;
+  border: none;
+}
+.btn-roxo:hover {
+  background-color: #5a32a3;
+}
+
+/* Sobre */
+.sobre-section {
+      background-color: #121212;
+      color: #fff;
+    }
+
+    .sobre-imagem {
+      border-radius: 15px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.1);
+      object-fit: cover;
+      width: 100%;
+      height: auto;
+    }
+
+    .sobre-header {
+      background: url("/static/images/bannersobre.jpg") center center / cover no-repeat;
+      height: 50vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-shadow: 0 0 8px #000;
+    }
+
+    .sobre-header h1 {
+      font-size: 3rem;
+      font-weight: 700;
+    }

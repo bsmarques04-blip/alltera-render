@@ -1,0 +1,58 @@
+<footer class="bg-black text-white py-5 mt-5 border-top border-secondary">
+  <div class="container">
+    <div class="row gy-4">
+      
+      <!-- Cidades -->
+      <div class="col-md-2">
+        <h6 class="text-uppercase fw-bold">Cidades Atendidas:</h6>
+        <ul class="list-unstyled small">
+          <li>Lisboa</li>
+          <li>Porto</li>
+          <li>Faro</li>
+          <li>Madrid</li>
+          <li>Barcelona</li>
+        </ul>
+      </div>
+
+      <!-- Links -->
+      <div class="col-md-3">
+        <h6 class="text-uppercase fw-bold">Serviços Populares:</h6>
+        <ul class="list-unstyled small">
+          <li><a href="{{ url_for('colecao', tipo='CARRO') }}" class="text-white text-decoration-none">Alugar um Carro</a></li>
+          <li><a href="{{ url_for('colecao', tipo='MOTA') }}" class="text-white text-decoration-none">Alugar uma Mota</a></li>
+        </ul>
+      </div>
+
+      <!-- Contactos -->
+      <div class="col-md-3">
+        <h6 class="text-uppercase fw-bold">Contactos:</h6>
+        <p class="small mb-1"><i class="bi bi-envelope me-2"></i>info@motocargo.pt</p>
+        <p class="small mb-1"><i class="bi bi-telephone me-2"></i>+351 938 925 818</p>
+      </div>
+
+      <!-- Redes sociais -->
+      <div class="col-md-2">
+        <h6 class="text-uppercase fw-bold">Redes Sociais:</h6>
+        <ul class="list-unstyled small">
+          <li><i class="bi bi-facebook me-2"></i><a href="#" class="text-white text-decoration-none">Facebook</a></li>
+          <li><i class="bi bi-instagram me-2"></i><a href="#" class="text-white text-decoration-none">Instagram</a></li>
+          <li><i class="bi bi-youtube me-2"></i><a href="#" class="text-white text-decoration-none">YouTube</a></li>
+        </ul>
+      </div>
+
+      <!-- Newsletter -->
+      <div class="col-md-2">
+        <h6 class="text-uppercase fw-bold">Newsletter:</h6>
+        <p class="small text-muted">Recebe novidades e promoções exclusivas</p>
+        <form class="d-flex">
+          <input type="email" class="form-control form-control-sm me-1" placeholder="Email" required>
+          <button class="btn btn-warning btn-sm" type="submit"><i class="bi bi-arrow-right"></i></button>
+        </form>
+      </div>
+    </div>
+
+    <div class="text-center small mt-4 border-top pt-3 border-secondary text-muted">
+      © 2025 MotoCarGo. Todos os direitos reservados.
+    </div>
+  </div>
+</footer>
