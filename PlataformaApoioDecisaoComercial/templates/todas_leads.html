@@ -65,7 +65,7 @@
 {% block scripts %}
 <script>
 (() => {
-    const allLeads = {{ leads|tojson }};
+    let allLeads = {{ leads|tojson }};
     const els = {
         table: document.getElementById("allLeadsTable"),
         search: document.getElementById("allLeadsSearch"),
@@ -247,10 +247,12 @@
             await showAlert("Não foi possível atualizar o estado da lead.", { type: "error", title: "Erro" });
             return;
         }
-        window.location.reload();
+        allLeads = allLeads.filter((item) => String(item.id) !== String(id));
+        render();
     }
 
     function render() {
+        const previousScroll = els.table.scrollTop;
         const rows = sortedRows(allLeads.filter(matches));
         els.table.innerHTML = rows.map((lead) => `
             <article class="all-leads-row">
@@ -290,6 +292,7 @@
                 await changeLeadState(button.dataset.stateId, button.dataset.stateAction);
             });
         });
+        els.table.scrollTop = previousScroll;
     }
 
     document.addEventListener("click", (event) => {
