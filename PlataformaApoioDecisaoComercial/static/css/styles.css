@@ -1937,6 +1937,117 @@ body.sidebar-collapsed .sidebar__link:hover::after {
     justify-content: center;
 }
 
+.marker-pin__insight {
+    position: absolute;
+    right: -4px;
+    top: -5px;
+    width: 14px;
+    height: 14px;
+    display: grid;
+    place-items: center;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #0f766e;
+    color: #fff;
+    font-size: 8px;
+    font-weight: 900;
+    transform: rotate(45deg);
+    box-shadow: 0 6px 14px rgba(15, 118, 110, 0.25);
+}
+
+.lead-popup__insight {
+    display: inline-flex;
+    width: fit-content;
+    margin-top: 4px;
+    padding: 3px 7px;
+    border: 1px solid rgba(15, 118, 110, 0.14);
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.08);
+    color: #115e59;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.internal-insights-panel {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 10px;
+    background: rgba(15, 118, 110, 0.045);
+}
+
+.internal-insights-panel__head,
+.internal-insights-panel__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.internal-insights-panel__head h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 13px;
+}
+
+.internal-insights-panel__head span,
+.internal-insights-panel__footer small {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.insight-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.insight-chip {
+    min-height: 26px;
+    padding: 4px 8px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.52);
+    color: #475569;
+    font-size: 10.5px;
+    font-weight: 800;
+}
+
+.insight-chip.is-active {
+    border-color: rgba(15, 118, 110, 0.22);
+    background: rgba(15, 118, 110, 0.12);
+    color: #115e59;
+}
+
+#internalInsightNote {
+    min-height: 64px;
+    resize: vertical;
+}
+
+body.dark-mode .internal-insights-panel {
+    background: rgba(20, 184, 166, 0.08);
+    border-color: rgba(148, 163, 184, 0.14);
+}
+
+body.dark-mode .internal-insights-panel__head h3 {
+    color: #f8fafc;
+}
+
+body.dark-mode .insight-chip {
+    background: rgba(148, 163, 184, 0.08);
+    border-color: rgba(148, 163, 184, 0.12);
+    color: #cbd5e1;
+}
+
+body.dark-mode .insight-chip.is-active {
+    background: rgba(20, 184, 166, 0.18);
+    border-color: rgba(45, 212, 191, 0.28);
+    color: #99f6e4;
+}
+
 .plan-created-card,
 .plan-warning-card {
     margin-bottom: 10px;

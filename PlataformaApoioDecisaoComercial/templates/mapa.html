@@ -79,6 +79,9 @@
             <label>Tag
                 <select id="tagFilter"><option value="">Todas</option>{% for item in options.tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
             </label>
+            <label>Insight interno
+                <select id="insightFilter"><option value="">Todos</option>{% for item in options.insight_tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            </label>
             <label class="check-row"><input id="historyFilter" type="checkbox"> Incluir histórico / inativas</label>
             <label class="check-row"><input id="heatmapToggle" type="checkbox"> Mapa de calor</label>
             <label>Território

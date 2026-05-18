@@ -39,6 +39,8 @@ class Lead(db.Model):
     data_reuniao = db.Column(db.Date, nullable=True)
     hora_reuniao = db.Column(db.String(10), nullable=True)
     tags = db.Column(db.String(300), nullable=True)
+    insight_tags = db.Column(db.String(400), nullable=True)
+    insight_note = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -80,6 +82,8 @@ class Lead(db.Model):
             "data_reuniao": self.data_reuniao.isoformat() if self.data_reuniao else "",
             "hora_reuniao": self.hora_reuniao or "",
             "tags": self.tag_list(),
+            "insight_tags": self.insight_tag_list(),
+            "insight_note": self.insight_note or "",
             "created_at": self.created_at.isoformat() if self.created_at else "",
             "updated_at": self.updated_at.isoformat() if self.updated_at else "",
             "score": self.operational_score(),
@@ -91,6 +95,9 @@ class Lead(db.Model):
 
     def tag_list(self):
         return [tag.strip() for tag in (self.tags or "").split(",") if tag.strip()]
+
+    def insight_tag_list(self):
+        return [tag.strip() for tag in (self.insight_tags or "").split(",") if tag.strip()]
 
     def _normalized_text(self, value):
         text = unicodedata.normalize("NFD", str(value or "").lower())

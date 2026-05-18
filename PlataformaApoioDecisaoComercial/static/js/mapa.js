@@ -55,6 +55,7 @@ const els = {
     classificationFilter: document.getElementById("classificationFilter"),
     scheduleFilter: document.getElementById("scheduleFilter"),
     tagFilter: document.getElementById("tagFilter"),
+    insightFilter: document.getElementById("insightFilter"),
     historyFilter: document.getElementById("historyFilter"),
     heatmapToggle: document.getElementById("heatmapToggle"),
     territoryMode: document.getElementById("territoryMode"),
@@ -119,6 +120,19 @@ const els = {
 };
 
 if (els.planDate) els.planDate.value = todayIso;
+
+const INSIGHT_TAGS = [
+    "VIP",
+    "Difícil",
+    "Impaciente",
+    "Só WhatsApp",
+    "Prefere email",
+    "Follow-up delicado",
+    "Interesse elevado",
+    "Sem resposta",
+    "Gatekeeper",
+    "Recuperar",
+];
 
 function haversineKm(a, b) { /* unchanged */
     const earthRadiusKm = 6371;
@@ -340,6 +354,20 @@ function eligibleForDayContactPlan(lead) {
     return lead && hasCoordinates(lead) && !excludedFromDayContact(lead);
 }
 
+function leadInsights(lead) {
+    return lead?.insight_tags || [];
+}
+
+function hasInsights(lead) {
+    return leadInsights(lead).length > 0 || Boolean(lead?.insight_note);
+}
+
+function insightSummary(lead) {
+    const tags = leadInsights(lead).slice(0, 3).join(", ");
+    const note = lead?.insight_note || "";
+    return [tags, note].filter(Boolean).join(" · ");
+}
+
 function setDrawerOpen(open) {
     if (els.leadDrawer) els.leadDrawer.classList.toggle("drawer-open", open);
     document.body.classList.toggle("map-drawer-open", open);
@@ -355,7 +383,7 @@ function markerIcon(lead) {
     if (selectedLead && lead.id !== selectedLead.id && !isNearby) classes.push("out-of-focus");
     return L.divIcon({
         className: "",
-        html: `<span class="${classes.join(" ")}"><span class="marker-pin__core"></span></span>`,
+        html: `<span class="${classes.join(" ")}" ${hasInsights(lead) ? `title="${insightSummary(lead)}"` : ""}><span class="marker-pin__core"></span>${hasInsights(lead) ? '<span class="marker-pin__insight">i</span>' : ""}</span>`,
         iconSize: [34, 42],
         iconAnchor: [17, 38],
         popupAnchor: [0, -34],
@@ -420,6 +448,7 @@ function popupHtml(lead) {
             <span>${leadArea(lead)}</span>
             <span>${lead.telefone || "—"}</span>
             <span>${leadCity(lead)}</span>
+            ${hasInsights(lead) ? `<span class="lead-popup__insight" title="${insightSummary(lead)}">Insights internos</span>` : ""}
             <small>${leadCommercialLabel(lead)} · ${lead.estado}</small>
         </div>
     `;
@@ -452,7 +481,8 @@ function passesFilters(lead) {
         (!selectedCommercial || leadCommercialKey(lead) === selectedCommercial) &&
         (!els.stateFilter?.value || lead.estado === els.stateFilter.value) &&
         passesScheduleFilter(lead) &&
-        (!els.tagFilter?.value || (lead.tags || []).includes(els.tagFilter.value))
+        (!els.tagFilter?.value || (lead.tags || []).includes(els.tagFilter.value)) &&
+        (!els.insightFilter?.value || leadInsights(lead).includes(els.insightFilter.value))
     );
 }
 
@@ -996,6 +1026,7 @@ function renderDetails() {
             ${detailLine("Motivo", selectedLead.motivo_classificacao || "—")}
             ${detailLine("Estado", selectedLead.estado)}
         </dl>
+        ${renderInsightPanel(selectedLead)}
         ${suggestion ? `<section class="commercial-suggestion">
             <strong>Esta lead está próxima de várias leads da ${suggestion.label}.</strong>
             <button class="button secondary" id="assignSuggestedCommercial" type="button">Atribuir à ${suggestion.label}</button>
@@ -1020,6 +1051,10 @@ function renderDetails() {
     document.querySelectorAll(".removable-tag").forEach((tag) => {
         tag.addEventListener("click", () => tagAction("remove_tag", tag.dataset.tag));
     });
+    document.querySelectorAll("[data-insight-tag]").forEach((button) => {
+        button.addEventListener("click", () => button.classList.toggle("is-active"));
+    });
+    document.getElementById("saveInternalInsights")?.addEventListener("click", saveInternalInsights);
 }
 
 function renderMapMiniCard() {
@@ -1060,6 +1095,27 @@ function renderMapMiniCard() {
 
 function detailLine(label, value) {
     return `<div class="detail-line"><dt>${label}</dt><dd>${value}</dd></div>`;
+}
+
+function renderInsightPanel(lead) {
+    const tags = leadInsights(lead);
+    const chips = INSIGHT_TAGS.map((tag) => `
+        <button type="button" class="insight-chip ${tags.includes(tag) ? "is-active" : ""}" data-insight-tag="${tag}">${tag}</button>
+    `).join("");
+    return `
+        <section class="internal-insights-panel">
+            <div class="internal-insights-panel__head">
+                <h3>Insights Internos</h3>
+                <span>${hasInsights(lead) ? "Atualizado" : "Sem insights"}</span>
+            </div>
+            <div class="insight-chip-list">${chips}</div>
+            <textarea id="internalInsightNote" rows="2" maxlength="280" placeholder="Adicionar insight interno...">${lead.insight_note || ""}</textarea>
+            <div class="internal-insights-panel__footer">
+                <small>Último update: ${lead.updated_at ? new Date(lead.updated_at).toLocaleDateString("pt-PT") : "—"}</small>
+                <button class="button secondary" id="saveInternalInsights" type="button">Guardar</button>
+            </div>
+        </section>
+    `;
 }
 
 function renderNearbyList() {
@@ -1449,6 +1505,32 @@ async function addLeadNote() {
     await loadLeads();
 }
 
+async function saveInternalInsights() {
+    if (!selectedLead) return;
+    const tags = Array.from(document.querySelectorAll("[data-insight-tag].is-active")).map((item) => item.dataset.insightTag);
+    const note = document.getElementById("internalInsightNote")?.value.trim() || "";
+    const response = await fetch(`/api/leads/${selectedLead.id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            action: "update_insights",
+            insight_tags: tags,
+            insight_note: note,
+            comercial_responsavel: selectedLead.comercial_responsavel,
+        }),
+    });
+    if (!response.ok) {
+        if (window.AllteraDialog) await window.AllteraDialog.alert("Não foi possível guardar os insights.", { type: "error", title: "Erro" });
+        return;
+    }
+    const updated = await response.json();
+    allLeads = allLeads.map((lead) => (lead.id === updated.id ? updated : lead));
+    selectedLead = updated;
+    applyFilters();
+    renderDetails();
+    if (window.AllteraToast) window.AllteraToast("Insights internos guardados.", "success");
+}
+
 async function bulkAction(action, extra = {}) {
     const ids = extra.ids || Array.from(selectedBulkIds);
     if (!ids.length) return;
@@ -1633,6 +1715,7 @@ function resetFilters() {
     if (els.scheduleFilter) els.scheduleFilter.value = "";
     if (els.territoryMode) els.territoryMode.value = "";
     els.tagFilter.value = "";
+    if (els.insightFilter) els.insightFilter.value = "";
     els.historyFilter.checked = false;
     mapInitialFitDone = false;
     applyFilters();
@@ -1662,6 +1745,7 @@ function bindEvents() {
         els.classificationFilter,
         els.scheduleFilter,
         els.tagFilter,
+        els.insightFilter,
         els.territoryMode,
         els.historyFilter,
         els.heatmapToggle,

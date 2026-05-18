@@ -87,6 +87,18 @@ TAG_OPTIONS = [
     "Voltar mais tarde",
     "Prioridade operacional",
 ]
+INSIGHT_TAG_OPTIONS = [
+    "VIP",
+    "Difícil",
+    "Impaciente",
+    "Só WhatsApp",
+    "Prefere email",
+    "Follow-up delicado",
+    "Interesse elevado",
+    "Sem resposta",
+    "Gatekeeper",
+    "Recuperar",
+]
 INVALID_CITY_VALUES = {"", "-", "n/a", "na", "null", "none", "sem cidade", "desconhecido"}
 CITY_CORRECTIONS = {
     "lisboas": "Lisboa",
@@ -268,6 +280,8 @@ def rebuild_legacy_lead_table_if_needed():
         ("data_reuniao", "DATE"),
         ("hora_reuniao", "VARCHAR(10)"),
         ("tags", "VARCHAR(300)"),
+        ("insight_tags", "VARCHAR(400)"),
+        ("insight_note", "TEXT"),
         ("created_at", "DATETIME"),
         ("updated_at", "DATETIME"),
     ]
@@ -322,6 +336,8 @@ def migrate_database():
         "hora_reuniao": "ALTER TABLE lead ADD COLUMN hora_reuniao VARCHAR(10)",
         "updated_at": "ALTER TABLE lead ADD COLUMN updated_at DATETIME",
         "tags": "ALTER TABLE lead ADD COLUMN tags VARCHAR(300)",
+        "insight_tags": "ALTER TABLE lead ADD COLUMN insight_tags VARCHAR(400)",
+        "insight_note": "ALTER TABLE lead ADD COLUMN insight_note TEXT",
     }
 
     for column, sql in migrations.items():
@@ -2212,6 +2228,7 @@ def get_options():
         "comerciais": ["Todos", UNASSIGNED_COMMERCIAL] + existing_commercials,
         "mapa_comerciais": MAP_COMMERCIALS,
         "tags": sorted(set(TAG_OPTIONS) | {tag for lead in leads for tag in lead.tag_list()}),
+        "insight_tags": sorted(set(INSIGHT_TAG_OPTIONS) | {tag for lead in leads for tag in lead.insight_tag_list()}),
     }
 
 
@@ -3432,6 +3449,28 @@ def register_routes(app):
             tags = [item for item in lead.tag_list() if item != tag]
             lead.tags = ", ".join(tags)
             add_history(lead, "Tag removida", tag, commercial)
+        elif action == "update_insights":
+            requested_tags = data.get("insight_tags") or []
+            if not isinstance(requested_tags, list):
+                requested_tags = []
+            old_tags = set(lead.insight_tag_list())
+            old_note = clean_text(lead.insight_note)
+            allowed_tags = set(INSIGHT_TAG_OPTIONS)
+            new_tags = [clean_text(tag) for tag in requested_tags if clean_text(tag) in allowed_tags]
+            note = clean_text(data.get("insight_note"))
+            lead.insight_tags = ", ".join(new_tags)
+            lead.insight_note = note
+            added = sorted(set(new_tags) - old_tags)
+            removed = sorted(old_tags - set(new_tags))
+            if added:
+                add_history(lead, "Insight tags adicionadas", ", ".join(added), commercial)
+            if removed:
+                add_history(lead, "Insight tags removidas", ", ".join(removed), commercial)
+            if note:
+                action_label = "Insight interno criado" if not old_note and not old_tags else "Insight interno editado"
+                add_history(lead, action_label, note, commercial)
+            elif added or removed:
+                add_history(lead, "Insight interno atualizado", "Tags internas atualizadas.", commercial)
         elif action == "update_coordinates":
             latitude = parse_float_optional(data.get("latitude"))
             longitude = parse_float_optional(data.get("longitude"))
