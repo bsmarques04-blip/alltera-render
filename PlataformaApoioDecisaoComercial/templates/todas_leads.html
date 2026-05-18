@@ -213,7 +213,7 @@
                 defaultValue: action === "ligar_volta" ? "Ligar de volta" : "Ligar mais tarde",
             });
             if (observation === null) return;
-            payload.action = "adiar";
+            payload.action = action === "ligar_volta" ? "ligar_volta" : "adiar";
             payload.data_novo_contacto = when;
             payload.observacao = observation || "";
         } else if (action === "crm" || action === "sem_interesse") {

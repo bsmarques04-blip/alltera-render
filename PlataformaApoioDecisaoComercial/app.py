@@ -3378,8 +3378,11 @@ def register_routes(app):
 
         if action in {"contactado", "ligar_volta"}:
             lead.estado = "Ligar de volta"
+            lead.estado_lead = "Ligar de volta"
             if action == "contactado":
                 lead.data_novo_contacto = None
+            else:
+                lead.data_novo_contacto = parse_date(data.get("data_novo_contacto"))
             add_history(lead, "Estado alterado", observation or "Lead marcada para ligar de volta.", commercial)
         elif action == "corrigir_estado":
             new_state = clean_text(data.get("estado"))
@@ -3401,6 +3404,7 @@ def register_routes(app):
             if not new_contact_date:
                 return jsonify({"error": "Data de novo contacto obrigatoria"}), 400
             lead.estado = "Adiar contacto"
+            lead.estado_lead = "Adiar contacto"
             lead.comercial_responsavel = commercial
             lead.data_novo_contacto = new_contact_date
             add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}. {observation}", commercial)

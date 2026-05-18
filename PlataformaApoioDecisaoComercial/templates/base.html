@@ -250,6 +250,31 @@
                     window.dispatchEvent(new Event("resize"));
                 });
             }
+
+            const scrollKey = `alltera.scroll.${window.location.pathname}`;
+            const saveScroll = () => {
+                sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
+            };
+            const savedScroll = sessionStorage.getItem(scrollKey);
+            if (savedScroll !== null) {
+                sessionStorage.removeItem(scrollKey);
+                requestAnimationFrame(() => {
+                    window.scrollTo({ top: Number(savedScroll) || 0, behavior: "instant" });
+                });
+            }
+            document.addEventListener("submit", (event) => {
+                if (event.target instanceof HTMLFormElement) saveScroll();
+            }, true);
+            document.addEventListener("click", (event) => {
+                if (event.target.closest("button[type='submit'], input[type='submit']")) saveScroll();
+            }, true);
+            document.addEventListener("change", (event) => {
+                const field = event.target;
+                if (!(field instanceof HTMLSelectElement || field instanceof HTMLInputElement)) return;
+                const form = field.form;
+                if (!form) return;
+                if (field.hasAttribute("onchange") || form.method.toLowerCase() === "get") saveScroll();
+            }, true);
         })();
     </script>
     <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
