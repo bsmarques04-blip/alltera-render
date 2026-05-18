@@ -3393,9 +3393,12 @@ def register_routes(app):
             lead.hora_reuniao = None
             add_history(lead, "Estado alterado", observation or "Lead já tratada no CRM.", commercial)
         elif action == "adiar":
+            new_contact_date = parse_date(data.get("data_novo_contacto"))
+            if not new_contact_date:
+                return jsonify({"error": "Data de novo contacto obrigatoria"}), 400
             lead.estado = "Adiar contacto"
             lead.comercial_responsavel = commercial
-            lead.data_novo_contacto = parse_date(data.get("data_novo_contacto"))
+            lead.data_novo_contacto = new_contact_date
             add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}. {observation}", commercial)
         elif action == "sem_interesse":
             lead.estado = "Sem interesse"

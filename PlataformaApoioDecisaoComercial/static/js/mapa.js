@@ -1379,10 +1379,16 @@ async function performAction(action) {
         if (!when) return;
         payload.action = "adiar";
         payload.data_novo_contacto = when;
-        payload.observacao = prompt("Motivo/observacao:", "Ligar de volta") || "Ligar de volta";
+        const observation = prompt("Motivo/observacao:", "Ligar de volta");
+        if (observation === null) return;
+        payload.observacao = observation || "Ligar de volta";
     } else if (action === "adiar") {
-        payload.data_novo_contacto = prompt("Data de novo contacto (AAAA-MM-DD):", todayIso);
-        payload.observacao = prompt("Motivo/observacao:", "Ligar mais tarde") || "";
+        const when = prompt("Data de novo contacto (AAAA-MM-DD):", todayIso);
+        if (!when) return;
+        const observation = prompt("Motivo/observacao:", "Ligar mais tarde");
+        if (observation === null) return;
+        payload.data_novo_contacto = when;
+        payload.observacao = observation || "";
     } else if (!["update_coordinates", "corrigir_estado"].includes(action)) {
         payload.observacao = prompt("Observacao opcional:", "") || "";
     }
