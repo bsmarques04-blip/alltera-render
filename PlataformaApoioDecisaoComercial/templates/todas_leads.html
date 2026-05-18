@@ -9,12 +9,12 @@
         <div>
             <p class="eyebrow">Operação comercial</p>
             <h1>Todas as Leads</h1>
-            <p>Consulta global com pesquisa rápida, filtros e ações operacionais.</p>
+            <p>Consulta de leads ativas com pesquisa rápida, filtros e ações operacionais.</p>
         </div>
     </section>
 
     <section class="metric-grid dashboard-metrics">
-        <article><span>Total de leads</span><strong>{{ summary.total }}</strong></article>
+        <article><span>Leads ativas</span><strong>{{ summary.total }}</strong></article>
         <article><span>Com localização</span><strong>{{ summary.with_coords }}</strong></article>
         <article><span>Sem localização</span><strong>{{ summary.without_coords }}</strong></article>
         <article><span>Agendadas</span><strong>{{ summary.scheduled }}</strong></article>
@@ -65,6 +65,12 @@
     const norm = (v) => String(v || "").toLowerCase();
     const leadName = (lead) => lead.nome_cliente || lead.nome || lead.empresa || lead.nome_empresa || "Lead sem nome";
     const badge = (text, cls) => `<span class="tag all-leads-tag ${cls || ""}">${text}</span>`;
+    const field = (label, value) => value ? `<span><b>${label}</b>${value}</span>` : "";
+    const formatDate = (value) => {
+        if (!value) return "";
+        const date = new Date(`${value}T00:00:00`);
+        return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("pt-PT");
+    };
     const leadNotes = (lead) => String(
         lead.observacoes ||
         lead.observacao ||
@@ -74,6 +80,9 @@
         lead.observacoes_contacto ||
         ""
     ).trim() || "Sem observações";
+
+    const contactNotes = (lead) => String(lead.observacoes_contacto || "").trim();
+    const generalNotes = (lead) => String(lead.observacoes || "").trim();
 
     function matches(lead) {
         const q = norm(els.search.value).trim();
@@ -86,6 +95,16 @@
         if (els.coords.value === "with" && !lead.tem_coordenadas) return false;
         if (els.coords.value === "without" && lead.tem_coordenadas) return false;
         return true;
+    }
+
+    function details(lead) {
+        return `
+            <div class="all-leads-details">
+                ${field("Area", lead.area_negocio || lead.tipo_cliente)}
+                ${field("Comercial", lead.comercial_responsavel)}
+                ${field("Novo contacto", formatDate(lead.data_novo_contacto))}
+            </div>
+        `;
     }
 
     function actions(lead) {
@@ -112,8 +131,35 @@
             <div class="all-leads-actions">
                 ${lead.tem_coordenadas ? `<a class="button secondary" href="${mapUrl}">Ver no mapa</a>` : `<span class="tag">Sem mapa</span>`}
                 <a class="button secondary" href="${editUrl}">Abrir/editar</a>
+                <button class="button secondary all-leads-inactivate" type="button" data-inactivate-id="${lead.id}">Tornar inativa</button>
             </div>
         `;
+    }
+
+    async function inactivateLead(id) {
+        if (!id) return;
+        const ok = window.AllteraDialog
+            ? await window.AllteraDialog.confirm("A lead sai da lista de ativas e passa para Leads Inativas.", {
+                  title: "Tornar lead inativa",
+                  type: "danger",
+                  confirmText: "Tornar inativa",
+              })
+            : confirm("Tornar esta lead inativa?");
+        if (!ok) return;
+        const response = await fetch(`/api/leads/${id}/action`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                action: "sem_interesse",
+                observacao: "Lead tornada inativa na lista de leads ativas.",
+            }),
+        });
+        if (!response.ok) {
+            if (window.AllteraDialog) await window.AllteraDialog.alert("Nao foi possivel tornar a lead inativa.", { type: "error", title: "Erro" });
+            else alert("Nao foi possivel tornar a lead inativa.");
+            return;
+        }
+        window.location.reload();
     }
 
     function render() {
@@ -123,17 +169,22 @@
                 <div class="all-leads-main">
                     <strong>${leadName(lead)}</strong>
                     <p>${lead.nome_empresa || "Sem empresa"} · ${lead.cidade || lead.localidade || "Sem cidade"} · ${lead.telefone || "Sem telefone"}</p>
-                    <small class="all-leads-notes">${leadNotes(lead)}</small>
+                    ${details(lead)}
+                    <small class="all-leads-notes"><b>Observações</b>${generalNotes(lead) || "Sem observações"}</small>
+                    <small class="all-leads-contact-notes"><b>Obs. contacto</b>${contactNotes(lead) || "Sem observações do contacto"}</small>
                 </div>
                 <div class="all-leads-badges">
                     ${badge(lead.tem_coordenadas ? "Com localização" : "Sem localização", lead.tem_coordenadas ? "tag--ok" : "tag--warn")}
                     ${lead.agendada ? badge("Agendada", "tag--info") : ""}
                     ${lead.estado === "Por contactar" ? badge("Por contactar", "tag--soft") : ""}
-                    ${lead.ativa ? "" : badge("Inativa", "tag--danger")}
+                    ${lead.prioridade ? badge(lead.prioridade, "tag--soft") : ""}
                 </div>
                 ${actions(lead)}
             </article>
         `).join("") || `<p class="empty-state">Sem leads para os filtros aplicados.</p>`;
+        els.table.querySelectorAll("[data-inactivate-id]").forEach((button) => {
+            button.addEventListener("click", () => inactivateLead(button.dataset.inactivateId));
+        });
     }
 
     [els.search, els.state, els.tag, els.coords].forEach((el) => el?.addEventListener("input", render));

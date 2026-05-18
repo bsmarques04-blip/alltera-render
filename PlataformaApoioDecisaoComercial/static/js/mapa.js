@@ -1361,36 +1361,48 @@ async function goToNextLead() {
 
 async function performAction(action) {
     if (!selectedLead) return;
+    const dialog = window.AllteraDialog;
+    const askConfirm = async (message, options) => (dialog ? dialog.confirm(message, options) : confirm(message));
+    const askPrompt = async (message, options = {}) => (dialog ? dialog.prompt(message, options) : prompt(message, options.defaultValue || ""));
+    const showAlert = async (message, options) => (dialog ? dialog.alert(message, options) : alert(message));
     const confirmations = {
         crm: "Confirmar que esta lead já foi tratada no CRM? A lead sai da lista ativa.",
         sem_interesse: "Confirmar Sem interesse? A lead deixa de aparecer na lista ativa.",
     };
-    if (confirmations[action] && !confirm(confirmations[action])) return;
+    if (confirmations[action] && !(await askConfirm(confirmations[action], { type: "warning", confirmText: "Confirmar" }))) return;
     const payload = { action, comercial_responsavel: selectedLead.comercial_responsavel, observacao: "" };
     if (action === "update_coordinates") {
-        payload.latitude = prompt("Latitude:", selectedLead.latitude || "");
-        payload.longitude = prompt("Longitude:", selectedLead.longitude || "");
+        payload.latitude = await askPrompt("Latitude:", { title: "Atualizar coordenadas", defaultValue: selectedLead.latitude || "" });
+        if (payload.latitude === null) return;
+        payload.longitude = await askPrompt("Longitude:", { title: "Atualizar coordenadas", defaultValue: selectedLead.longitude || "" });
+        if (payload.longitude === null) return;
     } else if (action === "corrigir_estado") {
-        payload.estado = prompt("Novo estado:", selectedLead.estado) || selectedLead.estado;
-        payload.observacao = prompt("Motivo da correcao:", "") || "";
+        const state = await askPrompt("Novo estado:", { title: "Corrigir estado", defaultValue: selectedLead.estado });
+        if (state === null) return;
+        payload.estado = state || selectedLead.estado;
+        const observation = await askPrompt("Motivo da correcao:", { title: "Corrigir estado" });
+        if (observation === null) return;
+        payload.observacao = observation || "";
     }
     if (action === "ligar_volta") {
-        const when = prompt("Data para ligar de volta (AAAA-MM-DD):", todayIso);
+        const when = await askPrompt("Data para ligar de volta:", { title: "Ligar de volta", defaultValue: todayIso, inputType: "date" });
         if (!when) return;
         payload.action = "adiar";
         payload.data_novo_contacto = when;
-        const observation = prompt("Motivo/observacao:", "Ligar de volta");
+        const observation = await askPrompt("Motivo/observacao:", { title: "Ligar de volta", defaultValue: "Ligar de volta" });
         if (observation === null) return;
         payload.observacao = observation || "Ligar de volta";
     } else if (action === "adiar") {
-        const when = prompt("Data de novo contacto (AAAA-MM-DD):", todayIso);
+        const when = await askPrompt("Data de novo contacto:", { title: "Reagendar contacto", defaultValue: todayIso, inputType: "date" });
         if (!when) return;
-        const observation = prompt("Motivo/observacao:", "Ligar mais tarde");
+        const observation = await askPrompt("Motivo/observacao:", { title: "Reagendar contacto", defaultValue: "Ligar mais tarde" });
         if (observation === null) return;
         payload.data_novo_contacto = when;
         payload.observacao = observation || "";
     } else if (!["update_coordinates", "corrigir_estado"].includes(action)) {
-        payload.observacao = prompt("Observacao opcional:", "") || "";
+        const observation = await askPrompt("Observacao opcional:", { title: "Registar ação" });
+        if (observation === null) return;
+        payload.observacao = observation || "";
     }
 
     const response = await fetch(`/api/leads/${selectedLead.id}/action`, {
@@ -1399,7 +1411,7 @@ async function performAction(action) {
         body: JSON.stringify(payload),
     });
     if (!response.ok) {
-        alert("Nao foi possivel atualizar a lead.");
+        await showAlert("Nao foi possivel atualizar a lead.", { type: "error", title: "Erro" });
         return;
     }
     await loadLeads();
@@ -1429,7 +1441,8 @@ async function addLeadNote() {
         }),
     });
     if (!response.ok) {
-        alert("Nao foi possivel guardar a nota.");
+        if (window.AllteraDialog) await window.AllteraDialog.alert("Nao foi possivel guardar a nota.", { type: "error", title: "Erro" });
+        else alert("Nao foi possivel guardar a nota.");
         return;
     }
     els.leadNoteInput.value = "";
@@ -1445,7 +1458,7 @@ async function bulkAction(action, extra = {}) {
         body: JSON.stringify({ action, ids, ...extra }),
     });
     if (!response.ok) {
-        alert("Não foi possível aplicar a ação em lote.");
+        if (window.AllteraDialog) await window.AllteraDialog.alert("Não foi possível aplicar a ação em lote.", { type: "error", title: "Erro" }); else alert("Não foi possível aplicar a ação em lote.");
         return;
     }
     selectedBulkIds = new Set();
@@ -1563,7 +1576,8 @@ function optimizedRoute(leads) {
 function drawSmartRoute() {
     const selected = visibleLeads.filter((lead) => selectedBulkIds.has(lead.id) && hasCoordinates(lead));
     if (selected.length < 2) {
-        alert("Seleciona pelo menos duas leads com coordenadas para desenhar uma rota.");
+        if (window.AllteraDialog) window.AllteraDialog.alert("Seleciona pelo menos duas leads com coordenadas para desenhar uma rota.", { type: "info", title: "Rota do dia" });
+        else alert("Seleciona pelo menos duas leads com coordenadas para desenhar uma rota.");
         return;
     }
     clearSmartRoute();

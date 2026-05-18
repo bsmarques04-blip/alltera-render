@@ -209,6 +209,95 @@
         };
     };
 
+    const initDialogs = () => {
+        const closeDialog = (overlay, value, resolve) => {
+            overlay.classList.add("alltera-dialog--closing");
+            window.setTimeout(() => {
+                overlay.remove();
+                resolve(value);
+            }, 160);
+        };
+
+        const openDialog = ({
+            title = "Confirmar ação",
+            message = "",
+            type = "info",
+            mode = "alert",
+            defaultValue = "",
+            inputType = "text",
+            confirmText = "Confirmar",
+            cancelText = "Cancelar",
+        } = {}) =>
+            new Promise((resolve) => {
+                const overlay = document.createElement("div");
+                overlay.className = `alltera-dialog alltera-dialog--${type}`;
+                overlay.setAttribute("role", "dialog");
+                overlay.setAttribute("aria-modal", "true");
+                overlay.innerHTML = `
+                    <div class="alltera-dialog__card">
+                        <div class="alltera-dialog__icon" aria-hidden="true"></div>
+                        <div class="alltera-dialog__content">
+                            <h2>${title}</h2>
+                            ${message ? `<p>${message}</p>` : ""}
+                            ${mode === "prompt" ? `<input class="alltera-dialog__input" type="${inputType}" value="">` : ""}
+                        </div>
+                        <div class="alltera-dialog__actions">
+                            ${mode === "alert" ? "" : `<button class="button secondary alltera-dialog__cancel" type="button">${cancelText}</button>`}
+                            <button class="button alltera-dialog__confirm" type="button">${confirmText}</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const input = overlay.querySelector(".alltera-dialog__input");
+                if (input) {
+                    input.value = defaultValue || "";
+                    window.setTimeout(() => input.focus(), 30);
+                } else {
+                    window.setTimeout(() => overlay.querySelector(".alltera-dialog__confirm")?.focus(), 30);
+                }
+
+                const finish = (value) => closeDialog(overlay, value, resolve);
+                overlay.querySelector(".alltera-dialog__confirm")?.addEventListener("click", () => {
+                    if (mode === "prompt") finish(input.value);
+                    else finish(true);
+                });
+                overlay.querySelector(".alltera-dialog__cancel")?.addEventListener("click", () => finish(mode === "prompt" ? null : false));
+                overlay.addEventListener("click", (event) => {
+                    if (event.target === overlay) finish(mode === "prompt" ? null : false);
+                });
+                overlay.addEventListener("keydown", (event) => {
+                    if (event.key === "Escape") finish(mode === "prompt" ? null : false);
+                    if (event.key === "Enter" && mode !== "prompt") finish(true);
+                });
+            });
+
+        window.AllteraDialog = {
+            alert: (message, options = {}) =>
+                openDialog({ title: options.title || "Mensagem", message, type: options.type || "info", mode: "alert", confirmText: options.confirmText || "Ok" }),
+            confirm: (message, options = {}) =>
+                openDialog({
+                    title: options.title || "Confirmar ação",
+                    message,
+                    type: options.type || "warning",
+                    mode: "confirm",
+                    confirmText: options.confirmText || "Confirmar",
+                    cancelText: options.cancelText || "Cancelar",
+                }),
+            prompt: (message, options = {}) =>
+                openDialog({
+                    title: options.title || "Preencher dado",
+                    message,
+                    type: options.type || "info",
+                    mode: "prompt",
+                    defaultValue: options.defaultValue || "",
+                    inputType: options.inputType || "text",
+                    confirmText: options.confirmText || "Guardar",
+                    cancelText: options.cancelText || "Cancelar",
+                }),
+        };
+    };
+
     const applyStoredOrder = (container, key) => {
         const stored = JSON.parse(localStorage.getItem(key) || "[]");
         if (!Array.isArray(stored) || !stored.length) return;
@@ -291,6 +380,7 @@
         initMagneticButtons();
         initSearchBar();
         initToasts();
+        initDialogs();
         initDashboardSort();
         initCursor();
         initSidebar();

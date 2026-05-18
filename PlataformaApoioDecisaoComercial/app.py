@@ -2827,7 +2827,11 @@ def register_routes(app):
 
     @app.route("/todas-leads")
     def todas_leads():
-        leads = Lead.query.order_by(Lead.nome_empresa.asc()).all()
+        leads = [
+            lead
+            for lead in Lead.query.order_by(Lead.nome_empresa.asc()).all()
+            if is_active_lead(lead)
+        ]
         total = len(leads)
         with_coords = sum(1 for lead in leads if valid_coordinates(lead.latitude, lead.longitude))
         scheduled = sum(1 for lead in leads if is_scheduled_lead(lead))
