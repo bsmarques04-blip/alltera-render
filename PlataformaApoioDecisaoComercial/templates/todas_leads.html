@@ -43,6 +43,17 @@
                 <option value="without">Sem localização</option>
             </select>
         </label>
+        <label>Ordenar por
+            <select id="allLeadsSort">
+                <option value="important">Mais importantes</option>
+                <option value="score_desc">Score mais alto</option>
+                <option value="next_contact">Novo contacto primeiro</option>
+                <option value="no_coords">Sem localização primeiro</option>
+                <option value="commercial">Comercial</option>
+                <option value="city">Cidade</option>
+                <option value="name">Nome A-Z</option>
+            </select>
+        </label>
     </section>
 
     <section class="panel table-card all-leads-table-wrap">
@@ -61,6 +72,7 @@
         state: document.getElementById("allLeadsState"),
         tag: document.getElementById("allLeadsTag"),
         coords: document.getElementById("allLeadsCoords"),
+        sort: document.getElementById("allLeadsSort"),
     };
     const norm = (v) => String(v || "").toLowerCase();
     const leadName = (lead) => lead.nome_cliente || lead.nome || lead.empresa || lead.nome_empresa || "Lead sem nome";
@@ -83,6 +95,13 @@
 
     const contactNotes = (lead) => String(lead.observacoes_contacto || "").trim();
     const generalNotes = (lead) => String(lead.observacoes || "").trim();
+    const leadScore = (lead) => Number(lead.score || 0);
+    const dateValue = (value, fallback = Number.MAX_SAFE_INTEGER) => {
+        if (!value) return fallback;
+        const time = new Date(`${value}T00:00:00`).getTime();
+        return Number.isNaN(time) ? fallback : time;
+    };
+    const byText = (getter) => (a, b) => norm(getter(a)).localeCompare(norm(getter(b)), "pt");
 
     function matches(lead) {
         const q = norm(els.search.value).trim();
@@ -95,6 +114,30 @@
         if (els.coords.value === "with" && !lead.tem_coordenadas) return false;
         if (els.coords.value === "without" && lead.tem_coordenadas) return false;
         return true;
+    }
+
+    function importance(lead) {
+        let value = leadScore(lead) * 10;
+        if (lead.agendada) value += 140;
+        if (!lead.tem_coordenadas) value += 35;
+        if (lead.data_novo_contacto) value += 25;
+        if (!lead.comercial_responsavel) value += 15;
+        return value;
+    }
+
+    function sortedRows(rows) {
+        const sort = els.sort?.value || "important";
+        const tie = byText(leadName);
+        const comparators = {
+            important: (a, b) => importance(b) - importance(a) || tie(a, b),
+            score_desc: (a, b) => leadScore(b) - leadScore(a) || tie(a, b),
+            next_contact: (a, b) => dateValue(a.data_novo_contacto) - dateValue(b.data_novo_contacto) || leadScore(b) - leadScore(a),
+            no_coords: (a, b) => Number(a.tem_coordenadas) - Number(b.tem_coordenadas) || leadScore(b) - leadScore(a),
+            commercial: byText((lead) => lead.comercial_responsavel || "Sem comercial"),
+            city: byText((lead) => lead.cidade || lead.localidade || "Sem cidade"),
+            name: tie,
+        };
+        return [...rows].sort(comparators[sort] || comparators.important);
     }
 
     function details(lead) {
@@ -131,39 +174,84 @@
             <div class="all-leads-actions">
                 ${lead.tem_coordenadas ? `<a class="button secondary" href="${mapUrl}">Ver no mapa</a>` : `<span class="tag">Sem mapa</span>`}
                 <a class="button secondary" href="${editUrl}">Abrir/editar</a>
-                <button class="button secondary all-leads-inactivate" type="button" data-inactivate-id="${lead.id}">Tornar inativa</button>
+                <div class="all-leads-state-menu">
+                    <button class="button secondary all-leads-state-trigger" type="button" data-state-menu="${lead.id}">Mudar estado</button>
+                    <div class="all-leads-state-popover" data-state-popover="${lead.id}" hidden>
+                        <button type="button" data-state-id="${lead.id}" data-state-action="contactado">Contactada</button>
+                        <button type="button" data-state-id="${lead.id}" data-state-action="ligar_volta">Ligar de volta</button>
+                        <button type="button" data-state-id="${lead.id}" data-state-action="reagendar">Reagendar</button>
+                        <button type="button" data-state-id="${lead.id}" data-state-action="crm">Já tratado / CRM</button>
+                        <button type="button" data-state-id="${lead.id}" data-state-action="sem_interesse" class="is-danger">Sem interesse</button>
+                    </div>
+                </div>
             </div>
         `;
     }
 
-    async function inactivateLead(id) {
-        if (!id) return;
-        const ok = window.AllteraDialog
-            ? await window.AllteraDialog.confirm("A lead sai da lista de ativas e passa para Leads Inativas.", {
-                  title: "Tornar lead inativa",
-                  type: "danger",
-                  confirmText: "Tornar inativa",
-              })
-            : confirm("Tornar esta lead inativa?");
-        if (!ok) return;
+    async function changeLeadState(id, action) {
+        const lead = allLeads.find((item) => String(item.id) === String(id));
+        if (!lead || !action) return;
+        const dialog = window.AllteraDialog;
+        const askConfirm = async (message, options) => (dialog ? dialog.confirm(message, options) : confirm(message));
+        const askPrompt = async (message, options = {}) => (dialog ? dialog.prompt(message, options) : prompt(message, options.defaultValue || ""));
+        const showAlert = async (message, options) => (dialog ? dialog.alert(message, options) : alert(message));
+        const payload = {
+            action,
+            comercial_responsavel: lead.comercial_responsavel || "",
+            observacao: "",
+        };
+
+        if (action === "ligar_volta" || action === "reagendar") {
+            const when = await askPrompt("Data de novo contacto:", {
+                title: action === "ligar_volta" ? "Ligar de volta" : "Reagendar contacto",
+                defaultValue: new Date().toISOString().slice(0, 10),
+                inputType: "date",
+            });
+            if (!when) return;
+            const observation = await askPrompt("Motivo/observação:", {
+                title: action === "ligar_volta" ? "Ligar de volta" : "Reagendar contacto",
+                defaultValue: action === "ligar_volta" ? "Ligar de volta" : "Ligar mais tarde",
+            });
+            if (observation === null) return;
+            payload.action = "adiar";
+            payload.data_novo_contacto = when;
+            payload.observacao = observation || "";
+        } else if (action === "crm" || action === "sem_interesse") {
+            const message = action === "crm"
+                ? "A lead sai da lista ativa como já tratada no CRM."
+                : "A lead sai da lista ativa e passa para Leads Inativas.";
+            const ok = await askConfirm(message, {
+                title: action === "crm" ? "Marcar como CRM" : "Marcar sem interesse",
+                type: action === "crm" ? "warning" : "danger",
+                confirmText: "Confirmar",
+            });
+            if (!ok) return;
+            payload.observacao = action === "crm"
+                ? "Lead marcada como já tratada no CRM na lista de leads ativas."
+                : "Lead marcada sem interesse na lista de leads ativas.";
+        } else if (action === "contactado") {
+            const observation = await askPrompt("Observação opcional:", {
+                title: "Marcar contactada",
+                defaultValue: "Lead contactada",
+            });
+            if (observation === null) return;
+            payload.observacao = observation || "Lead contactada";
+        }
+
         const response = await fetch(`/api/leads/${id}/action`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                action: "sem_interesse",
-                observacao: "Lead tornada inativa na lista de leads ativas.",
-            }),
+            body: JSON.stringify(payload),
         });
         if (!response.ok) {
-            if (window.AllteraDialog) await window.AllteraDialog.alert("Nao foi possivel tornar a lead inativa.", { type: "error", title: "Erro" });
-            else alert("Nao foi possivel tornar a lead inativa.");
+            await showAlert("Não foi possível atualizar o estado da lead.", { type: "error", title: "Erro" });
             return;
         }
         window.location.reload();
     }
 
     function render() {
-        const rows = allLeads.filter(matches);
+        const rows = sortedRows(allLeads.filter(matches));
         els.table.innerHTML = rows.map((lead) => `
             <article class="all-leads-row">
                 <div class="all-leads-main">
@@ -175,6 +263,7 @@
                 </div>
                 <div class="all-leads-badges">
                     ${badge(lead.tem_coordenadas ? "Com localização" : "Sem localização", lead.tem_coordenadas ? "tag--ok" : "tag--warn")}
+                    ${badge(`Score ${leadScore(lead)}`, leadScore(lead) >= 70 ? "tag--ok" : leadScore(lead) >= 40 ? "tag--info" : "tag--soft")}
                     ${lead.agendada ? badge("Agendada", "tag--info") : ""}
                     ${lead.estado === "Por contactar" ? badge("Por contactar", "tag--soft") : ""}
                     ${lead.prioridade ? badge(lead.prioridade, "tag--soft") : ""}
@@ -182,13 +271,36 @@
                 ${actions(lead)}
             </article>
         `).join("") || `<p class="empty-state">Sem leads para os filtros aplicados.</p>`;
-        els.table.querySelectorAll("[data-inactivate-id]").forEach((button) => {
-            button.addEventListener("click", () => inactivateLead(button.dataset.inactivateId));
+        els.table.querySelectorAll("[data-state-menu]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const id = button.dataset.stateMenu;
+                const popover = els.table.querySelector(`[data-state-popover="${id}"]`);
+                const shouldOpen = popover?.hidden;
+                els.table.querySelectorAll("[data-state-popover]").forEach((item) => {
+                    item.hidden = true;
+                });
+                if (popover) popover.hidden = !shouldOpen;
+            });
+        });
+        els.table.querySelectorAll("[data-state-action]").forEach((button) => {
+            button.addEventListener("click", async () => {
+                els.table.querySelectorAll("[data-state-popover]").forEach((item) => {
+                    item.hidden = true;
+                });
+                await changeLeadState(button.dataset.stateId, button.dataset.stateAction);
+            });
         });
     }
 
-    [els.search, els.state, els.tag, els.coords].forEach((el) => el?.addEventListener("input", render));
-    [els.state, els.tag, els.coords].forEach((el) => el?.addEventListener("change", render));
+    document.addEventListener("click", (event) => {
+        if (event.target.closest(".all-leads-state-menu")) return;
+        els.table?.querySelectorAll("[data-state-popover]").forEach((item) => {
+            item.hidden = true;
+        });
+    });
+
+    [els.search, els.state, els.tag, els.coords, els.sort].forEach((el) => el?.addEventListener("input", render));
+    [els.state, els.tag, els.coords, els.sort].forEach((el) => el?.addEventListener("change", render));
     render();
 })();
 </script>
