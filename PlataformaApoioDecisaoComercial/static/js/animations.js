@@ -1,6 +1,7 @@
 (function () {
     const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const canHover = window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const isMapPage = Boolean(document.querySelector(".map-page-layout"));
 
     const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -26,6 +27,20 @@
     };
 
     const initCounters = () => {
+        const autoCounters = Array.from(
+            document.querySelectorAll(
+                ".metric-grid strong, .dashboard-metrics strong, .panel-head .tag, .tag strong"
+            )
+        ).filter((el) => {
+            if (!el || el.dataset.countTo) return false;
+            const raw = String(el.textContent || "").trim();
+            return /^[0-9]+$/.test(raw);
+        });
+
+        autoCounters.forEach((el) => {
+            el.dataset.countTo = String(Number(el.textContent || 0));
+        });
+
         const counters = document.querySelectorAll("[data-count-to]");
         if (!counters.length) return;
 
@@ -48,6 +63,8 @@
     const initPageTransitions = () => {
         const shell = document.querySelector(".app-shell__content");
         if (!shell) return;
+        const progress = document.body.appendChild(document.createElement("div"));
+        progress.className = "nav-progress";
 
         shell.classList.add("page-enter");
         requestAnimationFrame(() => shell.classList.add("page-enter--active"));
@@ -63,14 +80,16 @@
             if (url.origin !== window.location.origin || url.pathname === window.location.pathname && url.search === window.location.search) return;
 
             event.preventDefault();
+            progress.classList.add("is-active");
             shell.classList.add("page-exit");
             window.setTimeout(() => {
                 window.location.href = url.href;
-            }, 140);
+            }, 190);
         });
     };
 
     const initStagger = () => {
+        if (isMapPage) return;
         const selectors = [
             ".dashboard-metrics > article",
             ".dashboard-masonry > article",
@@ -91,6 +110,7 @@
     };
 
     const initScrollReveal = () => {
+        if (isMapPage) return;
         const items = document.querySelectorAll(".panel, .metric-grid article, .dashboard-card, .table-card, .empty-state");
         if (!items.length || reduceMotion || !("IntersectionObserver" in window)) return;
 
@@ -123,6 +143,7 @@
     };
 
     const initRipples = () => {
+        if (document.body.classList.contains("premium-minimal")) return;
         document.addEventListener("click", (event) => {
             const button = event.target.closest(".button, .link-button, .theme-toggle, button[type='submit'], .primary-action");
             if (!button || reduceMotion) return;
@@ -225,6 +246,7 @@
     };
 
     const initCursor = () => {
+        if (document.body.classList.contains("premium-minimal")) return;
         if (!canHover || reduceMotion) return;
         const cursor = document.createElement("div");
         cursor.className = "premium-cursor";
@@ -258,6 +280,8 @@
     };
 
     const init = () => {
+        document.body.classList.add("premium-minimal");
+        if (isMapPage) document.body.classList.add("map-performance-mode");
         initPageTransitions();
         initCounters();
         initStagger();

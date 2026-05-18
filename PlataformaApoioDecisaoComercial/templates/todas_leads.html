@@ -89,11 +89,29 @@
     }
 
     function actions(lead) {
-        const mapUrl = lead.tem_coordenadas ? `/mapa?lead_id=${lead.id}` : "";
+        const mapUrl = lead.tem_coordenadas
+            ? `/mapa?lead_id=${lead.id}&lat=${encodeURIComponent(lead.latitude)}&lng=${encodeURIComponent(lead.longitude)}`
+            : "";
+        const editParams = new URLSearchParams({
+            next: "/todas-leads",
+            nome_cliente: lead.nome_cliente || "",
+            nome_empresa: lead.nome_empresa || "",
+            cidade: lead.cidade || lead.localidade || "",
+            localidade: lead.localidade || lead.cidade || "",
+            morada: lead.morada || "",
+            codigo_postal: lead.codigo_postal || "",
+            telefone: lead.telefone || "",
+            email: lead.email || "",
+            area_negocio: lead.area_negocio || "",
+            tipo_cliente: lead.tipo_cliente || "",
+            comercial_responsavel: lead.comercial_responsavel || "",
+            observacoes: lead.observacoes || "",
+        }).toString();
+        const editUrl = `/leads/nova?${editParams}`;
         return `
             <div class="all-leads-actions">
                 ${lead.tem_coordenadas ? `<a class="button secondary" href="${mapUrl}">Ver no mapa</a>` : `<span class="tag">Sem mapa</span>`}
-                <a class="button secondary" href="/adicionar">Abrir/editar</a>
+                <a class="button secondary" href="${editUrl}">Abrir/editar</a>
             </div>
         `;
     }

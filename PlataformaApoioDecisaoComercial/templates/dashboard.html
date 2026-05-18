@@ -30,6 +30,57 @@
     </section>
 
     <section class="dashboard-masonry" data-dashboard-sortable="widgets">
+        <article class="panel dashboard-card dashboard-card--list" data-dashboard-card="inbox-new">
+            <p class="eyebrow">Inbox novas</p>
+            <div class="dashboard-list">
+                {% for lead in inbox_new %}
+                <a href="{{ url_for('mapa_leads', lead_id=lead.id) }}">
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.cidade or lead.localidade or "Sem cidade" }} · por contactar</span>
+                </a>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem leads novas por tratar.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel dashboard-card dashboard-card--list" data-dashboard-card="unassigned-leads">
+            <p class="eyebrow">Sem dono</p>
+            <div class="dashboard-list">
+                {% for lead in unassigned %}
+                <a href="{{ url_for('mapa_leads', lead_id=lead.id) }}">
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>{{ lead.telefone or "Sem telefone" }} · {{ lead.cidade or lead.localidade or "Sem cidade" }}</span>
+                </a>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem leads ativas sem comercial.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel dashboard-card dashboard-card--list" data-dashboard-card="no-coords-priority">
+            <p class="eyebrow">Sem coordenadas prioritárias</p>
+            <div class="dashboard-list">
+                {% for lead in no_coords_priority %}
+                <a href="{{ url_for('sem_coordenadas') }}">
+                    <strong>{{ lead.nome_cliente or lead.nome_empresa }}</strong>
+                    <span>Score {{ lead.operational_score() }} · {{ lead.cidade or lead.localidade or "Sem cidade" }}</span>
+                </a>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Sem pendências críticas de localização.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel dashboard-card" data-dashboard-card="weekly-summary">
+            <p class="eyebrow">Resumo semanal pré-CRM</p>
+            <div class="dashboard-list">
+                <span><strong data-count-to="{{ weekly_summary.contacts }}">{{ weekly_summary.contacts }}</strong><small>Contactos registados</small></span>
+                <span><strong data-count-to="{{ weekly_summary.meetings }}">{{ weekly_summary.meetings }}</strong><small>Reuniões / CRM</small></span>
+                <span><strong data-count-to="{{ weekly_summary.state_changes }}">{{ weekly_summary.state_changes }}</strong><small>Mudanças de estado</small></span>
+            </div>
+        </article>
+
         <article class="panel dashboard-card dashboard-card--featured" data-dashboard-card="best-zone">
             <p class="eyebrow">Melhor zona hoje</p>
             <strong>{{ best_zone.name }}</strong>

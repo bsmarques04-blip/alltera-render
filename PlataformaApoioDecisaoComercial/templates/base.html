@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <aside class="sidebar" aria-label="NavegaÃ§Ã£o principal">
+    <aside class="sidebar" aria-label="Navegação principal">
         <div class="sidebar__aura" aria-hidden="true"></div>
         <div class="sidebar__brand">
             <div class="sidebar__logo" aria-hidden="true">
@@ -31,7 +31,7 @@
             </div>
             <div class="sidebar__brand-text">
                 <div class="sidebar__name">Alltera</div>
-                <div class="sidebar__subtitle">Planeamento comercial geogrÃ¡fico</div>
+                <div class="sidebar__subtitle">Planeamento comercial geográfico</div>
             </div>
         </div>
 
@@ -73,9 +73,9 @@
                 <strong class="sidebar__badge">{{ scheduled_sidebar_count }}</strong>
                 {% endif %}
             </a>
-            <a class="sidebar__link" data-tooltip="HistÃ³rico" href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>
+            <a class="sidebar__link" data-tooltip="Histórico" href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>
                 <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>HistÃ³rico</span>
+                <span>Histórico</span>
             </a>
         </nav>
 
@@ -97,13 +97,13 @@
         <header class="topbar topbar--minimal" aria-label="Barra superior">
             <div class="topbar__title">{% block header_title %}Alltera Lead Planner{% endblock %}</div>
 
-            {# Pesquisa contextual apenas em pÃ¡ginas que fazem sentido #}
+            {# Pesquisa contextual apenas em páginas que fazem sentido #}
             {% set ep = request.endpoint %}
             {% if ep in ["mapa_leads", "esquecidas", "sem_coordenadas", "agendadas", "historico"] %}
-                {# Nota: a pesquisa usa #globalSearchInput e #globalSearchResults; o JS jÃ¡ trata ausencia via optional chaining #}
+                {# Nota: a pesquisa usa #globalSearchInput e #globalSearchResults; o JS já trata ausência via optional chaining #}
                 <div class="global-search" role="search">
                     <div class="global-search__icon" aria-hidden="true"></div>
-                    <input id="globalSearchInput" type="search" placeholder="Pesquisarâ€¦" autocomplete="off" aria-label="Pesquisa">
+                    <input id="globalSearchInput" type="search" placeholder="Pesquisar..." autocomplete="off" aria-label="Pesquisa">
                     <div class="global-search__results" id="globalSearchResults" hidden></div>
                 </div>
             {% endif %}
@@ -155,8 +155,8 @@
             const themeKey = "alltera.theme";
 
             const globalSearch = document.querySelector(".global-search");
-            // Controla acessibilidade/consistÃªncia: se nÃ£o houver pesquisa no DOM, evita handlers desnecessÃ¡rios.
-            // (Quando a pesquisa estiver desativada por pagina, estes elementos nÃ£o existem.)
+            // Controla acessibilidade/consistência: se não houver pesquisa no DOM, evita handlers desnecessários.
+            // (Quando a pesquisa estiver desativada por página, estes elementos não existem.)
             const themeButton = document.getElementById("themeToggle");
             const applyTheme = (theme) => {
                 const dark = theme === "dark";
@@ -190,12 +190,25 @@
                     <a class="global-search__item" href="${item.url}">
                         <strong>${item.title || "Sem nome"}</strong>
                         <span>${item.subtitle || ""}</span>
-                        <small>${item.phone || "Sem telefone"} Â· ${item.commercial || "Sem comercial"}</small>
+                        <small>${item.phone || "Sem telefone"} · ${item.commercial || "Sem comercial"}</small>
                     </a>
                 `).join("");
                 searchResults.hidden = false;
             };
             if (searchInput) {
+                document.addEventListener("keydown", (event) => {
+                    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+                        event.preventDefault();
+                        searchInput.focus();
+                        searchInput.select();
+                        globalSearch?.classList.add("global-search--active");
+                    }
+                    if (event.key === "Escape" && document.activeElement === searchInput) {
+                        searchInput.blur();
+                        renderResults([]);
+                        globalSearch?.classList.remove("global-search--active");
+                    }
+                });
                 searchInput.addEventListener("input", () => {
                     const query = searchInput.value.trim();
                     clearTimeout(searchTimer);
@@ -216,6 +229,7 @@
                 document.addEventListener("click", (event) => {
                     if (!event.target.closest(".global-search")) renderResults([]);
                 });
+                searchInput.addEventListener("blur", () => globalSearch?.classList.remove("global-search--active"));
             }
 
             const key = "alltera.sidebar.collapsed";

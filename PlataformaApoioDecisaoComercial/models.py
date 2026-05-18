@@ -101,8 +101,15 @@ class Lead(db.Model):
         if not self.historico:
             return None
         latest = None
+        contact_tokens = ("contact", "ligar", "adiar", "estado", "crm", "nota", "plano", "reuniao", "sem interesse")
+        ignored_tokens = ("import", "geocoding", "classificacao", "duplicado", "tag")
         for item in self.historico:
             if not item.created_at:
+                continue
+            action = self._normalized_text(item.acao)
+            if any(token in action for token in ignored_tokens) and not any(token in action for token in contact_tokens):
+                continue
+            if not any(token in action for token in contact_tokens):
                 continue
             if latest is None or item.created_at > latest:
                 latest = item.created_at
@@ -111,35 +118,45 @@ class Lead(db.Model):
         return max(0, (datetime.utcnow() - latest).days)
 
     def operational_score(self):
-        score = 45
+        score = 35
         estado = self._normalized_text(self.estado)
         obs = self._normalized_text(" ".join(filter(None, [self.observacoes, self.observacoes_contacto, self.reuniao_info])))
         age = self.last_contact_age_days()
 
         if self.telefone or self.email:
-            score += 10
+            score += 5
         if not self.comercial_responsavel or self._normalized_text(self.comercial_responsavel) in {"", "outro", "sem comercial", "sem comercial atribuido"}:
-            score += 8
+            score += 12
+
+        if self.data_novo_contacto:
+            today = datetime.utcnow().date()
+            if self.data_novo_contacto < today:
+                score += 30
+            elif self.data_novo_contacto == today:
+                score += 18
+            else:
+                score += 8
 
         if any(token in obs for token in ["reuniao marcada", "reunião marcada", "agendado", "marcado para", "visita marcada", "confirmada reuniao", "confirmada reunião"]):
-            score += 22
+            score += 10
         if any(token in obs for token in ["ligar depois", "voltar a contactar", "proximo mes", "próximo mês", "outono", "setembro"]):
-            score += 12
+            score += 10
         if any(token in obs for token in ["nao atendeu", "não atendeu", "sem resposta", "chamada perdida"]):
-            score -= 12
+            score += 10
         if any(token in estado for token in ["sem interesse"]):
-            score -= 30
+            score -= 45
         if "ja tratado" in estado or "jatratado" in estado or "crm" in estado:
-            score -= 25
-        if age is not None:
-            if age <= 2:
-                score += 20
-            elif age <= 7:
-                score += 10
-            elif age <= 30:
-                score -= 5
-            else:
-                score -= 15
+            score -= 40
+        if age is None:
+            score += 18
+        elif age >= 45:
+            score += 18
+        elif age >= 21:
+            score += 12
+        elif age >= 8:
+            score += 6
+        elif age <= 2:
+            score -= 8
         if not self.latitude or not self.longitude:
             score -= 5
 

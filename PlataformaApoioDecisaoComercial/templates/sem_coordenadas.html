@@ -133,4 +133,19 @@
         {% endfor %}
     </section>
 </main>
+<script>
+(() => {
+    const key = "alltera.semCoordenadas.scrollY";
+    const saved = sessionStorage.getItem(key);
+    if (saved !== null) {
+        window.scrollTo(0, Number(saved) || 0);
+        sessionStorage.removeItem(key);
+    }
+    document.querySelectorAll('.no-coords-form, .no-coords-actions form, .history-toolbar form').forEach((form) => {
+        form.addEventListener("submit", () => {
+            sessionStorage.setItem(key, String(window.scrollY || 0));
+        });
+    });
+})();
+</script>
 {% endblock %}

@@ -72,6 +72,12 @@ MAP_COMMERCIALS = [
     {"value": "setil", "label": "Setil"},
 ]
 TAG_OPTIONS = [
+    "Quente",
+    "Frio",
+    "Urgente",
+    "VIP",
+    "Recuperar",
+    "Sem comercial",
     "Restaurante",
     "Hotel",
     "Cadeia",
@@ -2205,7 +2211,7 @@ def get_options():
         "classificacoes": CLASSIFICATION_FILTERS,
         "comerciais": ["Todos", UNASSIGNED_COMMERCIAL] + existing_commercials,
         "mapa_comerciais": MAP_COMMERCIALS,
-        "tags": TAG_OPTIONS,
+        "tags": sorted(set(TAG_OPTIONS) | {tag for lead in leads for tag in lead.tag_list()}),
     }
 
 
@@ -2398,6 +2404,21 @@ def dashboard_context():
     today_history = HistoricoLead.query.filter(db.func.date(HistoricoLead.created_at) == today.isoformat()).all()
     commercial_counts = Counter(display_commercial(lead.comercial_responsavel) for lead in active)
     recent_imports = HistoricoLead.query.filter(HistoricoLead.acao == "Lead importada").order_by(HistoricoLead.created_at.desc()).limit(5).all()
+    inbox_new = [
+        lead for lead in active
+        if not lead.historico and normalize_legacy_state(lead.estado) == "Por contactar"
+    ][:8]
+    unassigned = [lead for lead in active if lead_has_no_commercial(lead)][:8]
+    no_coords_priority = sorted(
+        [lead for lead in no_coords if is_active_lead(lead)],
+        key=lambda lead: operational_score(lead),
+        reverse=True,
+    )[:8]
+    week_start = datetime.utcnow() - timedelta(days=7)
+    week_history = [item for item in HistoricoLead.query.filter(HistoricoLead.created_at >= week_start).all()]
+    week_contacts = sum(1 for item in week_history if ("contact" in normalize_lookup(item.acao) or "ligar" in normalize_lookup(item.acao)))
+    week_meetings = sum(1 for item in week_history if ("reuni" in normalize_lookup(item.acao) or "crm" in normalize_lookup(item.acao)))
+    week_state_changes = sum(1 for item in week_history if ("estado" in normalize_lookup(item.acao)))
     return {
         "metrics": {
             "total": len(leads),
@@ -2418,6 +2439,15 @@ def dashboard_context():
         "score_preview": sorted([(lead, operational_score(lead)) for lead in leads if lead.latitude is not None or lead.longitude is not None], key=lambda item: item[1], reverse=True)[:6],
         "followups_today": scheduled["today"],
         "followups_overdue_count": scheduled["overdue_count"],
+        "inbox_new": inbox_new,
+        "unassigned": unassigned,
+        "no_coords_priority": no_coords_priority,
+        "weekly_summary": {
+            "contacts": week_contacts,
+            "meetings": week_meetings,
+            "state_changes": week_state_changes,
+            "period_days": 7,
+        },
     }
 
 
@@ -2891,7 +2921,8 @@ def register_routes(app):
             flash("Lead adicionada com sucesso.", "success")
             return redirect(url_for("mapa_leads"))
 
-        return render_template("adicionar_lead.html", form={})
+        prefill = {key: value for key, value in request.args.items() if value is not None}
+        return render_template("adicionar_lead.html", form=prefill)
 
     @app.route("/api/import/sheets", methods=["POST"])
     def api_import_sheets():
@@ -3372,6 +3403,12 @@ def register_routes(app):
         elif action == "atribuir":
             lead.comercial_responsavel = commercial
             add_history(lead, "Comercial atribuido", observation, commercial)
+        elif action == "add_note":
+            if not observation:
+                return jsonify({"error": "Nota vazia"}), 400
+            add_history(lead, "Nota adicionada", observation, commercial)
+        elif action == "day_plan":
+            add_history(lead, "Adicionada a plano do dia", observation or "Lead incluida na rota do dia.", commercial)
         elif action == "add_tag":
             tag = clean_text(data.get("tag"))
             tags = set(lead.tag_list())

@@ -24,6 +24,7 @@
             <h2>Carregar ficheiro</h2>
             <p class="hint">Arrasta o ficheiro para esta zona ou seleciona manualmente.</p>
             <label>Ficheiro .xlsx ou .csv<input type="file" name="ficheiro" accept=".xlsx,.csv" required></label>
+            <div class="file-preview-card" id="filePreview" hidden></div>
 <label class="check-row"><input type="checkbox" name="auto_geocode" value="1"> Obter coordenadas pela cidade automaticamente</label>
             <p class="hint" style="margin-top:-6px;">Por defeito, a importacao nao faz geocoding. As leads sem coordenadas nao aparecem no mapa ate um geocoding posterior.</p>
             <p class="hint" style="margin-top:-2px;">Importação em curso: se o geocoding automatico estiver ativo, pode demorar.</p>
@@ -179,6 +180,7 @@
     const progressDuplicates = document.getElementById("progressDuplicates");
     const progressErrors = document.getElementById("progressErrors");
     const fileInput = importForm?.querySelector('input[name="ficheiro"]');
+    const filePreview = document.getElementById("filePreview");
     const sheetPicker = document.getElementById("sheetPicker");
     const sheetOptions = document.getElementById("sheetOptions");
     const sheetFileName = document.getElementById("sheetFileName");
@@ -186,6 +188,21 @@
     const cancelSheetButton = document.getElementById("cancelSheetButton");
     let pendingUploadId = "";
     let selectedSheetName = "";
+
+    function updateFilePreview(file) {
+        if (!filePreview) return;
+        if (!file) {
+            filePreview.hidden = true;
+            filePreview.innerHTML = "";
+            return;
+        }
+        const sizeMb = file.size / (1024 * 1024);
+        filePreview.hidden = false;
+        filePreview.innerHTML = `
+            <strong>${file.name}</strong>
+            <span>${sizeMb < 1 ? `${Math.round(file.size / 1024)} KB` : `${sizeMb.toFixed(1)} MB`} · ${file.name.toLowerCase().endsWith(".xlsx") ? "Excel" : "CSV"}</span>
+        `;
+    }
 
     function secondsLabel(value) {
         const seconds = Math.max(0, Math.round(Number(value) || 0));
@@ -351,10 +368,34 @@
         selectedSheetName = "";
         sheetPicker.hidden = true;
         asyncResult.hidden = true;
+        updateFilePreview(fileInput.files?.[0]);
         importButton.textContent = fileInput.files?.[0]?.name?.toLowerCase().endsWith(".csv")
             ? "Importar CSV"
             : "Analisar ficheiro";
     });
+
+    if (importForm && fileInput) {
+        ["dragenter", "dragover"].forEach((eventName) => {
+            importForm.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                importForm.classList.add("import-dropzone--dragging");
+            });
+        });
+        ["dragleave", "drop"].forEach((eventName) => {
+            importForm.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                importForm.classList.remove("import-dropzone--dragging");
+            });
+        });
+        importForm.addEventListener("drop", (event) => {
+            const file = event.dataTransfer?.files?.[0];
+            if (!file) return;
+            const transfer = new DataTransfer();
+            transfer.items.add(file);
+            fileInput.files = transfer.files;
+            fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+    }
 
     if (importForm && importButton && importLoading) {
         importForm.addEventListener("submit", async (event) => {

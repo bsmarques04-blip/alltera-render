@@ -1,4 +1,5 @@
-const defaultCenter = [38.62, -9.03];
+// Centro inicial: Portugal (visão geral, sem zoom excessivo)
+const defaultCenter = [39.5, -8.0];
 const todayIso = new Date().toISOString().slice(0, 10);
 
 /** Raio fixo para “mesmo dia” e plano de contactos (km). */
@@ -27,6 +28,7 @@ let selectedBulkIds = new Set();
 let baseLayer = null;
 let hoveredLeadId = null;
 let leadListMode = "visible";
+let currentRouteDay = [];
 
 const map = L.map("map", {
     zoomControl: true,
@@ -34,7 +36,7 @@ const map = L.map("map", {
     zoomDelta: 0.5,
     wheelPxPerZoomLevel: 90,
     closePopupOnClick: false,
-}).setView(defaultCenter, 10);
+}).setView(defaultCenter, 7);
 function applyMapTiles() {
     if (baseLayer) baseLayer.remove();
     baseLayer = L.tileLayer(
@@ -60,6 +62,8 @@ const els = {
     selectedState: document.getElementById("selectedState"),
     leadDetails: document.getElementById("leadDetails"),
     leadHistory: document.getElementById("leadHistory"),
+    leadNoteInput: document.getElementById("leadNoteInput"),
+    addLeadNote: document.getElementById("addLeadNote"),
     tagSelect: document.getElementById("tagSelect"),
     addTag: document.getElementById("addTag"),
     tagList: document.getElementById("tagList"),
@@ -105,6 +109,11 @@ const els = {
     mapGeoStats: document.getElementById("mapGeoStats"),
     mapRouteSummary: document.getElementById("mapRouteSummary"),
     mapLeadMiniCard: document.getElementById("mapLeadMiniCard"),
+    routeSelectedCount: document.getElementById("routeSelectedCount"),
+    routeDayList: document.getElementById("routeDayList"),
+    drawRouteDay: document.getElementById("drawRouteDay"),
+    openRouteMaps: document.getElementById("openRouteMaps"),
+    clearRouteDay: document.getElementById("clearRouteDay"),
     leadListTabVisible: document.getElementById("leadListTabVisible"),
     leadListTabAll: document.getElementById("leadListTabAll"),
 };
@@ -180,6 +189,13 @@ function scoreLabel(lead) {
     return `${leadScore(lead)}/100`;
 }
 
+function priorityLabel(lead) {
+    const score = leadScore(lead);
+    if (score >= 70) return "Alta prioridade";
+    if (score >= 40) return "Media prioridade";
+    return "Baixa prioridade";
+}
+
 function commercialSuggestion(lead) {
     if (!lead || leadCommercialKey(lead) !== "sem_comercial" || !hasCoordinates(lead)) return null;
     const counts = new Map();
@@ -195,7 +211,12 @@ function commercialSuggestion(lead) {
 }
 
 function hasCoordinates(lead) {
-    return Number.isFinite(lead.latitude) && Number.isFinite(lead.longitude);
+    if (!lead || lead.latitude === null || lead.latitude === undefined || lead.longitude === null || lead.longitude === undefined) {
+        return false;
+    }
+    const lat = Number(lead.latitude);
+    const lng = Number(lead.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng);
 }
 
 function leadName(lead) {
@@ -394,7 +415,7 @@ function popupHtml(lead) {
         <div class="lead-popup">
             <div class="lead-popup__header">
                 <strong>${leadName(lead)}</strong>
-                <span class="priority-badge priority-badge--${scoreBand(lead)}">${scoreLabel(lead)}</span>
+                <span class="priority-badge priority-badge--${scoreBand(lead)}">${priorityLabel(lead)} · ${scoreLabel(lead)}</span>
             </div>
             <span>${leadArea(lead)}</span>
             <span>${lead.telefone || "—"}</span>
@@ -538,7 +559,7 @@ function renderMarkers() {
         else marker.addTo(map);
         markers.set(lead.id, marker);
     });
-    if (markers.size > 0 && !mapInitialFitDone) {
+    if (markers.size > 0 && !mapInitialFitDone && !(selectedLead && hasCoordinates(selectedLead))) {
         const group = L.featureGroup(Array.from(markers.values()));
         map.fitBounds(group.getBounds().pad(0.12), { maxZoom: 12 });
         mapInitialFitDone = true;
@@ -623,7 +644,7 @@ function renderLeadList() {
                 <span class="tag ${statusClass(lead.estado)}">${lead.estado}</span>
             </div>
             <div class="row-top row-top--secondary">
-                <span class="priority-badge priority-badge--${scoreBand(lead)}">Score ${scoreLabel(lead)}</span>
+                <span class="priority-badge priority-badge--${scoreBand(lead)}">${priorityLabel(lead)} · ${scoreLabel(lead)}</span>
                 <span class="muted">${leadCommercialLabel(lead)}</span>
             </div>
             ${lastContactInfo(lead) ? `<span class="contact-recency ${lastContactInfo(lead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(lead).label}</span>` : ""}
@@ -666,6 +687,48 @@ function renderBulkActions() {
     const count = selectedBulkIds.size;
     if (els.mapBulkActions) els.mapBulkActions.hidden = count === 0;
     if (els.bulkSelectedCount) els.bulkSelectedCount.textContent = count;
+    renderRouteDayList();
+}
+
+function routeDaySelection() {
+    return allLeads.filter((lead) => selectedBulkIds.has(lead.id) && hasCoordinates(lead));
+}
+
+function renderRouteDayList() {
+    const selected = routeDaySelection();
+    if (els.routeSelectedCount) els.routeSelectedCount.textContent = selected.length;
+    if (els.drawRouteDay) els.drawRouteDay.disabled = selected.length < 2;
+    if (els.openRouteMaps) els.openRouteMaps.disabled = currentRouteDay.length < 2;
+    if (els.clearRouteDay) els.clearRouteDay.disabled = selected.length === 0 && currentRouteDay.length === 0;
+    if (!els.routeDayList) return;
+    const rows = (currentRouteDay.length ? currentRouteDay : selected);
+    if (!rows.length) {
+        els.routeDayList.classList.add("empty-state");
+        els.routeDayList.innerHTML = "Seleciona leads proximas ou usa a lista da zona.";
+        return;
+    }
+    els.routeDayList.classList.remove("empty-state");
+    let total = 0;
+    els.routeDayList.innerHTML = rows.map((lead, index) => {
+        const leg = index === 0 ? 0 : haversineKm(rows[index - 1], lead);
+        total += leg;
+        return `
+            <article class="route-day-row">
+                <span>${index + 1}</span>
+                <div><strong>${leadName(lead)}</strong><small>${leadCity(lead)} · ${leg.toFixed(1)} km</small></div>
+                <button type="button" class="link-button route-remove" data-route-remove="${lead.id}">Remover</button>
+            </article>
+        `;
+    }).join("") + `<div class="route-day-total"><strong>${total.toFixed(1)} km aprox.</strong></div>`;
+    els.routeDayList.querySelectorAll("[data-route-remove]").forEach((button) => {
+        button.addEventListener("click", () => {
+            selectedBulkIds.delete(Number(button.dataset.routeRemove));
+            currentRouteDay = currentRouteDay.filter((lead) => lead.id !== Number(button.dataset.routeRemove));
+            clearSmartRoute();
+            renderLeadList();
+            renderRouteDayList();
+        });
+    });
 }
 
 function selectLead(id) {
@@ -695,11 +758,13 @@ function selectLead(id) {
     renderMapMiniCard();
     renderNearbyList();
     if (selectedLead && hasCoordinates(selectedLead)) {
-        const target = [selectedLead.latitude, selectedLead.longitude];
-        if (map.getZoom() > 12) {
-            map.flyTo(target, 12, { animate: true, duration: 0.65, easeLinearity: 0.24 });
-        } else if (map.getZoom() < 10) {
-            map.flyTo(target, 10, { animate: true, duration: 0.65, easeLinearity: 0.24 });
+        const marker = markers.get(selectedLead.id);
+        const markerLatLng = marker?.getLatLng?.();
+        const target = markerLatLng ? [markerLatLng.lat, markerLatLng.lng] : [selectedLead.latitude, selectedLead.longitude];
+        if (map.getZoom() > 14) {
+            map.flyTo(target, 14, { animate: true, duration: 0.65, easeLinearity: 0.24 });
+        } else if (map.getZoom() < 13) {
+            map.flyTo(target, 13, { animate: true, duration: 0.65, easeLinearity: 0.24 });
         } else {
             map.panTo(target, { animate: true, duration: 0.5, easeLinearity: 0.24 });
         }
@@ -782,7 +847,9 @@ function tooltipHtml(lead) {
 
 function openClusterPopup(cluster) {
     const popup = L.popup({
-        closeButton: true,
+        closeButton: false,
+        closeOnClick: true,
+        autoClose: true,
         autoPan: true,
         autoPanPadding: [26, 26],
         className: "cluster-leads-popup",
@@ -891,10 +958,13 @@ function renderDetails() {
         els.leadHistory.innerHTML = "—";
         els.tagList.innerHTML = "—";
         els.addTag.disabled = true;
+        if (els.leadNoteInput) els.leadNoteInput.value = "";
+        if (els.addLeadNote) els.addLeadNote.disabled = true;
         return;
     }
     els.leadDetails.classList.remove("empty-state");
     els.addTag.disabled = false;
+    if (els.addLeadNote) els.addLeadNote.disabled = false;
     const acc = document.getElementById("actionsAccordion");
     if (acc) acc.open = Boolean(selectedLead);
     els.selectedState.textContent = selectedLead.estado;
@@ -907,7 +977,7 @@ function renderDetails() {
                 <h3>${leadName(selectedLead)}</h3>
                 <p>${leadArea(selectedLead)} · ${selectedLead.telefone || "—"} · ${leadCity(selectedLead)}</p>
                 <div class="lead-score-row">
-                    <span class="priority-badge priority-badge--${scoreBand(selectedLead)}">Score ${scoreLabel(selectedLead)}</span>
+                    <span class="priority-badge priority-badge--${scoreBand(selectedLead)}">${priorityLabel(selectedLead)} · ${scoreLabel(selectedLead)}</span>
                     <span class="tag">${leadCommercialLabel(selectedLead)}</span>
                 </div>
                 ${lastContactInfo(selectedLead) ? `<span class="contact-recency ${lastContactInfo(selectedLead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(selectedLead).label}</span>` : ""}
@@ -1025,9 +1095,17 @@ function renderNearbyList() {
                 <span>${lead.telefone || "—"}</span>
                 <span>${leadCity(lead)}</span>
             </div>
-            <button class="link-button nearby-add" type="button">Adicionar ao plano</button>
+            <button class="link-button nearby-add" type="button" data-route-add="${lead.id}">Adicionar a rota</button>
         </article>
     `).join("");
+    els.nearbyList.querySelectorAll("[data-route-add]").forEach((button) => {
+        button.addEventListener("click", () => {
+            selectedBulkIds.add(Number(button.dataset.routeAdd));
+            if (selectedLead?.id) selectedBulkIds.add(selectedLead.id);
+            renderLeadList();
+            renderRouteDayList();
+        });
+    });
 }
 
 function updateRadiusUi() {
@@ -1060,6 +1138,9 @@ function generatePlan() {
     if (!selectedLead) return;
     const max = planLimit(12);
     const planLeads = [selectedLead, ...nearbyLeads].slice(0, max);
+    planLeads.forEach((lead) => selectedBulkIds.add(lead.id));
+    currentRouteDay = planLeads;
+    renderRouteDayList();
     const dominantLocality = dominant(planLeads.map((lead) => leadCity(lead)));
     els.planSummary.innerHTML = `
         <section class="plan-created-card">
@@ -1171,6 +1252,9 @@ function generateDayContactPlan() {
         ...lead,
         distanceKm: index === 0 ? 0 : haversineKm(selectedLead, lead),
     }));
+    planLeads.forEach((lead) => selectedBulkIds.add(lead.id));
+    currentRouteDay = planLeads;
+    renderRouteDayList();
 
     const dominantLocality = dominant(planLeads.map((lead) => leadCity(lead)));
     els.planSummary.innerHTML = `
@@ -1290,7 +1374,13 @@ async function performAction(action) {
         payload.estado = prompt("Novo estado:", selectedLead.estado) || selectedLead.estado;
         payload.observacao = prompt("Motivo da correcao:", "") || "";
     }
-    if (action === "adiar") {
+    if (action === "ligar_volta") {
+        const when = prompt("Data para ligar de volta (AAAA-MM-DD):", todayIso);
+        if (!when) return;
+        payload.action = "adiar";
+        payload.data_novo_contacto = when;
+        payload.observacao = prompt("Motivo/observacao:", "Ligar de volta") || "Ligar de volta";
+    } else if (action === "adiar") {
         payload.data_novo_contacto = prompt("Data de novo contacto (AAAA-MM-DD):", todayIso);
         payload.observacao = prompt("Motivo/observacao:", "Ligar mais tarde") || "";
     } else if (!["update_coordinates", "corrigir_estado"].includes(action)) {
@@ -1316,6 +1406,27 @@ async function tagAction(action, tag) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, tag, comercial_responsavel: selectedLead.comercial_responsavel }),
     });
+    await loadLeads();
+}
+
+async function addLeadNote() {
+    if (!selectedLead || !els.leadNoteInput) return;
+    const note = els.leadNoteInput.value.trim();
+    if (!note) return;
+    const response = await fetch(`/api/leads/${selectedLead.id}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            action: "add_note",
+            observacao: note,
+            comercial_responsavel: selectedLead.comercial_responsavel,
+        }),
+    });
+    if (!response.ok) {
+        alert("Nao foi possivel guardar a nota.");
+        return;
+    }
+    els.leadNoteInput.value = "";
     await loadLeads();
 }
 
@@ -1391,10 +1502,37 @@ function clearSmartRoute() {
     smartRouteLine = null;
     smartRouteMarkers.forEach((marker) => marker.remove());
     smartRouteMarkers = [];
+    currentRouteDay = [];
     if (els.mapRouteSummary) {
         els.mapRouteSummary.hidden = true;
         els.mapRouteSummary.innerHTML = "";
     }
+    renderRouteDayList();
+}
+
+function openRouteInMaps() {
+    const route = currentRouteDay.length ? currentRouteDay : routeDaySelection();
+    if (route.length < 2) return;
+    const points = route.slice(0, 10).map((lead) => `${lead.latitude},${lead.longitude}`);
+    const origin = encodeURIComponent(points[0]);
+    const destination = encodeURIComponent(points[points.length - 1]);
+    const waypoints = points.slice(1, -1).map(encodeURIComponent).join("|");
+    const url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${waypoints}` : ""}`;
+    window.open(url, "_blank", "noopener");
+}
+
+function markRouteHistory(route) {
+    route.forEach((lead, index) => {
+        fetch(`/api/leads/${lead.id}/action`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                action: "day_plan",
+                comercial_responsavel: lead.comercial_responsavel,
+                observacao: `Posicao ${index + 1} na rota do dia.`,
+            }),
+        }).catch(() => {});
+    });
 }
 
 function routeDistanceKm(route) {
@@ -1424,6 +1562,7 @@ function drawSmartRoute() {
     }
     clearSmartRoute();
     const route = optimizedRoute(selected);
+    currentRouteDay = route;
     const points = route.map((lead) => [lead.latitude, lead.longitude]);
     smartRouteLine = L.polyline(points, {
         color: "#0f766e",
@@ -1453,10 +1592,14 @@ function drawSmartRoute() {
         els.mapRouteSummary.innerHTML = `
             <strong>Rota inteligente</strong>
             <span>${route.length} leads · ${distance.toFixed(1)} km · ~${minutes} min</span>
+            <button type="button" class="link-button" id="openSmartRouteMaps">Google Maps</button>
             <button type="button" class="link-button" id="clearSmartRoute">Limpar</button>
         `;
         document.getElementById("clearSmartRoute")?.addEventListener("click", clearSmartRoute);
+        document.getElementById("openSmartRouteMaps")?.addEventListener("click", openRouteInMaps);
     }
+    renderRouteDayList();
+    markRouteHistory(route);
     map.flyToBounds(L.latLngBounds(points).pad(0.18), { duration: 0.65, easeLinearity: 0.24, maxZoom: 13 });
 }
 
@@ -1534,6 +1677,19 @@ function bindEvents() {
         });
     }
     if (els.nextLeadButton) els.nextLeadButton.addEventListener("click", goToNextLead);
+    if (els.addLeadNote) els.addLeadNote.addEventListener("click", addLeadNote);
+    if (els.leadNoteInput) {
+        els.leadNoteInput.addEventListener("keydown", (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") addLeadNote();
+        });
+    }
+    if (els.drawRouteDay) els.drawRouteDay.addEventListener("click", drawSmartRoute);
+    if (els.openRouteMaps) els.openRouteMaps.addEventListener("click", openRouteInMaps);
+    if (els.clearRouteDay) els.clearRouteDay.addEventListener("click", () => {
+        selectedBulkIds = new Set();
+        clearSmartRoute();
+        renderLeadList();
+    });
     if (els.leadListTabVisible) els.leadListTabVisible.addEventListener("click", () => setLeadListMode("visible"));
     if (els.leadListTabAll) els.leadListTabAll.addEventListener("click", () => setLeadListMode("all"));
     if (els.operationalMode) els.operationalMode.addEventListener("click", () => setMode("operational"));
@@ -1544,18 +1700,51 @@ function bindEvents() {
     });
     if (els.drawerClose) els.drawerClose.addEventListener("click", () => selectLead(null));
     if (els.drawerBackdrop) els.drawerBackdrop.addEventListener("click", () => selectLead(null));
+    map.on("click", () => selectLead(null));
     map.on("moveend zoomend", renderMapGeoStats);
 }
 
 async function loadLeads() {
-    const urlLeadId = Number(new URLSearchParams(window.location.search).get("lead_id"));
+    const params = new URLSearchParams(window.location.search);
+    const toFiniteNumber = (value) => {
+        if (value === null || value === undefined) return Number.NaN;
+        const trimmed = String(value).trim();
+        if (!trimmed) return Number.NaN;
+        const parsed = Number(trimmed);
+        return Number.isFinite(parsed) ? parsed : Number.NaN;
+    };
+    const urlLeadId = toFiniteNumber(params.get("lead_id"));
+    const urlLat = toFiniteNumber(params.get("lat"));
+    const urlLng = toFiniteNumber(params.get("lng"));
     const currentId = selectedLead?.id || (Number.isFinite(urlLeadId) && urlLeadId > 0 ? urlLeadId : null);
     const response = await fetch("/api/leads?history=1");
-    allLeads = await response.json();
+    allLeads = (await response.json()).map((lead) => ({
+        ...lead,
+        id: Number(lead?.id),
+        latitude: lead?.latitude === "" || lead?.latitude == null ? null : Number(lead.latitude),
+        longitude: lead?.longitude === "" || lead?.longitude == null ? null : Number(lead.longitude),
+    }));
     applyCityOffsets();
+    if (currentId) {
+        if (els.classificationFilter) els.classificationFilter.value = "";
+        if (els.historyFilter) els.historyFilter.checked = true;
+    }
     selectedLead = currentId ? allLeads.find((lead) => lead.id === currentId) || null : selectedLead;
     setDrawerOpen(Boolean(selectedLead));
     applyFilters();
+    if (currentId && selectedLead) {
+        const alreadyVisible = visibleLeads.some((lead) => lead.id === selectedLead.id);
+        if (!alreadyVisible) {
+            visibleLeads = [selectedLead, ...visibleLeads];
+            renderMarkers();
+        }
+        selectLead(currentId);
+        return;
+    }
+    if (Number.isFinite(urlLat) && Number.isFinite(urlLng)) {
+        // Respeita deep-link com coordenadas, mas sem aproximar demasiado.
+        map.flyTo([urlLat, urlLng], 11, { animate: true, duration: 0.7, easeLinearity: 0.24 });
+    }
 }
 
 function applyCityOffsets() {
