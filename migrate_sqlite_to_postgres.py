@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 from sqlalchemy import MetaData, Table, create_engine, func, inspect, select, text
@@ -18,6 +19,12 @@ def normalize_database_url():
     if not database_url:
         raise RuntimeError("DATABASE_URL nao esta definida. Configure-a antes de correr a migracao.")
     database_url = database_url.replace("postgres://", "postgresql://", 1)
+    parsed_url = urlsplit(database_url)
+    query_params = dict(parse_qsl(parsed_url.query, keep_blank_values=True))
+    hostname = parsed_url.hostname or ""
+    if "supabase.com" in hostname.lower() and "sslmode" not in query_params:
+        query_params["sslmode"] = "require"
+        database_url = urlunsplit(parsed_url._replace(query=urlencode(query_params)))
     os.environ["DATABASE_URL"] = database_url
     return database_url
 

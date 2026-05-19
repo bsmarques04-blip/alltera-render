@@ -12,6 +12,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta
 from difflib import SequenceMatcher
 from io import BytesIO, StringIO
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from dotenv import load_dotenv
@@ -216,7 +217,14 @@ REQUIRED_COLUMNS = []
 def get_database_uri():
     database_url = os.getenv("DATABASE_URL")
     if database_url:
-        return database_url.replace("postgres://", "postgresql://", 1)
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+        parsed_url = urlsplit(database_url)
+        query_params = dict(parse_qsl(parsed_url.query, keep_blank_values=True))
+        hostname = parsed_url.hostname or ""
+        if "supabase.com" in hostname.lower() and "sslmode" not in query_params:
+            query_params["sslmode"] = "require"
+            database_url = urlunsplit(parsed_url._replace(query=urlencode(query_params)))
+        return database_url
     return f"sqlite:///{DB_PATH}"
 
 
