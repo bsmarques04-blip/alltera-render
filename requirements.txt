@@ -5,3 +5,5 @@ Werkzeug
 openpyxl
 requests
 gunicorn
+psycopg2-binary
+python-dotenv

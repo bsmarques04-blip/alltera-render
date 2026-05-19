@@ -14,6 +14,7 @@ from difflib import SequenceMatcher
 from io import BytesIO, StringIO
 
 import requests
+from dotenv import load_dotenv
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
@@ -38,6 +39,8 @@ NOMINATIM_USER_AGENT = "AllteraLeadPlanner/1.0 academico"
 IMPORT_LOCK = None
 IMPORT_JOBS = {}
 IMPORT_JOBS_LOCK = threading.Lock()
+
+load_dotenv()
 IMPORT_UPLOADS = {}
 IMPORT_UPLOADS_LOCK = threading.Lock()
 
@@ -210,25 +213,32 @@ NOMINATIM_USER_AGENT = "AllteraLeadPlanner/1.0 acad\u00e9mico"
 REQUIRED_COLUMNS = []
 
 
+def get_database_uri():
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url.replace("postgres://", "postgresql://", 1)
+    return f"sqlite:///{DB_PATH}"
+
+
 def create_app():
     os.makedirs(INSTANCE_DIR, exist_ok=True)
     app = Flask(__name__, instance_path=INSTANCE_DIR, instance_relative_config=True)
     app.config["SECRET_KEY"] = "mudar_esta_chave"
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+    app.config["SQLALCHEMY_DATABASE_URI"] = get_database_uri()
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "connect_args": {
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+    if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite:"):
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"]["connect_args"] = {
             "timeout": 30,
             "check_same_thread": False,
-        },
-        "pool_pre_ping": True,
-    }
+        }
 
     db.init_app(app)
     with app.app_context():
-        configure_sqlite_connection()
         db.create_all()
-        migrate_database()
+        if db.engine.url.drivername == "sqlite":
+            configure_sqlite_connection()
+            migrate_database()
 
     register_routes(app)
     return app

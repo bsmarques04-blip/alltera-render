@@ -14,89 +14,50 @@
 
 {% block content %}
 <main class="sales-layout sales-layout--map-primary map-page-layout">
-    <aside class="filters-panel filters-panel--compact map-left-panel">
-        <section class="panel intro-panel intro-panel--compact">
-            <p class="eyebrow">Operação comercial</p>
-            <h1>Mapa de Leads</h1>
-            <p class="intro-lead">Mapa principal para contacto e planeamento por proximidade.</p>
-            <div class="smart-zone-card" id="recommendedZone">
-                <span>Zona recomendada hoje</span>
-                <strong>—</strong>
-            </div>
-            <div class="forgotten-alert" id="forgottenAlert" hidden></div>
-            <a class="button full import-excel-button" href="{{ url_for('importar_leads') }}">
-                <span class="import-excel-button__icon" aria-hidden="true"></span>
-                Importar Excel
-            </a>
-            <a class="button secondary full add-lead-button" href="{{ url_for('adicionar_lead') }}">
-                <span class="add-lead-button__icon" aria-hidden="true"></span>
-                Adicionar Lead
-            </a>
-            <button class="button secondary full" id="nextLeadButton" type="button">Próxima lead</button>
-        </section>
-
-        <section class="panel metric-grid metric-grid--compact">
-            <article><span>Total</span><strong id="metricTotal">{{ metrics.total }}</strong></article>
-            <article><span>Ativas</span><strong id="metricActive">{{ metrics.active }}</strong></article>
-            <article><span>No CRM</span><strong id="metricCrm">{{ metrics.crm }}</strong></article>
-            <article><span>Adiadas</span><strong id="metricPostponed">{{ metrics.postponed_future }}</strong></article>
-        </section>
-
-        <section class="panel panel--filters">
-            <div class="panel-head">
-                <h2>Filtros</h2>
-                <button class="link-button" id="resetFilters" type="button">Limpar</button>
-            </div>
-
-            <label>Pesquisar<input id="searchInput" type="search" placeholder="Nome cliente..."></label>
-            <label>Cidade
-                <select id="localityFilter"><option value="">Todas</option>{% for item in options.localidades %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
-            </label>
-            <label>Área de negócio
-                <select id="typeFilter"><option value="">Todas</option>{% for item in options.tipos %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
-            </label>
-            <label>Comercial
+    <section class="map-panel map-panel--primary map-shell">
+        <div class="map-toolbar" aria-label="Filtros do mapa">
+            <label>
+                <span>Comercial</span>
                 <select id="commercialFilter">
                     {% for item in options.mapa_comerciais %}
                     <option value="{{ item.value }}">{{ item.label }}</option>
                     {% endfor %}
                 </select>
             </label>
-            <label>Estado
+            <label>
+                <span>Estado</span>
                 <select id="stateFilter"><option value="">Todos</option>{% for item in options.estados %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
             </label>
-            <label>Vista
-                <select id="classificationFilter">{% for value, label in options.classificacoes %}<option value="{{ value }}" {% if value == 'ativos' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-            </label>
-            <label>Agenda
-                <select id="scheduleFilter">
-                    <option value="">Todos</option>
-                    <option value="now">Contactar agora</option>
-                    <option value="scheduled">Agendadas</option>
-                    <option value="overdue">Atrasadas</option>
-                </select>
-            </label>
-            <label>Tag
+            <label>
+                <span>Tag</span>
                 <select id="tagFilter"><option value="">Todas</option>{% for item in options.tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
             </label>
-            <label>Insight interno
-                <select id="insightFilter"><option value="">Todos</option>{% for item in options.insight_tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            <label class="map-toolbar__search">
+                <span>Pesquisa rápida</span>
+                <input id="searchInput" type="search" placeholder="Nome, telefone, cidade...">
             </label>
-            <label class="check-row"><input id="historyFilter" type="checkbox"> Incluir histórico / inativas</label>
-            <label class="check-row"><input id="heatmapToggle" type="checkbox"> Mapa de calor</label>
-            <label>Território
-                <select id="territoryMode">
-                    <option value="">Sem overlay</option>
-                    <option value="cidade">Por cidade</option>
-                    <option value="comercial">Por comercial</option>
-                    <option value="estado">Por estado</option>
-                </select>
-            </label>
-        </section>
-
-    </aside>
-
-    <section class="map-panel map-panel--primary map-shell">
+            <button class="link-button map-toolbar__reset" id="resetFilters" type="button">Limpar</button>
+        </div>
+        <div class="map-hidden-controls" hidden aria-hidden="true">
+            <select id="localityFilter"><option value="">Todas</option>{% for item in options.localidades %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            <select id="typeFilter"><option value="">Todas</option>{% for item in options.tipos %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            <select id="classificationFilter">{% for value, label in options.classificacoes %}<option value="{{ value }}" {% if value == 'ativos' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            <select id="scheduleFilter">
+                <option value="">Todos</option>
+                <option value="now">Contactar agora</option>
+                <option value="scheduled">Agendadas</option>
+                <option value="overdue">Atrasadas</option>
+            </select>
+            <select id="insightFilter"><option value="">Todos</option>{% for item in options.insight_tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+            <select id="territoryMode">
+                <option value="">Sem overlay</option>
+                <option value="cidade">Por cidade</option>
+                <option value="comercial">Por comercial</option>
+                <option value="estado">Por estado</option>
+            </select>
+            <input id="historyFilter" type="checkbox">
+            <input id="heatmapToggle" type="checkbox">
+        </div>
         {% if metrics.total == 0 %}
         <div class="map-empty-state">
             <strong>Ainda não existem leads importadas.</strong>
@@ -112,8 +73,8 @@
         </div>
         {% endif %}
         <div class="map-intel-panel" id="mapGeoStats" aria-live="polite"></div>
-        <div class="map-route-summary" id="mapRouteSummary" hidden></div>
         <div class="map-lead-mini-card" id="mapLeadMiniCard" hidden></div>
+        <div class="map-loading" id="mapLoading" aria-live="polite">A carregar mapa...</div>
         <div id="map" class="map-canvas" role="application" aria-label="Mapa de leads"></div>
         <div class="map-legend" aria-label="Legenda do mapa">
             <span><i class="legend-dot legend-dot--active"></i>Ativa</span>
@@ -184,19 +145,6 @@
                 <button type="button" class="button full" id="dayContactPlan" disabled>Criar lista de contactos da zona</button>
             </section>
 
-            <section class="panel panel--inset route-day-panel">
-                <div class="panel-head panel-head--tight">
-                    <h3>Rota do dia</h3>
-                    <span class="tag" id="routeSelectedCount">0</span>
-                </div>
-                <div id="routeDayList" class="route-day-list empty-state">Seleciona leads próximas ou usa a lista da zona.</div>
-                <div class="actions-grid actions-grid--compact">
-                    <button class="button secondary" id="drawRouteDay" type="button" disabled>Gerar rota</button>
-                    <button class="button secondary" id="openRouteMaps" type="button" disabled>Abrir no Google Maps</button>
-                    <button class="button secondary" id="clearRouteDay" type="button" disabled>Limpar</button>
-                </div>
-            </section>
-
             <details class="accordion panel panel--inset">
                 <summary>Tags</summary>
                 <label class="label-inline">Adicionar
@@ -244,7 +192,6 @@
                     <button id="bulkSetState" type="button"></button>
                     <button id="bulkIgnore" type="button"></button>
                     <button id="bulkExport" type="button"></button>
-                    <button id="bulkRoute" type="button"></button>
                     <button id="bulkPlan" type="button"></button>
                 </div>
                 <div id="leadsList"></div>
@@ -256,7 +203,6 @@
 
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="{{ url_for('static', filename='js/mapa.js') }}"></script>
 {% endblock %}

@@ -12,41 +12,167 @@
 {% endmacro %}
 
 {% macro scheduled_card(lead, tone="default") %}
-{% set name = lead.nome_cliente or lead.nome_empresa %}
+{% set name = lead.nome_cliente or lead.nome_empresa or lead.empresa or "Lead sem nome" %}
+{% set latest = lead.historico[0] if lead.historico else none %}
+{% set next_action = "Contactar hoje" if tone == "today" else ("Retomar contacto" if tone == "overdue" else "Preparar follow-up") %}
+{% set tags = lead.tag_list() %}
+{% set insight_tags = lead.insight_tag_list() %}
 <article class="scheduled-lead-card scheduled-lead-card--{{ tone }}">
     <div class="scheduled-lead-card__top">
         <div class="scheduled-avatar" aria-hidden="true">{{ name[:1]|upper }}</div>
         <div class="scheduled-lead-card__identity">
             <strong>{{ name }}</strong>
-            <span>{{ lead.empresa or lead.nome_empresa }}</span>
+            <span>{{ lead.empresa or lead.nome_empresa or "Sem empresa" }}</span>
         </div>
         <span class="scheduled-date-pill">{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-" }}</span>
+        <button class="link-button scheduled-info-toggle" type="button" aria-expanded="false">+ Info</button>
     </div>
 
-    <div class="scheduled-lead-card__details">
-        <span>{{ lead.telefone or lead.contacto or "Sem telefone" }}</span>
-        <span>{{ lead.cidade or lead.localidade or "Sem cidade" }}</span>
-        <span>{{ lead.comercial_responsavel or "Sem comercial" }}</span>
-    </div>
+    {#
+        <summary>+ info cliente</summary>
+        <dl>
+            <div>
+                <dt>Empresa</dt>
+                <dd>{{ lead.empresa or lead.nome_empresa or "-" }}</dd>
+            </div>
+            <div>
+                <dt>Contacto</dt>
+                <dd>{{ lead.telefone or lead.contacto or "-" }}</dd>
+            </div>
+            <div>
+                <dt>Email</dt>
+                <dd>{{ lead.email or "-" }}</dd>
+            </div>
+            <div>
+                <dt>Localização</dt>
+                <dd>{{ lead.cidade or lead.localidade or "-" }}{% if lead.codigo_postal %} · {{ lead.codigo_postal }}{% endif %}</dd>
+            </div>
+            <div>
+                <dt>Área</dt>
+                <dd>{{ lead.area_negocio or lead.tipo_cliente or "-" }}</dd>
+            </div>
+            <div>
+                <dt>Estado</dt>
+                <dd>{{ lead.estado or "-" }}</dd>
+            </div>
+            <div class="scheduled-more-info__wide">
+                <dt>Morada</dt>
+                <dd>{{ lead.morada or "-" }}</dd>
+            </div>
+            <div class="scheduled-more-info__wide">
+                <dt>Observações</dt>
+                <dd>{{ lead.observacoes_contacto or lead.observacoes or lead.classificacao_observacao or "-" }}</dd>
+            </div>
+        </dl>
+    #}
 
-    <div class="scheduled-note">
-        {{ lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.estado }}
-    </div>
+    <div class="scheduled-info-panel" hidden>
+        <div class="scheduled-info-layout">
+            <section class="scheduled-info-section scheduled-info-section--main">
+                <h3>Informa&ccedil;&atilde;o</h3>
+                <dl class="scheduled-info-grid">
+                    <div class="scheduled-info-field">
+                        <dt>Telefone</dt>
+                        <dd>{{ lead.telefone or lead.contacto or "-" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Email</dt>
+                        <dd>{{ lead.email or "-" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Cidade/localidade</dt>
+                        <dd>{{ lead.cidade or lead.localidade or "-" }}{% if lead.codigo_postal %} &middot; {{ lead.codigo_postal }}{% endif %}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Comercial</dt>
+                        <dd>{{ lead.comercial_responsavel or "Sem comercial" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Estado atual</dt>
+                        <dd>{{ lead.estado or "-" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Ultima interacao</dt>
+                        <dd>{{ (latest.created_at.strftime("%d/%m/%Y") ~ " - " ~ latest.acao) if latest else "Sem historico" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Proxima acao</dt>
+                        <dd>{{ next_action }}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Data agendada</dt>
+                        <dd>{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-" }}</dd>
+                    </div>
+                </dl>
+            </section>
 
-    <div class="scheduled-lead-card__actions">
-        <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir no mapa</a>
-        <form method="post">
-            <input type="hidden" name="lead_id" value="{{ lead.id }}">
-            <input type="hidden" name="action" value="contactada">
-            <button class="link-button" type="submit">Contactada</button>
-        </form>
-        <form method="post" class="scheduled-reschedule-form">
-            <input type="hidden" name="lead_id" value="{{ lead.id }}">
-            <input type="hidden" name="action" value="reagendar">
-            <input type="date" name="data_novo_contacto" value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else today.isoformat() }}" required>
-            <button class="link-button" type="submit">Reagendar</button>
-        </form>
+            <section class="scheduled-info-section scheduled-info-section--insights">
+                <h3>Insights</h3>
+                <div class="scheduled-insight-stack">
+                    <div class="scheduled-info-field scheduled-info-field--wide">
+                        <dt>Notas rapidas</dt>
+                        <dd>{{ lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.classificacao_observacao or "-" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field scheduled-info-field--wide">
+                        <dt>Insights internos</dt>
+                        <dd>{{ lead.insight_note or "-" }}</dd>
+                    </div>
+                    <div class="scheduled-info-field scheduled-info-field--wide">
+                        <dt>Tags</dt>
+                        <dd class="scheduled-info-chips">
+                            {% for insight in insight_tags %}
+                                <span class="scheduled-info-chip">{{ insight }}</span>
+                            {% endfor %}
+                            {% for tag in tags %}
+                                <span class="scheduled-info-chip">{{ tag }}</span>
+                            {% endfor %}
+                            {% if not insight_tags and not tags %}
+                                <span class="scheduled-info-chip scheduled-info-chip--muted">Sem tags</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                </div>
+            </section>
+
+            <section class="scheduled-info-section scheduled-info-section--actions">
+                <h3>A&ccedil;&otilde;es</h3>
+                <div class="scheduled-info-actions">
+                    <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir no mapa</a>
+                    <form method="post">
+                        <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                        <input type="hidden" name="action" value="contactada">
+                        <button class="link-button" type="submit">Contactada</button>
+                    </form>
+                    <form method="post" class="scheduled-reschedule-form">
+                        <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                        <input type="hidden" name="action" value="reagendar">
+                        <input type="date" name="data_novo_contacto" value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else today.isoformat() }}" required>
+                        <button class="link-button" type="submit">Reagendar</button>
+                    </form>
+                    <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir lead completa</a>
+                </div>
+            </section>
+        </div>
     </div>
+    <script type="application/json" class="scheduled-lead-data">
+        {{ {
+            "nome_cliente": name,
+            "empresa": lead.empresa or lead.nome_empresa or "-",
+            "cidade": lead.cidade or lead.localidade or "-",
+            "comercial": lead.comercial_responsavel or "Sem comercial",
+            "telefone": lead.telefone or lead.contacto or "-",
+            "email": lead.email or "-",
+            "estado": lead.estado or "-",
+            "data_agendamento": lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-",
+            "notas": lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.classificacao_observacao or "-",
+            "tags": lead.tag_list(),
+            "insights": lead.insight_tag_list(),
+            "insight_note": lead.insight_note or "",
+            "ultima_interacao": ((latest.created_at.strftime("%d/%m/%Y") ~ " · " ~ latest.acao) if latest else "Sem histórico"),
+            "proxima_acao": next_action,
+            "lead_url": url_for("mapa_leads", lead_id=lead.id)
+        }|tojson }}
+    </script>
 </article>
 {% endmacro %}
 
@@ -126,4 +252,101 @@
         ) }}
     </section>
 </main>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(() => {
+    const escapeHtml = (value) => String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+    const chips = (items, emptyLabel) => {
+        const values = Array.isArray(items) ? items.filter(Boolean) : [];
+        if (!values.length) return `<span class="scheduled-info-chip scheduled-info-chip--muted">${escapeHtml(emptyLabel)}</span>`;
+        return values.map((item) => `<span class="scheduled-info-chip">${escapeHtml(item)}</span>`).join("");
+    };
+
+    const field = (label, value) => `
+        <div class="scheduled-info-field">
+            <dt>${escapeHtml(label)}</dt>
+            <dd>${escapeHtml(value || "-")}</dd>
+        </div>
+    `;
+
+    const renderInfo = (data) => `
+        <dl class="scheduled-info-grid">
+            ${field("Nome cliente", data.nome_cliente)}
+            ${field("Empresa", data.empresa)}
+            ${field("Cidade/localidade", data.cidade)}
+            ${field("Comercial", data.comercial)}
+            ${field("Telefone", data.telefone)}
+            ${field("Email", data.email)}
+            ${field("Estado atual", data.estado)}
+            ${field("Agendamento", data.data_agendamento)}
+            ${field("Última interação", data.ultima_interacao)}
+            ${field("Próxima ação", data.proxima_acao)}
+            <div class="scheduled-info-field scheduled-info-field--wide">
+                <dt>Notas rápidas</dt>
+                <dd>${escapeHtml(data.notas || "-")}</dd>
+            </div>
+            <div class="scheduled-info-field scheduled-info-field--wide">
+                <dt>Insights internos / tags</dt>
+                <dd class="scheduled-info-chips">${chips(data.insights, "Sem insights")}${chips(data.tags, "Sem tags")}</dd>
+                ${data.insight_note ? `<p>${escapeHtml(data.insight_note)}</p>` : ""}
+            </div>
+            <div class="scheduled-info-actions">
+                <a class="link-button" href="${escapeHtml(data.lead_url || "#")}">Abrir lead completa</a>
+            </div>
+        </dl>
+    `;
+
+    const closeCard = (card) => {
+        const panel = card?.querySelector(".scheduled-info-panel");
+        const button = card?.querySelector(".scheduled-info-toggle");
+        if (!panel || !button) return;
+        card.classList.remove("is-expanded");
+        button.setAttribute("aria-expanded", "false");
+        panel.style.maxHeight = `${panel.scrollHeight}px`;
+        requestAnimationFrame(() => {
+            panel.style.maxHeight = "0px";
+            panel.style.opacity = "0";
+        });
+        window.setTimeout(() => {
+            if (!card.classList.contains("is-expanded")) panel.hidden = true;
+        }, 240);
+    };
+
+    const openCard = (card) => {
+        const panel = card.querySelector(".scheduled-info-panel");
+        const button = card.querySelector(".scheduled-info-toggle");
+        if (!panel || !button) return;
+        document.querySelectorAll(".scheduled-lead-card.is-expanded").forEach((item) => {
+            if (item !== card) closeCard(item);
+        });
+        panel.hidden = false;
+        panel.style.maxHeight = "0px";
+        panel.style.opacity = "0";
+        card.classList.add("is-expanded");
+        button.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() => {
+            panel.style.maxHeight = `${panel.scrollHeight}px`;
+            panel.style.opacity = "1";
+        });
+    };
+
+    document.addEventListener("click", (event) => {
+        const button = event.target.closest(".scheduled-info-toggle");
+        if (!button) return;
+        const card = button.closest(".scheduled-lead-card");
+        if (!card) return;
+        if (card.classList.contains("is-expanded")) closeCard(card);
+        else openCard(card);
+    });
+})();
+</script>
 {% endblock %}
