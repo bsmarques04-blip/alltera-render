@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import sys
 import uuid
 import sqlite3
 import threading
@@ -17,16 +18,19 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import requests
 from dotenv import load_dotenv
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask_login import LoginManager, current_user, login_required, login_user, logout_user
+from flask_migrate import Migrate
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, PatternFill
 from sqlalchemy.exc import IntegrityError, OperationalError
 from werkzeug.datastructures import FileStorage
+import click
 
 try:
-    from .models import GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, db
+    from .models import GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, User, db
 except ImportError:
-    from models import GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, db
+    from models import GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, User, db
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -42,6 +46,8 @@ IMPORT_JOBS = {}
 IMPORT_JOBS_LOCK = threading.Lock()
 
 load_dotenv()
+migrate = Migrate()
+login_manager = LoginManager()
 IMPORT_UPLOADS = {}
 IMPORT_UPLOADS_LOCK = threading.Lock()
 
@@ -228,6 +234,17 @@ def get_database_uri():
     return f"sqlite:///{DB_PATH}"
 
 
+def is_safe_next_url(target):
+    if not target:
+        return False
+    parsed = urlsplit(target)
+    return not parsed.netloc and parsed.path.startswith("/") and not parsed.path.startswith("//")
+
+
+def is_flask_db_command():
+    return "db" in sys.argv[1:]
+
+
 def create_app():
     os.makedirs(INSTANCE_DIR, exist_ok=True)
     app = Flask(__name__, instance_path=INSTANCE_DIR, instance_relative_config=True)
@@ -242,11 +259,38 @@ def create_app():
         }
 
     db.init_app(app)
+    migrate.init_app(app, db)
+    login_manager.init_app(app)
+    login_manager.login_view = "login"
+    login_manager.login_message = "Inicia sessao para aceder a Alltera."
+    login_manager.login_message_category = "warning"
     with app.app_context():
-        db.create_all()
-        if db.engine.url.drivername == "sqlite":
+        if db.engine.url.drivername == "sqlite" and not is_flask_db_command():
+            db.create_all()
             configure_sqlite_connection()
             migrate_database()
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        try:
+            return db.session.get(User, int(user_id))
+        except (TypeError, ValueError):
+            return None
+
+    @app.cli.command("create-admin")
+    @click.option("--nome", required=True, help="Nome do utilizador.")
+    @click.option("--email", required=True, help="Email de login.")
+    @click.option("--password", required=True, help="Password inicial.")
+    def create_admin(nome, email, password):
+        normalized_email = clean_text(email).lower()
+        existing = User.query.filter_by(email=normalized_email).first()
+        if existing:
+            raise click.ClickException("Ja existe um utilizador com esse email.")
+        user = User(nome=clean_text(nome), email=normalized_email, role="admin", ativo=True)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        click.echo(f"Admin criado: {normalized_email}")
 
     register_routes(app)
     return app
@@ -2850,17 +2894,44 @@ def run_import_job(app, job_id, filename, file_bytes, auto_geocode, sheet_name=N
 def register_routes(app):
     @app.context_processor
     def inject_sidebar_counts():
+        if request.endpoint == "login":
+            return {"scheduled_sidebar_count": 0}
         return {"scheduled_sidebar_count": scheduled_leads_context()["badge_count"]}
 
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            email = clean_text(request.form.get("email")).lower()
+            password = request.form.get("password") or ""
+            user = User.query.filter_by(email=email).first()
+            if user and user.ativo and user.check_password(password):
+                login_user(user, remember=request.form.get("remember") == "1")
+                next_url = request.args.get("next")
+                return redirect(next_url if is_safe_next_url(next_url) else url_for("dashboard"))
+            flash("Email ou password invalidos.", "error")
+        return render_template("login.html")
+
+    @app.route("/logout")
+    @login_required
+    def logout():
+        logout_user()
+        flash("Sessao terminada com seguranca.", "success")
+        return redirect(url_for("login"))
+
     @app.route("/")
+    @login_required
     def dashboard():
         return render_template("dashboard.html", **dashboard_context())
 
     @app.route("/mapa")
+    @login_required
     def mapa_leads():
         return render_template("mapa.html", options=get_options(), metrics=minimal_metrics())
 
     @app.route("/todas-leads")
+    @login_required
     def todas_leads():
         leads = [
             lead
@@ -2898,6 +2969,7 @@ def register_routes(app):
         )
 
     @app.route("/agendadas", methods=["GET", "POST"])
+    @login_required
     def agendadas():
         if request.method == "POST":
             lead = Lead.query.get_or_404(int(request.form.get("lead_id")))
@@ -2926,6 +2998,7 @@ def register_routes(app):
         return render_template("agendadas.html", scheduled=scheduled_leads_context(), today=date.today())
 
     @app.route("/leads/nova", methods=["GET", "POST"])
+    @login_required
     def adicionar_lead():
         if request.method == "POST":
             lead_data = build_manual_lead(request.form)
@@ -2964,6 +3037,7 @@ def register_routes(app):
         return render_template("adicionar_lead.html", form=prefill)
 
     @app.route("/api/import/sheets", methods=["POST"])
+    @login_required
     def api_import_sheets():
         file = request.files.get("ficheiro")
         if not file or not file.filename:
@@ -2985,6 +3059,7 @@ def register_routes(app):
         return jsonify({"upload_id": upload_id, "filename": file.filename, "sheets": sheets})
 
     @app.route("/api/import/start", methods=["POST"])
+    @login_required
     def api_import_start():
         upload_id = request.form.get("upload_id")
         sheet_name = request.form.get("sheet_name") or None
@@ -3016,6 +3091,7 @@ def register_routes(app):
         return jsonify({"job_id": job_id})
 
     @app.route("/api/import/progress/<job_id>")
+    @login_required
     def api_import_progress(job_id):
         job = get_import_job(job_id)
         if not job:
@@ -3023,6 +3099,7 @@ def register_routes(app):
         return jsonify(job)
 
     @app.route("/importar", methods=["GET", "POST"])
+    @login_required
     def importar_leads():
         summary = None
         mapping_preview = None
@@ -3066,6 +3143,7 @@ def register_routes(app):
         return render_template("importar.html", columns=IMPORT_COLUMNS, real_columns=ALLTERA_REAL_COLUMNS, summary=summary, mapping_preview=mapping_preview, latest_import=latest_import_summary())
 
     @app.route("/planeamento", methods=["GET", "POST"])
+    @login_required
     def planeamento():
         day_plan = None
         plan_summary = None
@@ -3125,16 +3203,19 @@ def register_routes(app):
         )
 
     @app.route("/agenda")
+    @login_required
     def agenda():
         flash("Agenda removida: usa o Plano do dia para contactos geográficos.", "info")
         return redirect(url_for("planeamento"))
 
     @app.route("/lista-dia")
+    @login_required
     def lista_dia():
         flash("Lista de dia antiga removida: usa o Plano do dia operacional.", "info")
         return redirect(url_for("planeamento"))
 
     @app.route("/sem-coordenadas", methods=["GET", "POST"])
+    @login_required
     def sem_coordenadas():
         if request.method == "POST":
             action = request.form.get("action")
@@ -3209,6 +3290,7 @@ def register_routes(app):
         return render_template("sem_coordenadas.html", rows=rows, status_filter=status_filter, quality=coordinate_quality_context(rows))
 
     @app.route("/leads-inativas", methods=["GET", "POST"])
+    @login_required
     def leads_inativas():
         if request.method == "POST":
             lead = Lead.query.get_or_404(int(request.form.get("lead_id")))
@@ -3283,6 +3365,7 @@ def register_routes(app):
         return render_template("leads_inativas.html", leads=leads, filters=filters, options=options, estados=LEAD_STATES)
 
     @app.route("/esquecidas")
+    @login_required
     def esquecidas():
         days = int(request.args.get("dias", 60) or 60)
         commercial = request.args.get("comercial", "")
@@ -3307,6 +3390,7 @@ def register_routes(app):
         )
 
     @app.route("/duplicados", methods=["GET", "POST"])
+    @login_required
     def duplicados():
         if request.method == "POST":
             duplicate = PossivelDuplicado.query.get_or_404(int(request.form["id"]))
@@ -3329,6 +3413,7 @@ def register_routes(app):
         return render_template("duplicados.html", candidates=candidates)
 
     @app.route("/historico")
+    @login_required
     def historico():
         lead_id = request.args.get("lead_id", type=int)
         query = HistoricoLead.query
@@ -3338,6 +3423,7 @@ def register_routes(app):
         return render_template("historico.html", entries=entries)
 
     @app.route("/api/leads")
+    @login_required
     def api_leads():
         include_history = request.args.get("history") == "1"
         leads = Lead.query.order_by(Lead.nome_empresa.asc()).all()
@@ -3356,10 +3442,12 @@ def register_routes(app):
         return jsonify(payload)
 
     @app.route("/api/search")
+    @login_required
     def api_search():
         return jsonify({"results": search_leads(request.args.get("q", ""))})
 
     @app.route("/api/leads/next")
+    @login_required
     def api_next_lead():
         base_id = request.args.get("base_id", type=int)
         commercial = request.args.get("commercial")
@@ -3370,6 +3458,7 @@ def register_routes(app):
         return jsonify({"lead": lead.to_dict(include_history=True) if lead else None})
 
     @app.route("/api/leads/bulk-action", methods=["POST"])
+    @login_required
     def api_leads_bulk_action():
         data = request.get_json(silent=True) or {}
         ids = [int(value) for value in data.get("ids", []) if str(value).isdigit()]
@@ -3404,6 +3493,7 @@ def register_routes(app):
         return jsonify({"updated": len(leads)})
 
     @app.route("/api/leads/<int:lead_id>/action", methods=["POST"])
+    @login_required
     def lead_action(lead_id):
         lead = Lead.query.get_or_404(lead_id)
         data = request.get_json(silent=True) or {}
@@ -3505,6 +3595,7 @@ def register_routes(app):
         return jsonify({**lead.to_dict(include_history=True), "ativa": is_active_lead(lead)})
 
     @app.route("/api/export-plan", methods=["POST"])
+    @login_required
     def export_plan():
         rows = (request.get_json(silent=True) or {}).get("rows", [])
         if rows:

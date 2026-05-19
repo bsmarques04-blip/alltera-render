@@ -7674,6 +7674,15 @@ body.dark-mode .file-preview-card span {
     white-space: nowrap;
 }
 
+.topbar-user {
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #475569;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
 .topbar-icon-button,
 .theme-toggle.topbar-icon-button {
     width: 44px;
@@ -7710,6 +7719,10 @@ body.dark-mode .theme-toggle.topbar-icon-button {
     background: rgba(30, 41, 59, 0.92);
     color: #f8fafc;
     box-shadow: 0 10px 22px rgba(2, 6, 23, 0.38);
+}
+
+body.dark-mode .topbar-user {
+    color: #cbd5e1;
 }
 
 @media (max-width: 980px) {

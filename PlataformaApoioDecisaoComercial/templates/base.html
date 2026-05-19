@@ -110,6 +110,12 @@
 
             <div class="topbar__spacer"></div>
             <div class="topbar__actions">
+                {% if current_user.is_authenticated %}
+                <span class="topbar-user" title="{{ current_user.email }}">{{ current_user.nome }}</span>
+                <a class="topbar-icon-button" href="{{ url_for('logout') }}" title="Terminar sessao" aria-label="Terminar sessao">
+                    <span aria-hidden="true">Sair</span>
+                </a>
+                {% endif %}
                 <a class="topbar-icon-button" href="{{ url_for('todas_leads') }}" title="Todas as Leads" aria-label="Todas as Leads" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>
                     <span aria-hidden="true">👤</span>
                 </a>
