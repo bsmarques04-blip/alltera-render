@@ -8,271 +8,57 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            color-scheme: dark;
-            --bg: #071112;
-            --panel: rgba(12, 28, 29, 0.86);
-            --panel-strong: rgba(17, 43, 44, 0.94);
-            --line: rgba(171, 245, 232, 0.16);
-            --text: #eefcf8;
-            --muted: #9cc7bd;
-            --accent: #20d7a4;
-            --accent-strong: #13b887;
-            --danger: #ff8a8a;
-            --shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            min-height: 100vh;
-            margin: 0;
-            font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: var(--text);
-            background:
-                radial-gradient(circle at 18% 18%, rgba(32, 215, 164, 0.18), transparent 30%),
-                radial-gradient(circle at 82% 12%, rgba(93, 185, 255, 0.12), transparent 34%),
-                linear-gradient(135deg, #06100f 0%, #0a1718 42%, #071112 100%);
-            display: grid;
-            place-items: center;
-            padding: 28px;
-        }
-
-        .login-shell {
-            width: min(100%, 1040px);
-            min-height: 620px;
-            display: grid;
-            grid-template-columns: 1fr 430px;
-            border: 1px solid var(--line);
-            background: linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02));
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-
-        .login-hero {
-            padding: 56px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            background:
-                linear-gradient(180deg, rgba(6, 16, 15, 0.1), rgba(6, 16, 15, 0.76)),
-                url("{{ url_for('static', filename='favicon-main.png') }}") center / 240px no-repeat;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .brand img {
-            width: 46px;
-            height: 46px;
-            border-radius: 10px;
-        }
-
-        .brand strong {
-            display: block;
-            font-size: 1.02rem;
-            letter-spacing: 0;
-        }
-
-        .brand span,
-        .hero-copy p,
-        .login-copy {
-            color: var(--muted);
-        }
-
-        .hero-copy {
-            max-width: 520px;
-        }
-
-        .hero-copy h1 {
-            margin: 0 0 16px;
-            font-size: clamp(2.25rem, 6vw, 4.7rem);
-            line-height: 0.94;
-            letter-spacing: 0;
-        }
-
-        .hero-copy p {
-            margin: 0;
-            max-width: 420px;
-            line-height: 1.7;
-        }
-
-        .login-panel {
-            padding: 52px 42px;
-            background: var(--panel);
-            border-left: 1px solid var(--line);
-            backdrop-filter: blur(18px);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .login-panel h2 {
-            margin: 0 0 8px;
-            font-size: 1.65rem;
-            letter-spacing: 0;
-        }
-
-        .login-copy {
-            margin: 0 0 28px;
-            line-height: 1.55;
-        }
-
-        .field {
-            display: grid;
-            gap: 8px;
-            margin-bottom: 18px;
-        }
-
-        label {
-            font-size: 0.84rem;
-            color: #cbeee6;
-            font-weight: 700;
-        }
-
-        input[type="email"],
-        input[type="password"] {
-            width: 100%;
-            min-height: 48px;
-            border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text);
-            border-radius: 8px;
-            padding: 0 14px;
-            font: inherit;
-            outline: none;
-        }
-
-        input:focus {
-            border-color: rgba(32, 215, 164, 0.72);
-            box-shadow: 0 0 0 4px rgba(32, 215, 164, 0.14);
-        }
-
-        .row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin: 4px 0 24px;
-            color: var(--muted);
-            font-size: 0.9rem;
-        }
-
-        .remember {
-            display: inline-flex;
-            align-items: center;
-            gap: 9px;
-        }
-
-        .submit {
-            width: 100%;
-            min-height: 50px;
-            border: 0;
-            border-radius: 8px;
-            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-            color: #031412;
-            font: inherit;
-            font-weight: 800;
-            cursor: pointer;
-        }
-
-        .submit:hover {
-            filter: brightness(1.04);
-        }
-
-        .messages {
-            display: grid;
-            gap: 10px;
-            margin-bottom: 18px;
-        }
-
-        .message {
-            border: 1px solid rgba(255, 138, 138, 0.26);
-            background: rgba(255, 138, 138, 0.1);
-            color: var(--danger);
-            padding: 12px 14px;
-            border-radius: 8px;
-            font-size: 0.92rem;
-        }
-
-        .login-footnote {
-            margin-top: 22px;
-            color: var(--muted);
-            font-size: 0.82rem;
-            line-height: 1.5;
-        }
-
-        @media (max-width: 860px) {
-            body { padding: 18px; }
-            .login-shell {
-                grid-template-columns: 1fr;
-                min-height: auto;
-            }
-            .login-hero {
-                min-height: 260px;
-                padding: 34px;
-            }
-            .login-panel {
-                border-left: 0;
-                border-top: 1px solid var(--line);
-                padding: 34px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
-<body>
-    <main class="login-shell">
-        <section class="login-hero" aria-label="Alltera">
-            <div class="brand">
-                <img src="{{ url_for('static', filename='favicon-main.png') }}" alt="">
-                <div>
+<body class="login-page">
+    <main class="login-shell" aria-labelledby="login-title">
+        <section class="login-card" aria-label="Acesso Alltera">
+            <div class="login-brand">
+                <span class="login-brand__mark" aria-hidden="true">
+                    <img src="{{ url_for('static', filename='favicon-main.png') }}" alt="">
+                </span>
+                <span class="login-brand__text">
                     <strong>Alltera</strong>
-                    <span>Field Planning</span>
-                </div>
+                    <small>Acesso interno Alltera</small>
+                </span>
             </div>
-            <div class="hero-copy">
-                <h1>Alltera</h1>
-                <p>Area interna para contacto, marcação de reuniões, planeamento geografico e gestao operacional de leads.</p>
-            </div>
-        </section>
 
-        <section class="login-panel" aria-label="Login">
-            <h2>Entrar</h2>
-            <p class="login-copy">Usa as credenciais internas da equipa de receção.</p>
+            <div class="login-card__header">
+                <p class="login-eyebrow">Lead Planner</p>
+                <h1 id="login-title">Planeamento comercial geogr&aacute;fico</h1>
+                <p>Gest&atilde;o operacional de leads para equipas comerciais no terreno.</p>
+            </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-            <div class="messages" role="status">
+            <div class="login-messages" role="status" aria-live="polite">
                 {% for category, message in messages %}
-                <div class="message message--{{ category }}">{{ message }}</div>
+                <div class="login-message login-message--{{ category }}">{{ message }}</div>
                 {% endfor %}
             </div>
             {% endif %}
             {% endwith %}
 
-            <form method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
-                <div class="field">
+            <form class="login-form" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+                <div class="login-field">
                     <label for="email">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" required autofocus>
+                    <input id="email" name="email" type="email" autocomplete="email" placeholder="nome@alltera.pt" required autofocus>
                 </div>
-                <div class="field">
+
+                <div class="login-field">
                     <label for="password">Password</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" required>
+                    <input id="password" name="password" type="password" autocomplete="current-password" placeholder="A tua password" required>
                 </div>
-                <div class="row">
-                    <label class="remember">
-                        <input type="checkbox" name="remember" value="1">
-                        Manter sessao
-                    </label>
-                </div>
-                <button class="submit" type="submit">Entrar</button>
+
+                <label class="login-remember">
+                    <input type="checkbox" name="remember" value="1">
+                    <span>Manter sess&atilde;o iniciada</span>
+                </label>
+
+                <button class="login-submit" type="submit">Entrar</button>
             </form>
 
-            <p class="login-footnote">Acesso reservado a utilizadores internos. As acoes ficam associadas automaticamente ao utilizador autenticado.</p>
+            <p class="login-footnote">Acesso reservado a utilizadores autorizados. As a&ccedil;&otilde;es ficam associadas ao utilizador autenticado.</p>
         </section>
     </main>
 </body>

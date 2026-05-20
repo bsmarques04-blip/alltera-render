@@ -1,5 +1,6 @@
 ﻿import csv
 import json
+import logging
 import math
 import os
 import re
@@ -52,6 +53,7 @@ AUDIT_CONTEXT = threading.local()
 load_dotenv()
 migrate = Migrate()
 login_manager = LoginManager()
+logger = logging.getLogger(__name__)
 IMPORT_UPLOADS = {}
 IMPORT_UPLOADS_LOCK = threading.Lock()
 
@@ -2579,17 +2581,55 @@ def validate_and_import_rows(rows, auto_geocode=True, geocode_city_limit=None):
     return import_summary(rows, auto_geocode=auto_geocode, geocode_city_limit=geocode_city_limit)
 
 
+def safe_perf_log(message):
+    try:
+        logger.info("%s", clean_text(message))
+    except (OSError, ValueError):
+        pass
+
+
+def safe_options_query(name, fallback, factory):
+    try:
+        value = factory()
+        if value is None:
+            return fallback
+        return value
+    except Exception as exc:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        safe_perf_log(f"[OPTIONS] {name} fallback: {exc.__class__.__name__}")
+        return fallback
+
+
 def distinct_non_empty(*columns):
     values = set()
     for column in columns:
-        rows = db.session.query(column).filter(column.isnot(None), column != "").distinct().all()
+        try:
+            rows = db.session.query(column).filter(column.isnot(None), column != "").distinct().all()
+        except Exception as exc:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            safe_perf_log(f"[OPTIONS] distinct fallback: {exc.__class__.__name__}")
+            continue
         values.update(clean_text(row[0]) for row in rows if clean_text(row[0]))
     return sorted(values)
 
 
 def split_distinct_tags(column):
     tags = set()
-    rows = db.session.query(column).filter(column.isnot(None), column != "").distinct().all()
+    try:
+        rows = db.session.query(column).filter(column.isnot(None), column != "").distinct().all()
+    except Exception as exc:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        safe_perf_log(f"[OPTIONS] tags fallback: {exc.__class__.__name__}")
+        return []
     for (value,) in rows:
         tags.update(tag.strip() for tag in (value or "").split(",") if tag.strip())
     return sorted(tags)
@@ -2597,29 +2637,33 @@ def split_distinct_tags(column):
 
 def get_options():
     start = time.perf_counter()
-    existing_commercials = [
-        item
-        for item in distinct_non_empty(Lead.comercial_responsavel)
-        if item != "Outro"
-    ]
+    existing_commercials = safe_options_query(
+        "comerciais",
+        [],
+        lambda: [item for item in distinct_non_empty(Lead.comercial_responsavel) if item != "Outro"],
+    )
     options = {
-        "localidades": distinct_non_empty(Lead.cidade, Lead.localidade),
-        "tipos": distinct_non_empty(Lead.area_negocio, Lead.tipo_cliente),
-        "estados": distinct_non_empty(Lead.estado) or LEAD_STATES,
+        "localidades": safe_options_query("localidades", [], lambda: distinct_non_empty(Lead.cidade, Lead.localidade)),
+        "tipos": safe_options_query("tipos", [], lambda: distinct_non_empty(Lead.area_negocio, Lead.tipo_cliente)),
+        "estados": safe_options_query("estados", LEAD_STATES, lambda: distinct_non_empty(Lead.estado) or LEAD_STATES),
         "classificacoes": CLASSIFICATION_FILTERS,
         "comerciais": ["Todos", UNASSIGNED_COMMERCIAL] + existing_commercials,
         "mapa_comerciais": MAP_COMMERCIALS,
-        "tags": sorted(set(TAG_OPTIONS) | set(split_distinct_tags(Lead.tags))),
-        "insight_tags": sorted(set(INSIGHT_TAG_OPTIONS) | set(split_distinct_tags(Lead.insight_tags))),
+        "tags": safe_options_query("tags", sorted(TAG_OPTIONS), lambda: sorted(set(TAG_OPTIONS) | set(split_distinct_tags(Lead.tags)))),
+        "insight_tags": safe_options_query(
+            "insight_tags",
+            sorted(INSIGHT_TAG_OPTIONS),
+            lambda: sorted(set(INSIGHT_TAG_OPTIONS) | set(split_distinct_tags(Lead.insight_tags))),
+        ),
     }
-    print(f"[PERF] get_options {time.perf_counter() - start:.3f}s", flush=True)
+    safe_perf_log(f"[PERF] get_options {time.perf_counter() - start:.3f}s")
     return options
 
 
 def minimal_map_metrics():
     start = time.perf_counter()
     total = db.session.query(db.func.count(Lead.id)).scalar() or 0
-    print(f"[PERF] minimal_map_metrics {time.perf_counter() - start:.3f}s", flush=True)
+    safe_perf_log(f"[PERF] minimal_map_metrics {time.perf_counter() - start:.3f}s")
     return {
         "total": total,
         "active": 0,
@@ -3546,7 +3590,7 @@ def register_routes(app):
         start = time.perf_counter()
         options = get_options()
         metrics = minimal_map_metrics()
-        print(f"[PERF] /mapa route {time.perf_counter() - start:.3f}s", flush=True)
+        safe_perf_log(f"[PERF] /mapa route {time.perf_counter() - start:.3f}s")
         return render_template(
             "mapa.html",
             options=options,
@@ -4122,9 +4166,8 @@ def register_routes(app):
                 item["agenda_bucket"] = scheduled_bucket(lead)
                 item["tem_coordenadas"] = lead.latitude is not None and lead.longitude is not None
             payload.append(item)
-        print(
-            f"[PERF] /api/leads count={len(leads)} bounds={has_bounds} lite={lite} query={query_elapsed:.3f}s total={time.perf_counter() - start:.3f}s",
-            flush=True,
+        safe_perf_log(
+            f"[PERF] /api/leads count={len(leads)} bounds={has_bounds} lite={lite} query={query_elapsed:.3f}s total={time.perf_counter() - start:.3f}s"
         )
         return jsonify(payload)
 
