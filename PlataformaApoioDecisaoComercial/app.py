@@ -4177,6 +4177,15 @@ def register_routes(app):
         lead = Lead.query.get_or_404(lead_id)
         item = lead_map_payload(lead, include_history=False)
         item.update({
+            "nome_cliente": lead.nome_cliente or lead.nome_empresa or "",
+            "nome_empresa": lead.nome_empresa or "",
+            "empresa": lead.empresa or "",
+            "area_negocio": lead.area_negocio or lead.tipo_cliente or "",
+            "tipo_cliente": lead.tipo_cliente or "",
+            "telefone": lead.telefone or lead.contacto or "",
+            "email": lead.email or "",
+            "cidade": lead.cidade or lead.localidade or "",
+            "localidade": lead.localidade or "",
             "morada": lead.morada or "",
             "codigo_postal": lead.codigo_postal or "",
             "contacto": lead.contacto or "",

@@ -75,6 +75,7 @@ const els = {
     territoryMode: document.getElementById("territoryMode"),
     resetFilters: document.getElementById("resetFilters"),
     selectedState: document.getElementById("selectedState"),
+    leadDrawerTitle: document.getElementById("leadDrawerTitle"),
     leadDetails: document.getElementById("leadDetails"),
     leadHistory: document.getElementById("leadHistory"),
     leadNoteInput: document.getElementById("leadNoteInput"),
@@ -1068,6 +1069,7 @@ function renderDetails() {
     if (!selectedLead) {
         els.selectedState.textContent = "—";
         els.selectedState.className = "tag tag--estado";
+        if (els.leadDrawerTitle) els.leadDrawerTitle.textContent = "Lead selecionada";
         const accEmpty = document.getElementById("actionsAccordion");
         if (accEmpty) accEmpty.open = false;
         els.leadDetails.innerHTML = `
@@ -1101,33 +1103,38 @@ function renderDetails() {
     els.selectedState.textContent = selectedLead.estado;
     els.selectedState.className = `tag tag--estado ${statusClass(selectedLead.estado)}`;
     const suggestion = commercialSuggestion(selectedLead);
+    const phone = selectedLead.telefone || selectedLead.contacto || "";
+    const company = selectedLead.empresa || selectedLead.nome_empresa || "";
+    const address = selectedLead.morada || "";
+    const postalCode = selectedLead.codigo_postal || "";
+    if (els.leadDrawerTitle) els.leadDrawerTitle.textContent = leadName(selectedLead);
     els.leadDetails.innerHTML = `
-        <section class="lead-hero">
-            <div class="lead-avatar" aria-hidden="true">${leadName(selectedLead).slice(0, 1).toUpperCase()}</div>
-            <div>
-                <h3>${leadName(selectedLead)}</h3>
-                <p>${leadArea(selectedLead)} · ${selectedLead.telefone || "—"} · ${leadCity(selectedLead)}</p>
-                <div class="lead-score-row">
-                    <span class="priority-badge priority-badge--${scoreBand(selectedLead)}">${priorityLabel(selectedLead)} · ${scoreLabel(selectedLead)}</span>
-                    <span class="tag">${leadCommercialLabel(selectedLead)}</span>
-                </div>
-                ${lastContactInfo(selectedLead) ? `<span class="contact-recency ${lastContactInfo(selectedLead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(selectedLead).label}</span>` : ""}
+        <section class="lead-drawer-block">
+            <div class="lead-drawer-block__head">
+                <h4>Resumo</h4>
+                <span class="priority-badge priority-badge--${scoreBand(selectedLead)}">${priorityLabel(selectedLead)} &middot; ${scoreLabel(selectedLead)}</span>
             </div>
+            <dl class="lead-details-dl lead-details-dl--grid">
+                ${detailLine("Nome cliente", leadName(selectedLead))}
+                ${detailLine("Empresa", company)}
+                ${detailLine("&Aacute;rea de neg&oacute;cio", leadArea(selectedLead))}
+                ${detailLine("Cidade", leadCity(selectedLead))}
+                ${detailLine("Telefone", phone)}
+                ${detailLine("Email", selectedLead.email)}
+                ${detailLine("Comercial", leadCommercialLabel(selectedLead))}
+            </dl>
+            ${lastContactInfo(selectedLead) ? `<span class="contact-recency ${lastContactInfo(selectedLead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(selectedLead).label}</span>` : ""}
         </section>
-        <dl class="lead-details-dl">
-            ${detailLine("Nome Cliente", leadName(selectedLead))}
-            ${detailLine("Área de negócio", leadArea(selectedLead))}
-            ${detailLine("Contacto telefónico", selectedLead.telefone || "—")}
-            ${detailLine("Cidade", leadCity(selectedLead))}
-            ${detailLine("Empresa", selectedLead.empresa || selectedLead.nome_empresa || "—")}
-            ${detailLine("Email", selectedLead.email || "—")}
-            ${detailLine("Observações", selectedLead.observacoes || "—")}
-            ${detailLine("Observações do contacto", selectedLead.observacoes_contacto || "—")}
-            ${detailLine("Classificação", selectedLead.classificacao_observacao || "—")}
-            ${detailLine("Motivo", selectedLead.motivo_classificacao || "—")}
-            ${detailLine("Estado", selectedLead.estado)}
-        </dl>
-        ${renderInsightPanel(selectedLead)}
+        <section class="lead-drawer-block">
+            <h4>Localiza&ccedil;&atilde;o</h4>
+            <dl class="lead-details-dl lead-details-dl--grid">
+                ${detailLine("Morada", address)}
+                ${detailLine("C&oacute;digo postal", postalCode)}
+            </dl>
+        </section>
+        ${observationBlock("Observa&ccedil;&otilde;es", selectedLead.observacoes, "Sem observa&ccedil;&otilde;es")}
+        ${observationBlock("Observa&ccedil;&otilde;es do contacto", selectedLead.observacoes_contacto, "Sem observa&ccedil;&otilde;es de contacto")}
+        ${renderOperationalSignals(selectedLead)}
         ${suggestion ? `<section class="commercial-suggestion">
             <strong>Esta lead está próxima de várias leads da ${suggestion.label}.</strong>
             <button class="button secondary" id="assignSuggestedCommercial" type="button">Atribuir à ${suggestion.label}</button>
@@ -1142,12 +1149,12 @@ function renderDetails() {
         ? selectedLead.historico
               .map(
                   (item) =>
-                      `<article class="history-item"><strong>${item.created_at} · ${item.acao}</strong><p>${item.observacao || ""}</p></article>`
+                      `<article class="history-item"><strong>${displayValue(item.created_at)} &middot; ${displayValue(item.acao)}</strong><p>${displayValue(item.observacao, "")}</p></article>`
               )
               .join("")
         : "Sem histórico.";
     els.tagList.innerHTML = selectedLead.tags?.length
-        ? selectedLead.tags.map((tag) => `<span class="tag removable-tag" data-tag="${tag}">${tag} ×</span>`).join("")
+        ? selectedLead.tags.map((tag) => `<span class="tag removable-tag" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} &times;</span>`).join("")
         : "Sem tags.";
     document.querySelectorAll(".removable-tag").forEach((tag) => {
         tag.addEventListener("click", () => tagAction("remove_tag", tag.dataset.tag));
@@ -1194,8 +1201,45 @@ function renderMapMiniCard() {
     });
 }
 
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function displayValue(value, fallback = "-") {
+    const text = String(value ?? "").trim();
+    return text ? escapeHtml(text) : fallback;
+}
+
 function detailLine(label, value) {
-    return `<div class="detail-line"><dt>${label}</dt><dd>${value}</dd></div>`;
+    return `<div class="detail-line"><dt>${label}</dt><dd>${displayValue(value)}</dd></div>`;
+}
+
+function observationBlock(title, value, emptyText) {
+    const text = String(value ?? "").trim();
+    return `
+        <section class="lead-drawer-block lead-observation-block ${text ? "" : "lead-observation-block--empty"}">
+            <h4>${title}</h4>
+            <p>${text ? escapeHtml(text) : emptyText}</p>
+        </section>
+    `;
+}
+
+function renderOperationalSignals(lead) {
+    const tags = Array.isArray(lead.tags) ? lead.tags.filter(Boolean) : [];
+    const insights = leadInsights(lead).filter(Boolean);
+    return `
+        <section class="lead-drawer-block lead-signal-block">
+            <h4>Tags</h4>
+            ${tags.length ? `<div class="lead-chip-row">${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : `<p class="lead-muted-copy">Sem tags</p>`}
+            ${insights.length ? `<div class="lead-chip-row lead-chip-row--insights">${insights.map((tag) => `<span class="insight-pill">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+            ${lead.insight_note ? `<p>${escapeHtml(lead.insight_note)}</p>` : ""}
+        </section>
+    `;
 }
 
 function renderInsightPanel(lead) {
@@ -1210,7 +1254,7 @@ function renderInsightPanel(lead) {
                 <span>${hasInsights(lead) ? "Atualizado" : "Sem insights"}</span>
             </div>
             <div class="insight-chip-list">${chips}</div>
-            <textarea id="internalInsightNote" rows="2" maxlength="280" placeholder="Adicionar insight interno...">${lead.insight_note || ""}</textarea>
+            <textarea id="internalInsightNote" rows="2" maxlength="280" placeholder="Adicionar insight interno...">${displayValue(lead.insight_note, "")}</textarea>
             <div class="internal-insights-panel__footer">
                 <small>Último update: ${lead.updated_at ? new Date(lead.updated_at).toLocaleDateString("pt-PT") : "—"}</small>
                 <button class="button secondary" id="saveInternalInsights" type="button">Guardar</button>

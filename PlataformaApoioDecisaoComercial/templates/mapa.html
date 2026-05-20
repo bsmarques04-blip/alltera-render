@@ -127,34 +127,31 @@
         </div>
     </section>
 
-    <aside class="lead-drawer details-panel details-drawer map-right-panel" id="leadDrawer" aria-label="Detalhe da lead" aria-hidden="true">
-
-        <button type="button" class="lead-drawer-overlay drawer-backdrop" id="drawerBackdrop" tabindex="-1" aria-hidden="true"></button>
-        <div class="lead-drawer-content drawer-scroll" role="dialog" aria-modal="true" aria-labelledby="leadDrawerTitle">
+    <button type="button" class="lead-drawer-overlay drawer-backdrop" id="drawerBackdrop" tabindex="-1" aria-hidden="true"></button>
+    <aside class="lead-drawer details-panel details-drawer map-right-panel" id="leadDrawer" aria-label="Detalhe da lead" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="leadDrawerTitle">
             <div class="lead-drawer-header drawer-header">
-                <h2 class="drawer-title" id="leadDrawerTitle">Lead selecionada</h2>
+                <div>
+                    <span class="lead-drawer-label">LEAD</span>
+                    <h2 class="drawer-title" id="leadDrawerTitle">Lead selecionada</h2>
+                </div>
                 <button type="button" class="drawer-close" id="drawerClose" title="Fechar painel" aria-label="Fechar painel">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
 
+            <div class="lead-drawer-body">
             <section class="panel panel--inset selected-card" id="selectedCard">
                 <div class="panel-head panel-head--tight">
                     <span class="tag tag--estado" id="selectedState">—</span>
                 </div>
                 <div id="leadDetails" class="lead-details-compact empty-state">Clique num pin ou numa linha da lista para abrir o painel.</div>
+            </section>
 
-                <details class="accordion" id="actionsAccordion">
-                    <summary>Ações rápidas</summary>
-                    <div class="actions-grid actions-grid--compact">
-                        <button class="button secondary" data-action="contactado" disabled>Contactada</button>
-                        <button class="button secondary" data-action="adiar" disabled>Reagendar</button>
-                        <button class="button secondary" data-action="crm" disabled>Marcar reunião</button>
-                        <a class="button secondary" id="openFullLead" href="#" aria-disabled="true">Abrir lead completa</a>
-                        <button class="button secondary" id="focusSelectedLead" type="button" disabled>Abrir no mapa</button>
-                        <button class="button secondary" data-action="corrigir_estado" disabled>Corrigir estado</button>
-                    </div>
-                </details>
+            <section class="panel panel--inset lead-timeline-panel">
+                <div class="panel-head panel-head--tight">
+                    <h3>Timeline</h3>
+                </div>
+                <div id="leadHistory" class="lead-timeline empty-state">—</div>
             </section>
 
             <section class="panel panel--inset lead-note-panel">
@@ -163,13 +160,6 @@
                 </div>
                 <textarea id="leadNoteInput" rows="3" placeholder="Adicionar nota"></textarea>
                 <button class="button secondary full" id="addLeadNote" type="button" disabled>Guardar nota</button>
-            </section>
-
-            <section class="panel panel--inset lead-timeline-panel">
-                <div class="panel-head panel-head--tight">
-                    <h3>Timeline</h3>
-                </div>
-                <div id="leadHistory" class="lead-timeline empty-state">—</div>
             </section>
 
             <section class="panel panel--inset nearby-panel">
@@ -237,7 +227,15 @@
                 </div>
                 <div id="leadsList"></div>
             </section>
-        </div>
+            </div>
+
+            <div class="lead-drawer-footer" id="leadDrawerActions">
+                <button class="button secondary" data-action="contactado" disabled>Contactada</button>
+                <button class="button secondary" data-action="adiar" disabled>Reagendar</button>
+                <button class="button secondary" data-action="crm" disabled>Marcar reunião</button>
+                <a class="button secondary" id="openFullLead" href="#" aria-disabled="true">Abrir página completa</a>
+                <button class="button secondary" id="focusSelectedLead" type="button" disabled>Abrir no mapa</button>
+            </div>
     </aside>
 </main>
 {% endblock %}

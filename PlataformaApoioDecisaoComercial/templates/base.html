@@ -172,17 +172,24 @@
     </aside>
     <aside class="global-lead-drawer" id="globalLeadDrawer" aria-hidden="true">
         <button type="button" class="global-lead-drawer__backdrop" id="globalLeadDrawerBackdrop" tabindex="-1" aria-hidden="true"></button>
-        <section class="global-lead-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="globalLeadDrawerTitle">
-            <header class="global-lead-drawer__header">
+        <section class="global-lead-drawer__panel lead-drawer" role="dialog" aria-modal="true" aria-labelledby="globalLeadDrawerTitle">
+            <header class="global-lead-drawer__header lead-drawer-header">
                 <div>
                     <p class="eyebrow">Lead</p>
                     <h2 id="globalLeadDrawerTitle">Detalhe rápido</h2>
                 </div>
                 <button type="button" class="global-lead-drawer__close" id="globalLeadDrawerClose" aria-label="Fechar detalhe">&times;</button>
             </header>
-            <div class="global-lead-drawer__body" id="globalLeadDrawerBody">
+            <div class="global-lead-drawer__body lead-drawer-body" id="globalLeadDrawerBody">
                 <p class="global-lead-drawer__empty">Seleciona uma lead para ver detalhes.</p>
             </div>
+            <footer class="global-lead-drawer__footer lead-drawer-footer" id="globalLeadDrawerFooter">
+                <button type="button" data-global-lead-action="contactado" disabled>Contactada</button>
+                <button type="button" data-global-lead-action="adiar" disabled>Reagendar</button>
+                <button type="button" data-global-lead-action="reuniao" disabled>Marcar reunião</button>
+                <a id="globalLeadFullLink" href="#" aria-disabled="true">Abrir página completa</a>
+                <a id="globalLeadMapLink" href="#" aria-disabled="true">Abrir no mapa</a>
+            </footer>
         </section>
     </aside>
     {% endif %}
@@ -318,6 +325,9 @@
             const leadDrawerTitle = document.getElementById("globalLeadDrawerTitle");
             const leadDrawerClose = document.getElementById("globalLeadDrawerClose");
             const leadDrawerBackdrop = document.getElementById("globalLeadDrawerBackdrop");
+            const leadDrawerFooter = document.getElementById("globalLeadDrawerFooter");
+            const globalLeadFullLink = document.getElementById("globalLeadFullLink");
+            const globalLeadMapLink = document.getElementById("globalLeadMapLink");
             let activeLeadId = null;
             const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
             const leadName = (lead) => lead.nome_cliente || lead.nome_empresa || lead.empresa || "Lead sem nome";
@@ -329,6 +339,21 @@
             const timeline = (items) => {
                 const values = Array.isArray(items) ? items.slice(0, 5) : [];
                 return values.length ? values.map((item) => `<li><strong>${escapeHtml(item.acao || "Evento")}</strong><span>${escapeHtml(item.created_at || "")}</span><p>${escapeHtml(item.observacao || item.resultado || "")}</p></li>`).join("") : `<li class="is-empty">Sem histórico recente.</li>`;
+            };
+            const setGlobalLeadActions = (enabled, lead = null) => {
+                leadDrawerFooter?.querySelectorAll("button").forEach((button) => {
+                    button.disabled = !enabled;
+                });
+                const fullUrl = lead?.id ? `/mapa?lead_id=${encodeURIComponent(lead.id)}&history=1` : "#";
+                const mapUrl = lead?.id ? (lead.latitude && lead.longitude ? `/mapa?lead_id=${encodeURIComponent(lead.id)}&lat=${encodeURIComponent(lead.latitude)}&lng=${encodeURIComponent(lead.longitude)}` : `/mapa?lead_id=${encodeURIComponent(lead.id)}`) : "#";
+                if (globalLeadFullLink) {
+                    globalLeadFullLink.href = fullUrl;
+                    globalLeadFullLink.setAttribute("aria-disabled", String(!enabled));
+                }
+                if (globalLeadMapLink) {
+                    globalLeadMapLink.href = mapUrl;
+                    globalLeadMapLink.setAttribute("aria-disabled", String(!enabled));
+                }
             };
             const openLeadDrawerShell = () => {
                 if (!leadDrawer) return;
@@ -342,37 +367,43 @@
                 leadDrawer.setAttribute("aria-hidden", "true");
                 document.body.classList.remove("lead-drawer-open");
                 activeLeadId = null;
+                setGlobalLeadActions(false);
             };
             const renderLeadDrawer = (lead) => {
                 if (!leadDrawerBody || !leadDrawerTitle) return;
                 const name = leadName(lead);
                 leadDrawerTitle.textContent = name;
-                const fullUrl = `/mapa?lead_id=${encodeURIComponent(lead.id)}&history=1`;
-                const mapUrl = lead.latitude && lead.longitude ? `/mapa?lead_id=${encodeURIComponent(lead.id)}&lat=${encodeURIComponent(lead.latitude)}&lng=${encodeURIComponent(lead.longitude)}` : `/mapa?lead_id=${encodeURIComponent(lead.id)}`;
+                setGlobalLeadActions(true, lead);
                 leadDrawerBody.innerHTML = `
-                    <section class="global-lead-summary"><strong>${escapeHtml(name)}</strong><span>${valueOrDash(lead.empresa || lead.nome_empresa)}</span></section>
-                    <dl class="global-lead-fields">
-                        <div><dt>Telefone</dt><dd>${valueOrDash(lead.telefone || lead.contacto)}</dd></div>
-                        <div><dt>Email</dt><dd>${valueOrDash(lead.email)}</dd></div>
-                        <div><dt>Cidade</dt><dd>${valueOrDash(lead.cidade || lead.localidade)}</dd></div>
-                        <div><dt>Estado</dt><dd>${valueOrDash(lead.estado)}</dd></div>
-                    </dl>
-                    <section class="global-lead-section"><h3>Tags</h3><div class="global-lead-tags">${chips([...(lead.insight_tags || []), ...(lead.tags || [])])}</div></section>
-                    <section class="global-lead-section"><h3>Notas rápidas</h3><p>${valueOrDash(lead.motivo_classificacao || lead.observacoes_contacto || lead.observacoes || lead.classificacao_observacao)}</p></section>
-                    <section class="global-lead-section"><h3>Timeline</h3><ol class="global-lead-timeline">${timeline(lead.historico)}</ol></section>
-                    <div class="global-lead-actions">
-                        <button type="button" data-global-lead-action="contactado">Contactada</button>
-                        <button type="button" data-global-lead-action="adiar">Reagendar</button>
-                        <button type="button" data-global-lead-action="reuniao">Marcar reunião</button>
-                        <a href="${fullUrl}">Abrir página completa</a>
-                        <a href="${mapUrl}">Abrir no mapa</a>
-                    </div>
+                    <section class="lead-drawer-block global-lead-section">
+                        <h3>Resumo</h3>
+                        <dl class="global-lead-fields">
+                            <div><dt>Nome cliente</dt><dd>${valueOrDash(name)}</dd></div>
+                            <div><dt>Empresa</dt><dd>${valueOrDash(lead.empresa || lead.nome_empresa)}</dd></div>
+                            <div><dt>Área de negócio</dt><dd>${valueOrDash(lead.area_negocio || lead.tipo_cliente)}</dd></div>
+                            <div><dt>Cidade</dt><dd>${valueOrDash(lead.cidade || lead.localidade)}</dd></div>
+                            <div><dt>Telefone</dt><dd>${valueOrDash(lead.telefone || lead.contacto)}</dd></div>
+                            <div><dt>Email</dt><dd>${valueOrDash(lead.email)}</dd></div>
+                        </dl>
+                    </section>
+                    <section class="lead-drawer-block global-lead-section">
+                        <h3>Localização</h3>
+                        <dl class="global-lead-fields">
+                            <div><dt>Morada</dt><dd>${valueOrDash(lead.morada)}</dd></div>
+                            <div><dt>Código postal</dt><dd>${valueOrDash(lead.codigo_postal)}</dd></div>
+                        </dl>
+                    </section>
+                    <section class="lead-drawer-block global-lead-section"><h3>Observações</h3><p>${lead.observacoes ? escapeHtml(lead.observacoes) : "Sem observações"}</p></section>
+                    <section class="lead-drawer-block global-lead-section"><h3>Observações do contacto</h3><p>${lead.observacoes_contacto ? escapeHtml(lead.observacoes_contacto) : "Sem observações de contacto"}</p></section>
+                    <section class="lead-drawer-block global-lead-section"><h3>Tags</h3><div class="global-lead-tags">${chips([...(lead.insight_tags || []), ...(lead.tags || [])])}</div></section>
+                    <section class="lead-drawer-block global-lead-section"><h3>Timeline</h3><ol class="global-lead-timeline">${timeline(lead.historico)}</ol></section>
                 `;
             };
             const openLeadDrawer = async (leadId) => {
                 if (!leadDrawer || !leadDrawerBody || !leadId) return;
                 activeLeadId = leadId;
                 leadDrawerBody.innerHTML = `<p class="global-lead-drawer__empty">A carregar lead...</p>`;
+                setGlobalLeadActions(false);
                 openLeadDrawerShell();
                 try {
                     const response = await fetch(`/api/leads/${encodeURIComponent(leadId)}/resumo`);
