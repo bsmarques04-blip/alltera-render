@@ -12,18 +12,21 @@ import unicodedata
 from collections import Counter
 from datetime import date, datetime, timedelta
 from difflib import SequenceMatcher
+from functools import wraps
 from io import BytesIO, StringIO
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, flash, has_request_context, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from flask_migrate import Migrate
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, PatternFill
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import joinedload, selectinload
 from werkzeug.datastructures import FileStorage
 import click
 
@@ -44,6 +47,7 @@ NOMINATIM_USER_AGENT = "AllteraLeadPlanner/1.0 academico"
 IMPORT_LOCK = None
 IMPORT_JOBS = {}
 IMPORT_JOBS_LOCK = threading.Lock()
+AUDIT_CONTEXT = threading.local()
 
 load_dotenv()
 migrate = Migrate()
@@ -60,6 +64,26 @@ LEAD_STATES = [
 ]
 ACTIVE_STATES = ["Por contactar", "Ligar de volta"]
 SCHEDULED_STATES = {"Ligar de volta", "Adiar contacto", "Sem interesse"}
+MAP_INACTIVE_STATE_KEYS = {
+    "inativa",
+    "inativo",
+    "naoativa",
+    "naoativo",
+    "desativada",
+    "desativado",
+    "arquivada",
+    "arquivado",
+    "perdida",
+    "perdido",
+    "seminteresse",
+    "seminteressemomentaneo",
+    "naointeressada",
+    "naointeressado",
+    "tratadonocrm",
+    "tratadocrm",
+    "duplicada",
+    "duplicado",
+}
 CLASSIFICATION_FILTERS = [
     ("ativos", "Todos ativos"),
     ("por_contactar", "Por contactar"),
@@ -245,6 +269,75 @@ def is_flask_db_command():
     return "db" in sys.argv[1:]
 
 
+def role_required(*roles):
+    def decorator(view):
+        @wraps(view)
+        def wrapped_view(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return login_manager.unauthorized()
+            if current_user.role not in roles:
+                abort(403)
+            return view(*args, **kwargs)
+
+        return wrapped_view
+
+    return decorator
+
+
+admin_required = role_required("admin")
+
+
+def active_commercial_users():
+    return User.query.filter_by(ativo=True, role="comercial").order_by(User.nome.asc()).all()
+
+
+def assignment_scope_options():
+    return [
+        {"value": "all", "label": "Todas"},
+        {"value": "por_contactar", "label": "Por contactar"},
+        {"value": "contactadas", "label": "Contactadas"},
+        {"value": "agendadas", "label": "Agendadas"},
+        {"value": "sem_proximo_contacto", "label": "Sem próximo contacto"},
+    ]
+
+
+def requested_assignment_scope(default=None):
+    if default is None:
+        default = "all"
+    scope = request.args.get("scope", default)
+    allowed = {option["value"] for option in assignment_scope_options()}
+    return scope if scope in allowed else default
+
+
+def apply_assignment_scope(query, scope):
+    if scope == "por_contactar":
+        return query.filter(Lead.estado == "Por contactar")
+    if scope == "contactadas":
+        return query.filter(Lead.estado != "Por contactar")
+    if scope == "agendadas":
+        return query.filter(Lead.data_novo_contacto.isnot(None))
+    if scope == "sem_proximo_contacto":
+        return query.filter(Lead.data_novo_contacto.is_(None))
+    return query
+
+
+def create_user_record(nome, email, password, role):
+    normalized_role = clean_text(role).lower() or "comercial"
+    if normalized_role not in {"admin", "comercial"}:
+        raise click.ClickException("Role invalida. Usa 'admin' ou 'comercial'.")
+
+    normalized_email = clean_text(email).lower()
+    existing = User.query.filter_by(email=normalized_email).first()
+    if existing:
+        raise click.ClickException("Ja existe um utilizador com esse email.")
+
+    user = User(nome=clean_text(nome), email=normalized_email, role=normalized_role, ativo=True)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
 def create_app():
     os.makedirs(INSTANCE_DIR, exist_ok=True)
     app = Flask(__name__, instance_path=INSTANCE_DIR, instance_relative_config=True)
@@ -282,15 +375,17 @@ def create_app():
     @click.option("--email", required=True, help="Email de login.")
     @click.option("--password", required=True, help="Password inicial.")
     def create_admin(nome, email, password):
-        normalized_email = clean_text(email).lower()
-        existing = User.query.filter_by(email=normalized_email).first()
-        if existing:
-            raise click.ClickException("Ja existe um utilizador com esse email.")
-        user = User(nome=clean_text(nome), email=normalized_email, role="admin", ativo=True)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        click.echo(f"Admin criado: {normalized_email}")
+        user = create_user_record(nome=nome, email=email, password=password, role="admin")
+        click.echo(f"Admin criado: {user.email}")
+
+    @app.cli.command("create-user")
+    @click.option("--nome", required=True, help="Nome do utilizador.")
+    @click.option("--email", required=True, help="Email de login.")
+    @click.option("--password", required=True, help="Password inicial.")
+    @click.option("--role", default="comercial", show_default=True, help="Role: admin ou comercial.")
+    def create_user(nome, email, password, role):
+        user = create_user_record(nome=nome, email=email, password=password, role=role)
+        click.echo(f"Utilizador criado: {user.email} ({user.role})")
 
     register_routes(app)
     return app
@@ -400,6 +495,7 @@ def migrate_database():
         "tags": "ALTER TABLE lead ADD COLUMN tags VARCHAR(300)",
         "insight_tags": "ALTER TABLE lead ADD COLUMN insight_tags VARCHAR(400)",
         "insight_note": "ALTER TABLE lead ADD COLUMN insight_note TEXT",
+        "assigned_to_id": "ALTER TABLE lead ADD COLUMN assigned_to_id INTEGER",
     }
 
     for column, sql in migrations.items():
@@ -426,6 +522,19 @@ def migrate_database():
     db.session.execute(db.text("UPDATE lead SET cidade = COALESCE(cidade, localidade, 'Sem cidade')"))
     db.session.execute(db.text("UPDATE lead SET empresa = COALESCE(empresa, nome_empresa)"))
     db.session.commit()
+
+    history_tables = {row[0] for row in db.session.execute(db.text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()}
+    if "historico_lead" in history_tables:
+        history_columns = {row[1] for row in db.session.execute(db.text("PRAGMA table_info(historico_lead)")).fetchall()}
+        history_migrations = {
+            "user_id": "ALTER TABLE historico_lead ADD COLUMN user_id INTEGER",
+            "tipo_acao": "ALTER TABLE historico_lead ADD COLUMN tipo_acao VARCHAR(80)",
+            "resultado": "ALTER TABLE historico_lead ADD COLUMN resultado VARCHAR(120)",
+        }
+        for column, sql in history_migrations.items():
+            if column not in history_columns:
+                db.session.execute(db.text(sql))
+        db.session.commit()
 
     for lead in Lead.query.all():
         lead.estado = normalize_legacy_state(lead.estado)
@@ -773,6 +882,36 @@ def parse_date(value):
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def parse_time_value(value):
+    value = clean_text(value)
+    if not value:
+        return None
+    match = re.fullmatch(r"([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?", value)
+    if not match:
+        return None
+    return f"{int(match.group(1)):02d}:{match.group(2)}"
+
+
+def scheduled_time_label(lead):
+    return parse_time_value(getattr(lead, "hora_reuniao", None)) or ""
+
+
+def scheduled_datetime_label(lead):
+    if not lead or not lead.data_novo_contacto:
+        return "-"
+    date_text = lead.data_novo_contacto.strftime("%d/%m/%Y")
+    hour_text = scheduled_time_label(lead)
+    return f"{date_text} às {hour_text}" if hour_text else date_text
+
+
+def scheduled_sort_key(lead):
+    return (
+        lead.data_novo_contacto or date.max,
+        scheduled_time_label(lead) or "99:99",
+        normalize_lookup(lead.nome_empresa or lead.nome_cliente or ""),
+    )
+
+
 def parse_split_contact_date(row):
     day = clean_text(row.get("dia"))
     month = clean_text(row.get("mes"))
@@ -788,6 +927,9 @@ def parse_split_contact_date(row):
 def is_active_lead(lead, today=None):
     today = today or date.today()
     state = normalize_legacy_state(lead.estado)
+    raw_state = normalize_lookup(lead.estado).replace(" ", "")
+    if raw_state in MAP_INACTIVE_STATE_KEYS:
+        return False
     if state == "Já tratado / no CRM" or state == "Sem interesse":
         return False
     if is_scheduled_lead(lead) and lead.data_novo_contacto > today:
@@ -798,6 +940,50 @@ def is_active_lead(lead, today=None):
         return True
     return False
 
+
+def normalized_sql_text(column):
+    value = db.func.lower(db.func.coalesce(column, ""))
+    replacements = {
+        "ã": "a",
+        "á": "a",
+        "à": "a",
+        "â": "a",
+        "é": "e",
+        "ê": "e",
+        "í": "i",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ú": "u",
+        "ç": "c",
+        " ": "",
+        "/": "",
+        "-": "",
+        "_": "",
+        ".": "",
+        ",": "",
+    }
+    for old, new in replacements.items():
+        value = db.func.replace(value, old, new)
+    return value
+
+
+def aplicar_filtro_leads_operacionais_mapa(query):
+    # O mapa mostra apenas leads operacionais; leads encerradas continuam disponíveis nas listagens.
+    fields = [
+        Lead.estado,
+        Lead.estado_lead,
+        Lead.classificacao_observacao,
+        Lead.motivo_classificacao,
+        Lead.observacoes,
+        Lead.observacoes_contacto,
+        Lead.tags,
+    ]
+    closed_conditions = []
+    for field in fields:
+        normalized = normalized_sql_text(field)
+        closed_conditions.extend(normalized.like(f"%{token}%") for token in MAP_INACTIVE_STATE_KEYS)
+    return query.filter(~or_(*closed_conditions))
 
 def is_inactive_lead(lead, today=None):
     today = today or date.today()
@@ -853,10 +1039,13 @@ def scheduled_bucket(lead, today=None):
 def scheduled_leads_context(limit_today=None):
     today = date.today()
     buckets = {"today": [], "overdue": [], "next7": [], "future": []}
-    for lead in Lead.query.order_by(Lead.data_novo_contacto.asc(), Lead.nome_empresa.asc()).all():
+    query = Lead.query
+    for lead in query.order_by(Lead.data_novo_contacto.asc(), Lead.hora_reuniao.asc(), Lead.nome_empresa.asc()).all():
         bucket = scheduled_bucket(lead, today)
         if bucket:
             buckets[bucket].append(lead)
+    for items in buckets.values():
+        items.sort(key=scheduled_sort_key)
     today_items = buckets["today"][:limit_today] if limit_today else buckets["today"]
     return {
         "today": today_items,
@@ -866,6 +1055,78 @@ def scheduled_leads_context(limit_today=None):
         "today_count": len(buckets["today"]),
         "overdue_count": len(buckets["overdue"]),
         "badge_count": len(buckets["today"]) + len(buckets["overdue"]),
+    }
+
+
+def scheduled_badge_count():
+    today = date.today()
+    return (
+        Lead.query.filter(
+            Lead.data_novo_contacto.isnot(None),
+            Lead.data_novo_contacto <= today,
+            Lead.estado.in_(list(SCHEDULED_STATES)),
+        ).count()
+    )
+
+
+def operational_notifications_context(limit=8):
+    today = date.today()
+    if not getattr(current_user, "is_authenticated", False):
+        return {"count": 0, "items": []}
+
+    followups_today = [
+        lead
+        for lead in Lead.query.filter(Lead.data_novo_contacto == today)
+        .order_by(Lead.hora_reuniao.asc(), Lead.nome_empresa.asc())
+        .limit(30)
+        .all()
+        if is_scheduled_lead(lead)
+    ]
+    overdue = [
+        lead
+        for lead in Lead.query.filter(
+            Lead.data_novo_contacto.isnot(None),
+            Lead.data_novo_contacto < today,
+        )
+        .order_by(Lead.data_novo_contacto.asc(), Lead.hora_reuniao.asc(), Lead.nome_empresa.asc())
+        .limit(30)
+        .all()
+        if is_scheduled_lead(lead)
+    ]
+    meetings_today = (
+        Lead.query.filter(Lead.data_reuniao == today)
+        .order_by(Lead.hora_reuniao.asc(), Lead.nome_empresa.asc())
+        .limit(30)
+        .all()
+    )
+
+    items = []
+
+    def lead_name(lead):
+        return lead.nome_cliente or lead.nome_empresa or lead.empresa or "Lead sem nome"
+
+    def push(lead, kind, action, when_label):
+        items.append({
+            "kind": kind,
+            "time": scheduled_time_label(lead) or when_label,
+            "lead": lead_name(lead),
+            "action": action,
+            "url": url_for("mapa_leads", lead_id=lead.id),
+        })
+
+    for lead in followups_today:
+        push(lead, "today", "Follow-up", "Hoje")
+    for lead in meetings_today:
+        push(lead, "meeting", "Reunião", "Hoje")
+    for lead in overdue:
+        days = max(1, (today - lead.data_novo_contacto).days)
+        push(lead, "overdue", "Atrasada", f"{days}d")
+
+    priority = {"overdue": 0, "today": 1, "meeting": 2}
+    items.sort(key=lambda item: (priority.get(item["kind"], 9), item["time"] or "99:99", normalize_lookup(item["lead"])))
+    return {
+        "count": len(followups_today) + len(meetings_today) + len(overdue),
+        "items": items[:limit],
     }
 
 
@@ -935,13 +1196,55 @@ def classify_observations(observacoes="", observacoes_contacto=""):
     return "Por contactar", "", "Sem padrao forte; mantido conservadoramente por contactar."
 
 
-def add_history(lead, action, observation="", commercial=None):
+def current_audit_user_id():
+    if has_request_context() and current_user.is_authenticated:
+        return current_user.id
+    return getattr(AUDIT_CONTEXT, "user_id", None)
+
+
+def infer_action_type(action):
+    value = normalize_lookup(action)
+    if "import" in value:
+        return "import_excel"
+    if "adicion" in value or "criad" in value:
+        return "criacao_lead"
+    if "reuniao" in value or "crm" in value:
+        return "reuniao_marcada"
+    if "reagend" in value or "adiar" in value or "follow" in value:
+        return "followup_reagendado"
+    if "nota" in value:
+        return "nota_adicionada"
+    if "apag" in value or "elimin" in value:
+        return "apagar_lead"
+    if "contact" in value or "atualiz" in value or "corrig" in value or "alterad" in value or "atribuid" in value or "removid" in value:
+        return "edicao_lead"
+    return "atividade"
+
+
+def registar_historico(lead, action, observation="", commercial=None, tipo_acao=None, resultado=None, created_at=None, user_id=None):
     db.session.add(HistoricoLead(
         lead=lead,
+        user_id=current_audit_user_id() if user_id is None else user_id,
         acao=action,
+        tipo_acao=tipo_acao or infer_action_type(action),
         observacao=observation,
+        resultado=resultado or "ok",
         comercial_responsavel=commercial or lead.comercial_responsavel,
+        created_at=created_at or datetime.utcnow(),
     ))
+
+
+def add_history(lead, action, observation="", commercial=None, tipo_acao=None, resultado=None, created_at=None, user_id=None):
+    registar_historico(
+        lead=lead,
+        action=action,
+        observation=observation,
+        commercial=commercial,
+        tipo_acao=tipo_acao,
+        resultado=resultado,
+        created_at=created_at,
+        user_id=user_id,
+    )
 
 
 def read_csv(file_storage):
@@ -1584,13 +1887,13 @@ def validate_and_import_rows(rows, auto_geocode=True, geocode_city_limit=None):
                     f"Lead duplicada encontrada na importação; dados atualizados. Motivo: {reason}.",
                 )
                 if contact_date:
-                    db.session.add(HistoricoLead(
-                        lead=duplicate,
-                        acao="Contacto registado em importacao",
-                        observacao="Data reconstruida a partir das colunas DIA/MES/ANO.",
-                        comercial_responsavel=duplicate.comercial_responsavel,
+                    add_history(
+                        duplicate,
+                        "Contacto registado em importacao",
+                        "Data reconstruida a partir das colunas DIA/MES/ANO.",
                         created_at=datetime.combine(contact_date, datetime.min.time()),
-                    ))
+                        tipo_acao="import_excel",
+                    )
                 db.session.commit()
                 continue
 
@@ -1609,13 +1912,13 @@ def validate_and_import_rows(rows, auto_geocode=True, geocode_city_limit=None):
             print(f"[IMPORT] linha {index}: nova lead criada lead_id={lead.id}", flush=True)
             add_history(lead, "Lead importada", "Lead criada por importacao de ficheiro.")
             if contact_date:
-                db.session.add(HistoricoLead(
-                    lead=lead,
-                    acao="Contacto registado em importacao",
-                    observacao="Data reconstruida a partir das colunas DIA/MES/ANO.",
-                    comercial_responsavel=lead.comercial_responsavel,
+                add_history(
+                    lead,
+                    "Contacto registado em importacao",
+                    "Data reconstruida a partir das colunas DIA/MES/ANO.",
                     created_at=datetime.combine(contact_date, datetime.min.time()),
-                ))
+                    tipo_acao="import_excel",
+                )
             if classificacao:
                 add_history(lead, "Classificacao automatica", f"{classificacao}. {motivo}")
             if geocode_result:
@@ -1924,13 +2227,13 @@ def save_or_update_lead(lead, phone_index=None, fallback_index=None):
         if updated:
             add_history(duplicate, "Lead atualizada por duplicado", "Campos vazios foram preenchidos a partir da importacao.")
         if imported_contact_date:
-            db.session.add(HistoricoLead(
-                lead=duplicate,
-                acao="Contacto registado em importacao",
-                observacao="Data reconstruida a partir das colunas DIA/MES/ANO.",
-                comercial_responsavel=duplicate.comercial_responsavel,
+            add_history(
+                duplicate,
+                "Contacto registado em importacao",
+                "Data reconstruida a partir das colunas DIA/MES/ANO.",
                 created_at=datetime.combine(imported_contact_date, datetime.min.time()),
-            ))
+                tipo_acao="import_excel",
+            )
         return duplicate, False, updated, reason
 
     lead_obj = Lead(**lead)
@@ -1940,13 +2243,13 @@ def save_or_update_lead(lead, phone_index=None, fallback_index=None):
     if lead.get("classificacao_observacao"):
         add_history(lead_obj, "Classificacao automatica", f"{lead.get('classificacao_observacao')}. {lead.get('motivo_classificacao')}")
     if imported_contact_date:
-        db.session.add(HistoricoLead(
-            lead=lead_obj,
-            acao="Contacto registado em importacao",
-            observacao="Data reconstruida a partir das colunas DIA/MES/ANO.",
-            comercial_responsavel=lead_obj.comercial_responsavel,
+        add_history(
+            lead_obj,
+            "Contacto registado em importacao",
+            "Data reconstruida a partir das colunas DIA/MES/ANO.",
             created_at=datetime.combine(imported_contact_date, datetime.min.time()),
-        ))
+            tipo_acao="import_excel",
+        )
     if phone_index is not None and fallback_index is not None:
         index_saved_lead(lead_obj, phone_index, fallback_index)
     return lead_obj, True, False, ""
@@ -2275,22 +2578,58 @@ def import_summary(rows, auto_geocode=True, geocode_city_limit=None, progress=No
 def validate_and_import_rows(rows, auto_geocode=True, geocode_city_limit=None):
     return import_summary(rows, auto_geocode=auto_geocode, geocode_city_limit=geocode_city_limit)
 
+
+def distinct_non_empty(*columns):
+    values = set()
+    for column in columns:
+        rows = db.session.query(column).filter(column.isnot(None), column != "").distinct().all()
+        values.update(clean_text(row[0]) for row in rows if clean_text(row[0]))
+    return sorted(values)
+
+
+def split_distinct_tags(column):
+    tags = set()
+    rows = db.session.query(column).filter(column.isnot(None), column != "").distinct().all()
+    for (value,) in rows:
+        tags.update(tag.strip() for tag in (value or "").split(",") if tag.strip())
+    return sorted(tags)
+
+
 def get_options():
-    leads = Lead.query.all()
-    existing_commercials = sorted({
-        lead.comercial_responsavel
-        for lead in leads
-        if clean_text(lead.comercial_responsavel) and lead.comercial_responsavel != "Outro"
-    })
-    return {
-        "localidades": sorted({lead.cidade or lead.localidade for lead in leads if lead.cidade or lead.localidade}),
-        "tipos": sorted({lead.area_negocio or lead.tipo_cliente for lead in leads if lead.area_negocio or lead.tipo_cliente}),
-        "estados": LEAD_STATES,
+    start = time.perf_counter()
+    existing_commercials = [
+        item
+        for item in distinct_non_empty(Lead.comercial_responsavel)
+        if item != "Outro"
+    ]
+    options = {
+        "localidades": distinct_non_empty(Lead.cidade, Lead.localidade),
+        "tipos": distinct_non_empty(Lead.area_negocio, Lead.tipo_cliente),
+        "estados": distinct_non_empty(Lead.estado) or LEAD_STATES,
         "classificacoes": CLASSIFICATION_FILTERS,
         "comerciais": ["Todos", UNASSIGNED_COMMERCIAL] + existing_commercials,
         "mapa_comerciais": MAP_COMMERCIALS,
-        "tags": sorted(set(TAG_OPTIONS) | {tag for lead in leads for tag in lead.tag_list()}),
-        "insight_tags": sorted(set(INSIGHT_TAG_OPTIONS) | {tag for lead in leads for tag in lead.insight_tag_list()}),
+        "tags": sorted(set(TAG_OPTIONS) | set(split_distinct_tags(Lead.tags))),
+        "insight_tags": sorted(set(INSIGHT_TAG_OPTIONS) | set(split_distinct_tags(Lead.insight_tags))),
+    }
+    print(f"[PERF] get_options {time.perf_counter() - start:.3f}s", flush=True)
+    return options
+
+
+def minimal_map_metrics():
+    start = time.perf_counter()
+    total = db.session.query(db.func.count(Lead.id)).scalar() or 0
+    print(f"[PERF] minimal_map_metrics {time.perf_counter() - start:.3f}s", flush=True)
+    return {
+        "total": total,
+        "active": 0,
+        "meetings": 0,
+        "crm": 0,
+        "postponed_future": 0,
+        "without_commercial": 0,
+        "forgotten": 0,
+        "avg_nearby": 0,
+        "plans": 0,
     }
 
 
@@ -2310,6 +2649,147 @@ def minimal_metrics():
         "avg_nearby": round(sum(nearby_counts) / len(nearby_counts), 1) if nearby_counts else 0,
         "plans": PlanoReunioes.query.count(),
     }
+
+
+def history_matches(entry, tokens):
+    text = normalize_lookup(" ".join([
+        entry.tipo_acao or "",
+        entry.acao or "",
+        entry.resultado or "",
+        entry.observacao or "",
+    ]))
+    return any(token in text for token in tokens)
+
+
+def admin_overview_context():
+    today = date.today()
+    since = datetime.utcnow() - timedelta(days=30)
+    total_leads = Lead.query.count()
+    contacted_leads = Lead.query.filter(Lead.estado != "Por contactar").count()
+    scheduled_leads = Lead.query.filter(
+        (Lead.data_novo_contacto.isnot(None)) | (Lead.data_reuniao.isnot(None))
+    ).count()
+    pending_followups = Lead.query.filter(
+        Lead.data_novo_contacto.isnot(None),
+        Lead.data_novo_contacto <= today,
+    ).count()
+    active_users = User.query.filter_by(ativo=True).count()
+    recent_activity = (
+        HistoricoLead.query.options(joinedload(HistoricoLead.user), joinedload(HistoricoLead.lead))
+        .order_by(HistoricoLead.created_at.desc())
+        .limit(8)
+        .all()
+    )
+    operators = User.query.filter_by(role="comercial", ativo=True).order_by(User.nome.asc()).all()
+    operator_ids = [user.id for user in operators]
+    performance_entries = (
+        HistoricoLead.query.filter(
+            HistoricoLead.user_id.in_(operator_ids) if operator_ids else db.text("0=1"),
+            HistoricoLead.created_at >= since,
+        )
+        .order_by(HistoricoLead.created_at.desc())
+        .all()
+    )
+    entries_by_user = {}
+    for entry in performance_entries:
+        entries_by_user.setdefault(entry.user_id, []).append(entry)
+
+    contact_tokens = ["contactada", "contactado", "contacto", "chamada", "telefonema", "email", "whatsapp", "sem resposta", "nao atendeu"]
+    meeting_tokens = ["reuniao_marcada", "reuniao marcada", "agendada", "marcada reuniao", "reuniao", "crm registado"]
+    followup_tokens = ["followup", "follow-up", "reagendado", "reagendada", "novo contacto", "ligar mais tarde", "adiar contacto"]
+    operator_performance = []
+    for user in operators:
+        entries = entries_by_user.get(user.id, [])
+        contacts = sum(1 for entry in entries if history_matches(entry, contact_tokens))
+        meetings = sum(1 for entry in entries if history_matches(entry, meeting_tokens))
+        followups = sum(1 for entry in entries if history_matches(entry, followup_tokens))
+        conversion_rate = round((meetings / contacts) * 100) if contacts else 0
+        operator_performance.append({
+            "user": user,
+            "total_acoes": len(entries),
+            "contactos": contacts,
+            "reunioes": meetings,
+            "followups": followups,
+            "taxa_concretizacao": conversion_rate,
+            "ultima_atividade": entries[0].created_at if entries else None,
+        })
+    operator_performance.sort(key=lambda item: (item["total_acoes"], item["reunioes"], item["contactos"]), reverse=True)
+    return {
+        "metrics": {
+            "total_leads": total_leads,
+            "contacted_leads": contacted_leads,
+            "scheduled_leads": scheduled_leads,
+            "pending_followups": pending_followups,
+            "active_users": active_users,
+        },
+        "users_by_role": {
+            "admin": User.query.filter_by(role="admin", ativo=True).count(),
+            "comercial": User.query.filter_by(role="comercial", ativo=True).count(),
+        },
+        "operator_performance": operator_performance,
+        "recent_users": User.query.order_by(User.created_at.desc()).limit(5).all(),
+        "recent_activity": recent_activity,
+    }
+
+
+def personal_performance_context(user):
+    today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
+    since_7 = today_start - timedelta(days=6)
+    contact_tokens = ["contactada", "contactado", "contacto", "chamada", "telefonema", "email", "whatsapp", "sem resposta", "nao atendeu"]
+    meeting_tokens = ["reuniao_marcada", "reuniao marcada", "agendada", "marcada reuniao", "reuniao", "crm registado"]
+
+    recent_window = (
+        HistoricoLead.query.options(joinedload(HistoricoLead.lead))
+        .filter(
+            HistoricoLead.user_id == user.id,
+            HistoricoLead.created_at >= since_7,
+        )
+        .order_by(HistoricoLead.created_at.desc())
+        .limit(250)
+        .all()
+    )
+    timeline = (
+        HistoricoLead.query.options(joinedload(HistoricoLead.lead))
+        .filter(HistoricoLead.user_id == user.id)
+        .order_by(HistoricoLead.created_at.desc())
+        .limit(12)
+        .all()
+    )
+    contacts_today = sum(
+        1
+        for entry in recent_window
+        if entry.created_at and entry.created_at >= today_start and history_matches(entry, contact_tokens)
+    )
+    contacts_7 = sum(1 for entry in recent_window if history_matches(entry, contact_tokens))
+    meetings_7 = sum(1 for entry in recent_window if history_matches(entry, meeting_tokens))
+    conversion_rate = round((meetings_7 / contacts_7) * 100) if contacts_7 else 0
+    pending_followups = (
+        db.session.query(Lead.id)
+        .join(HistoricoLead, HistoricoLead.lead_id == Lead.id)
+        .filter(
+            HistoricoLead.user_id == user.id,
+            Lead.data_novo_contacto.isnot(None),
+            Lead.data_novo_contacto <= today,
+            or_(HistoricoLead.tipo_acao == "followup_reagendado", HistoricoLead.acao.ilike("%Adiar%")),
+        )
+        .distinct()
+        .count()
+    )
+
+    return {
+        "metrics": {
+            "contacts_today": contacts_today,
+            "contacts_7": contacts_7,
+            "meetings": meetings_7,
+            "conversion_rate": conversion_rate,
+            "pending_followups": pending_followups,
+            "last_activity": timeline[0].created_at if timeline else None,
+        },
+        "timeline": timeline,
+        "has_history": bool(timeline),
+    }
+
 
 def invalid_location_value(value):
     key = normalize_lookup(value)
@@ -2565,8 +3045,21 @@ def search_leads(query, limit=8):
     term = normalize_lookup(query)
     if not term:
         return []
+    like = f"%{clean_text(query).lower()}%"
     results = []
-    for lead in Lead.query.order_by(Lead.nome_empresa.asc()).all():
+    scope = requested_assignment_scope()
+    lead_query = apply_assignment_scope(Lead.query, scope).filter(or_(
+        db.func.lower(db.func.coalesce(Lead.nome_cliente, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.nome_empresa, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.empresa, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.telefone, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.email, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.cidade, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.localidade, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.tags, "")).like(like),
+        db.func.lower(db.func.coalesce(Lead.insight_tags, "")).like(like),
+    ))
+    for lead in lead_query.order_by(Lead.updated_at.desc(), Lead.nome_empresa.asc()).limit(limit).all():
         haystack = normalize_lookup(" ".join([
             lead.nome_cliente or "",
             lead.nome_empresa or "",
@@ -2574,10 +3067,13 @@ def search_leads(query, limit=8):
             lead.telefone or "",
             lead.cidade or lead.localidade or "",
             lead.email or "",
+            lead.tags or "",
+            lead.insight_tags or "",
             display_commercial(lead.comercial_responsavel),
         ]))
         if term in haystack:
             results.append({
+                "type": "lead",
                 "id": lead.id,
                 "title": lead.nome_cliente or lead.nome_empresa,
                 "subtitle": f"{lead.nome_empresa or lead.empresa or '-'} · {lead.cidade or lead.localidade or '-'}",
@@ -2595,6 +3091,97 @@ def operational_score(lead):
         return int(lead.operational_score())
     except Exception:
         return 0
+
+
+def lightweight_heat_score(lead):
+    score = 35
+    estado = normalize_lookup(lead.estado)
+    if lead.telefone or lead.email:
+        score += 5
+    if not lead.comercial_responsavel or normalize_commercial_key(lead.comercial_responsavel) == "sem_comercial":
+        score += 8
+    if lead.data_novo_contacto:
+        today = date.today()
+        if lead.data_novo_contacto < today:
+            score += 30
+        elif lead.data_novo_contacto == today:
+            score += 18
+        else:
+            score += 8
+    text = normalize_lookup(" ".join(filter(None, [
+        lead.estado,
+        lead.observacoes_contacto,
+        lead.reuniao_info,
+        lead.motivo_classificacao,
+    ])))
+    if any(token in text for token in ["reuniao", "crm", "marcada", "agendado"]):
+        score += 18
+    if any(token in text for token in ["nao atendeu", "sem resposta", "ligar depois", "voltar a contactar"]):
+        score += 10
+    if "sem interesse" in estado:
+        score -= 45
+    if not lead.latitude or not lead.longitude:
+        score -= 5
+    return max(0, min(100, score))
+
+
+def heat_band_from_score(score):
+    if score >= 70:
+        return "hot"
+    if score >= 40:
+        return "warm"
+    return "cold"
+
+
+def heat_label_from_band(band):
+    return {
+        "hot": "🔥 quente",
+        "warm": "🟡 morna",
+        "cold": "⚪ fria",
+    }.get(band, "⚪ fria")
+
+
+def lead_map_payload(lead, include_history=False):
+    heat_score = lightweight_heat_score(lead)
+    heat_band = heat_band_from_score(heat_score)
+    item = {
+        "id": lead.id,
+        "nome_cliente": lead.nome_cliente or lead.nome_empresa,
+        "nome_empresa": lead.nome_empresa,
+        "empresa": lead.empresa or "",
+        "area_negocio": lead.area_negocio or lead.tipo_cliente,
+        "tipo_cliente": lead.tipo_cliente,
+        "cidade": lead.cidade or lead.localidade,
+        "localidade": lead.localidade,
+        "telefone": lead.telefone or lead.contacto or "",
+        "email": lead.email or "",
+        "latitude": lead.latitude,
+        "longitude": lead.longitude,
+        "estado": normalize_legacy_state(lead.estado),
+        "prioridade": lead.prioridade or "",
+        "comercial_responsavel": display_commercial(lead.comercial_responsavel),
+        "comercial_key": normalize_commercial_key(lead.comercial_responsavel),
+        "data_novo_contacto": lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else "",
+        "data_reuniao": lead.data_reuniao.isoformat() if lead.data_reuniao else "",
+        "hora_reuniao": lead.hora_reuniao or "",
+        "tags": lead.tag_list(),
+        "insight_tags": lead.insight_tag_list(),
+        "insight_note": "",
+        "observacoes": "",
+        "observacoes_contacto": "",
+        "score": heat_score,
+        "score_band": heat_band,
+        "heat_score": heat_score,
+        "heat_band": heat_band,
+        "heat_label": heat_label_from_band(heat_band),
+        "ativa": is_active_lead(lead),
+        "agendada": is_scheduled_lead(lead),
+        "agenda_bucket": scheduled_bucket(lead),
+        "tem_coordenadas": lead.latitude is not None and lead.longitude is not None,
+    }
+    if include_history:
+        item["historico"] = [entry.to_dict() for entry in lead.historico]
+    return item
 
 
 def score_to_band(score):
@@ -2778,7 +3365,7 @@ def latest_import_summary():
     }
 
 
-def create_import_job():
+def create_import_job(user_id=None):
     job_id = uuid.uuid4().hex
     now = time.time()
     with IMPORT_JOBS_LOCK:
@@ -2800,6 +3387,7 @@ def create_import_job():
             "eta": "",
             "summary": None,
             "error": "",
+            "user_id": user_id,
             "started_at": now,
             "finished_at": None,
         }
@@ -2842,8 +3430,9 @@ def format_duration(seconds):
     return f"{hours}h {minutes}m"
 
 
-def run_import_job(app, job_id, filename, file_bytes, auto_geocode, sheet_name=None):
+def run_import_job(app, job_id, filename, file_bytes, auto_geocode, sheet_name=None, user_id=None):
     with app.app_context():
+        AUDIT_CONTEXT.user_id = user_id
         update_import_job(job_id, status="running", phase="Preparar ficheiro...", percent=3)
         try:
             print("[IMPORT] INICIO IMPORTACAO", flush=True)
@@ -2887,6 +3476,7 @@ def run_import_job(app, job_id, filename, file_bytes, auto_geocode, sheet_name=N
             update_import_job(job_id, status="error", phase="Erro na importacao", error=str(exc), percent=100, eta="0s")
             print(f"[IMPORT] erro: {exc}", flush=True)
         finally:
+            AUDIT_CONTEXT.user_id = None
             db.session.remove()
             print("[IMPORT] sessao fechada", flush=True)
 
@@ -2895,8 +3485,11 @@ def register_routes(app):
     @app.context_processor
     def inject_sidebar_counts():
         if request.endpoint == "login":
-            return {"scheduled_sidebar_count": 0}
-        return {"scheduled_sidebar_count": scheduled_leads_context()["badge_count"]}
+            return {"scheduled_sidebar_count": 0, "operational_notifications": {"count": 0, "items": []}}
+        return {
+            "scheduled_sidebar_count": scheduled_badge_count(),
+            "operational_notifications": operational_notifications_context(),
+        }
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -2909,7 +3502,9 @@ def register_routes(app):
             if user and user.ativo and user.check_password(password):
                 login_user(user, remember=request.form.get("remember") == "1")
                 next_url = request.args.get("next")
-                return redirect(next_url if is_safe_next_url(next_url) else url_for("dashboard"))
+                if is_safe_next_url(next_url):
+                    return redirect(next_url)
+                return redirect(url_for("admin_overview" if user.role == "admin" else "mapa_leads"))
             flash("Email ou password invalidos.", "error")
         return render_template("login.html")
 
@@ -2920,22 +3515,54 @@ def register_routes(app):
         flash("Sessao terminada com seguranca.", "success")
         return redirect(url_for("login"))
 
+    @app.route("/admin")
+    @login_required
+    @admin_required
+    def admin_overview():
+        return render_template("admin_overview.html", **admin_overview_context())
+
+    @app.route("/admin/users")
+    @login_required
+    @admin_required
+    def admin_users():
+        users = User.query.order_by(User.ativo.desc(), User.role.asc(), User.nome.asc()).all()
+        return render_template("admin_users.html", users=users)
+
+    @app.route("/meu-desempenho")
+    @login_required
+    def meu_desempenho():
+        return render_template("meu_desempenho.html", performance=personal_performance_context(current_user))
+
     @app.route("/")
     @login_required
     def dashboard():
-        return render_template("dashboard.html", **dashboard_context())
+        if current_user.role == "admin":
+            return redirect(url_for("admin_overview"))
+        return redirect(url_for("mapa_leads"))
 
     @app.route("/mapa")
     @login_required
     def mapa_leads():
-        return render_template("mapa.html", options=get_options(), metrics=minimal_metrics())
+        start = time.perf_counter()
+        options = get_options()
+        metrics = minimal_map_metrics()
+        print(f"[PERF] /mapa route {time.perf_counter() - start:.3f}s", flush=True)
+        return render_template(
+            "mapa.html",
+            options=options,
+            metrics=metrics,
+            assignment_scope=requested_assignment_scope(),
+            assignment_scopes=assignment_scope_options(),
+        )
 
     @app.route("/todas-leads")
     @login_required
     def todas_leads():
+        scope = requested_assignment_scope()
+        query = apply_assignment_scope(Lead.query.options(joinedload(Lead.assigned_to), selectinload(Lead.historico)), scope)
         leads = [
             lead
-            for lead in Lead.query.order_by(Lead.nome_empresa.asc()).all()
+            for lead in query.order_by(Lead.nome_empresa.asc()).all()
             if is_active_lead(lead)
         ]
         total = len(leads)
@@ -2966,6 +3593,8 @@ def register_routes(app):
                 "scheduled": scheduled,
             },
             filters={"states": sorted(states), "tags": sorted(tags)},
+            assignment_scope=scope,
+            assignment_scopes=assignment_scope_options(),
         )
 
     @app.route("/agendadas", methods=["GET", "POST"])
@@ -2979,23 +3608,33 @@ def register_routes(app):
                 lead.estado = "Ligar de volta"
                 lead.estado_lead = lead.estado
                 lead.data_novo_contacto = None
+                lead.hora_reuniao = None
                 add_history(lead, "Lead contactada", note or "Follow-up marcado como contactado.")
                 flash("Lead marcada como contactada.", "success")
             elif action == "reagendar":
                 new_date = parse_date(request.form.get("data_novo_contacto"))
+                new_time = parse_time_value(request.form.get("hora_reuniao"))
                 if not new_date:
                     flash("Escolhe uma data valida para reagendar.", "error")
                     return redirect(url_for("agendadas"))
                 lead.estado = "Adiar contacto"
                 lead.estado_lead = lead.estado
                 lead.data_novo_contacto = new_date
+                lead.hora_reuniao = new_time
                 lead.motivo_classificacao = note or "Lead reagendada manualmente."
-                add_history(lead, "Lead reagendada", f"Novo contacto: {new_date}. {note}")
+                time_note = f" às {new_time}" if new_time else ""
+                add_history(lead, "Lead reagendada", f"Novo contacto: {new_date}{time_note}. {note}")
                 flash("Lead reagendada.", "success")
             db.session.commit()
             return redirect(url_for("agendadas"))
 
-        return render_template("agendadas.html", scheduled=scheduled_leads_context(), today=date.today())
+        return render_template(
+            "agendadas.html",
+            scheduled=scheduled_leads_context(),
+            today=date.today(),
+            scheduled_datetime_label=scheduled_datetime_label,
+            scheduled_time_label=scheduled_time_label,
+        )
 
     @app.route("/leads/nova", methods=["GET", "POST"])
     @login_required
@@ -3081,10 +3720,10 @@ def register_routes(app):
             if filename.lower().endswith(".xlsx") and not sheet_name:
                 return jsonify({"error": "Seleciona uma folha antes de importar."}), 400
         auto_geocode = request.form.get("auto_geocode") == "1"
-        job_id = create_import_job()
+        job_id = create_import_job(user_id=current_user.id)
         thread = threading.Thread(
             target=run_import_job,
-            args=(app, job_id, filename, file_bytes, auto_geocode, sheet_name),
+            args=(app, job_id, filename, file_bytes, auto_geocode, sheet_name, current_user.id),
             daemon=True,
         )
         thread.start()
@@ -3299,6 +3938,7 @@ def register_routes(app):
                 lead.estado = "Por contactar"
                 lead.estado_lead = "Por contactar"
                 lead.data_novo_contacto = None
+                lead.hora_reuniao = None
                 lead.classificacao_observacao = "Corrigido manualmente"
                 lead.motivo_classificacao = "Lead reativada manualmente após revisão."
                 add_history(lead, "Lead reativada", "Estado alterado para Por contactar.")
@@ -3312,6 +3952,7 @@ def register_routes(app):
                     lead.motivo_classificacao = f"Estado corrigido manualmente para {new_state}."
                     if new_state != "Adiar contacto":
                         lead.data_novo_contacto = None
+                        lead.hora_reuniao = None
                     add_history(lead, "Estado corrigido manualmente", lead.motivo_classificacao)
                     flash("Estado atualizado.", "success")
                 else:
@@ -3320,8 +3961,10 @@ def register_routes(app):
                 lead.estado = "Adiar contacto"
                 lead.estado_lead = "Adiar contacto"
                 lead.data_novo_contacto = parse_date(request.form.get("data_novo_contacto"))
+                lead.hora_reuniao = parse_time_value(request.form.get("hora_reuniao"))
                 lead.motivo_classificacao = "Contacto adiado manualmente na revisão de inativas."
-                add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}.")
+                time_note = f" às {lead.hora_reuniao}" if lead.hora_reuniao else ""
+                add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}{time_note}.")
                 flash("Contacto adiado.", "success")
             db.session.commit()
             return redirect(url_for("leads_inativas"))
@@ -3419,32 +4062,105 @@ def register_routes(app):
         query = HistoricoLead.query
         if lead_id:
             query = query.filter_by(lead_id=lead_id)
-        entries = query.order_by(HistoricoLead.created_at.desc()).limit(300).all()
+        entries = (
+            query.options(joinedload(HistoricoLead.user), joinedload(HistoricoLead.lead))
+            .order_by(HistoricoLead.created_at.desc())
+            .limit(300)
+            .all()
+        )
         return render_template("historico.html", entries=entries)
 
     @app.route("/api/leads")
     @login_required
     def api_leads():
+        start = time.perf_counter()
         include_history = request.args.get("history") == "1"
-        leads = Lead.query.order_by(Lead.nome_empresa.asc()).all()
-        print(f"[API] /api/leads devolveu {len(leads)} leads reais", flush=True)
+        lite = request.args.get("lite") == "1"
+        scope = requested_assignment_scope()
+        bounds = {
+            key: parse_float_optional(request.args.get(key))
+            for key in ("north", "south", "east", "west")
+        }
+        has_bounds = all(value is not None for value in bounds.values())
+        selected_lead_id = request.args.get("lead_id", type=int)
+        query = apply_assignment_scope(Lead.query, scope)
+        if lite:
+            query = aplicar_filtro_leads_operacionais_mapa(query)
+        if not lite:
+            query = query.options(joinedload(Lead.assigned_to), selectinload(Lead.historico))
+        elif include_history:
+            query = query.options(selectinload(Lead.historico))
+        if has_bounds:
+            spatial_filters = (
+                Lead.latitude.isnot(None),
+                Lead.longitude.isnot(None),
+                Lead.latitude <= bounds["north"],
+                Lead.latitude >= bounds["south"],
+            )
+            if bounds["east"] >= bounds["west"]:
+                longitude_filter = Lead.longitude.between(bounds["west"], bounds["east"])
+            else:
+                longitude_filter = or_(Lead.longitude >= bounds["west"], Lead.longitude <= bounds["east"])
+            spatial_filter = and_(*spatial_filters, longitude_filter)
+            if selected_lead_id:
+                query = query.filter(or_(spatial_filter, Lead.id == selected_lead_id))
+            else:
+                query = query.filter(spatial_filter)
+        leads = query.order_by(Lead.nome_empresa.asc()).all()
+        query_elapsed = time.perf_counter() - start
         payload = []
         for lead in leads:
-            item = lead.to_dict(include_history=include_history)
-            item["estado"] = normalize_legacy_state(item["estado"])
-            item["comercial_responsavel"] = display_commercial(item.get("comercial_responsavel"))
-            item["comercial_key"] = normalize_commercial_key(item.get("comercial_responsavel"))
-            item["ativa"] = is_active_lead(lead)
-            item["agendada"] = is_scheduled_lead(lead)
-            item["agenda_bucket"] = scheduled_bucket(lead)
-            item["tem_coordenadas"] = lead.latitude is not None and lead.longitude is not None
+            if lite:
+                item = lead_map_payload(lead, include_history=include_history)
+            else:
+                item = lead.to_dict(include_history=include_history)
+                item["estado"] = normalize_legacy_state(item["estado"])
+                item["comercial_responsavel"] = display_commercial(item.get("comercial_responsavel"))
+                item["comercial_key"] = normalize_commercial_key(item.get("comercial_responsavel"))
+                item["ativa"] = is_active_lead(lead)
+                item["agendada"] = is_scheduled_lead(lead)
+                item["agenda_bucket"] = scheduled_bucket(lead)
+                item["tem_coordenadas"] = lead.latitude is not None and lead.longitude is not None
             payload.append(item)
+        print(
+            f"[PERF] /api/leads count={len(leads)} bounds={has_bounds} lite={lite} query={query_elapsed:.3f}s total={time.perf_counter() - start:.3f}s",
+            flush=True,
+        )
         return jsonify(payload)
+
+    @app.route("/api/leads/<int:lead_id>/resumo")
+    @login_required
+    def api_lead_resumo(lead_id):
+        lead = Lead.query.get_or_404(lead_id)
+        item = lead_map_payload(lead, include_history=False)
+        item.update({
+            "morada": lead.morada or "",
+            "codigo_postal": lead.codigo_postal or "",
+            "contacto": lead.contacto or "",
+            "categoria": lead.categoria or "",
+            "nif": lead.nif or "",
+            "observacoes": lead.observacoes or "",
+            "observacoes_contacto": lead.observacoes_contacto or "",
+            "reuniao_info": lead.reuniao_info or "",
+            "classificacao_observacao": lead.classificacao_observacao or "",
+            "motivo_classificacao": lead.motivo_classificacao or "",
+            "insight_note": lead.insight_note or "",
+        })
+        # Resumo leve para o drawer: a timeline completa continua fora do payload inicial do mapa.
+        history = (
+            HistoricoLead.query
+            .filter(HistoricoLead.lead_id == lead.id)
+            .order_by(HistoricoLead.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        item["historico"] = [entry.to_dict() for entry in history]
+        return jsonify(item)
 
     @app.route("/api/search")
     @login_required
     def api_search():
-        return jsonify({"results": search_leads(request.args.get("q", ""))})
+        return jsonify({"results": search_leads(request.args.get("q", ""), limit=10)})
 
     @app.route("/api/leads/next")
     @login_required
@@ -3463,13 +4179,28 @@ def register_routes(app):
         data = request.get_json(silent=True) or {}
         ids = [int(value) for value in data.get("ids", []) if str(value).isdigit()]
         action = data.get("action")
-        leads = Lead.query.filter(Lead.id.in_(ids)).all() if ids else []
+        query = Lead.query.filter(Lead.id.in_(ids)) if ids else Lead.query.filter(db.text("0=1"))
+        leads = query.all()
         if not leads:
             return jsonify({"updated": 0})
         for lead in leads:
             if action == "assign_commercial":
                 lead.comercial_responsavel = commercial_label_from_key(data.get("comercial"))
                 add_history(lead, "Comercial atribuído", f"Atribuído em lote a {lead.comercial_responsavel}.")
+            elif action == "assign_user":
+                if current_user.role != "admin":
+                    return jsonify({"error": "Sem permissao para atribuir leads"}), 403
+                assigned_to_id = data.get("assigned_to_id")
+                user = db.session.get(User, int(assigned_to_id)) if str(assigned_to_id or "").isdigit() else None
+                if assigned_to_id and not user:
+                    return jsonify({"error": "Utilizador invalido"}), 400
+                lead.assigned_to = user
+                add_history(
+                    lead,
+                    "Lead atribuida",
+                    f"Atribuida a {user.nome}." if user else "Atribuicao removida.",
+                    tipo_acao="edicao_lead",
+                )
             elif action == "clear_commercial":
                 lead.comercial_responsavel = UNASSIGNED_COMMERCIAL
                 add_history(lead, "Comercial removido", "Comercial removido em lote.")
@@ -3506,8 +4237,10 @@ def register_routes(app):
             lead.estado_lead = "Ligar de volta"
             if action == "contactado":
                 lead.data_novo_contacto = None
+                lead.hora_reuniao = None
             else:
                 lead.data_novo_contacto = parse_date(data.get("data_novo_contacto"))
+                lead.hora_reuniao = parse_time_value(data.get("hora_reuniao"))
             add_history(lead, "Estado alterado", observation or "Lead marcada para ligar de volta.", commercial)
         elif action == "corrigir_estado":
             new_state = clean_text(data.get("estado"))
@@ -3518,27 +4251,45 @@ def register_routes(app):
             lead.motivo_classificacao = observation or f"Estado corrigido manualmente para {new_state}."
             if new_state != "Adiar contacto":
                 lead.data_novo_contacto = None
+                lead.hora_reuniao = None
             add_history(lead, "Estado corrigido manualmente", lead.motivo_classificacao, commercial)
         elif action in {"reuniao", "cliente_existente", "crm"}:
             lead.estado = "Já tratado / no CRM"
             lead.data_reuniao = None
             lead.hora_reuniao = None
-            add_history(lead, "Estado alterado", observation or "Lead já tratada no CRM.", commercial)
+            add_history(lead, "Reunião/CRM registado", observation or "Lead já tratada no CRM.", commercial, tipo_acao="reuniao_marcada")
         elif action == "adiar":
             new_contact_date = parse_date(data.get("data_novo_contacto"))
+            new_contact_time = parse_time_value(data.get("hora_reuniao"))
             if not new_contact_date:
                 return jsonify({"error": "Data de novo contacto obrigatoria"}), 400
             lead.estado = "Adiar contacto"
             lead.estado_lead = "Adiar contacto"
             lead.comercial_responsavel = commercial
             lead.data_novo_contacto = new_contact_date
-            add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}. {observation}", commercial)
+            lead.hora_reuniao = new_contact_time
+            time_note = f" às {new_contact_time}" if new_contact_time else ""
+            add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}{time_note}. {observation}", commercial, tipo_acao="followup_reagendado")
         elif action == "sem_interesse":
             lead.estado = "Sem interesse"
             add_history(lead, "Estado alterado", observation or "Lead marcada sem interesse.", commercial)
         elif action == "atribuir":
             lead.comercial_responsavel = commercial
             add_history(lead, "Comercial atribuido", observation, commercial)
+        elif action == "assign_user":
+            if current_user.role != "admin":
+                return jsonify({"error": "Sem permissao para atribuir leads"}), 403
+            assigned_to_id = data.get("assigned_to_id")
+            user = db.session.get(User, int(assigned_to_id)) if str(assigned_to_id or "").isdigit() else None
+            if assigned_to_id and not user:
+                return jsonify({"error": "Utilizador invalido"}), 400
+            lead.assigned_to = user
+            add_history(
+                lead,
+                "Lead atribuida",
+                f"Atribuida a {user.nome}." if user else "Atribuicao removida.",
+                tipo_acao="edicao_lead",
+            )
         elif action == "add_note":
             if not observation:
                 return jsonify({"error": "Nota vazia"}), 400

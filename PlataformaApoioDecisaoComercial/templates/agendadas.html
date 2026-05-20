@@ -17,14 +17,14 @@
 {% set next_action = "Contactar hoje" if tone == "today" else ("Retomar contacto" if tone == "overdue" else "Preparar follow-up") %}
 {% set tags = lead.tag_list() %}
 {% set insight_tags = lead.insight_tag_list() %}
-<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}">
+<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}" data-lead-card="{{ lead.id }}" data-lead-drawer="{{ lead.id }}">
     <div class="scheduled-lead-card__top">
         <div class="scheduled-avatar" aria-hidden="true">{{ name[:1]|upper }}</div>
         <div class="scheduled-lead-card__identity">
             <strong>{{ name }}</strong>
             <span>{{ lead.empresa or lead.nome_empresa or "Sem empresa" }}</span>
         </div>
-        <span class="scheduled-date-pill">{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-" }}</span>
+        <span class="scheduled-date-pill">{{ scheduled_datetime_label(lead) }}</span>
         <button class="link-button scheduled-info-toggle" type="button" aria-expanded="false">+ Info</button>
     </div>
 
@@ -84,12 +84,12 @@
                         <dd>{{ lead.cidade or lead.localidade or "-" }}{% if lead.codigo_postal %} &middot; {{ lead.codigo_postal }}{% endif %}</dd>
                     </div>
                     <div class="scheduled-info-field">
-                        <dt>Comercial</dt>
-                        <dd>{{ lead.comercial_responsavel or "Sem comercial" }}</dd>
+                        <dt>Operação</dt>
+                        <dd>{{ lead.comercial_responsavel or "Sem operação" }}</dd>
                     </div>
                     <div class="scheduled-info-field">
                         <dt>Estado atual</dt>
-                        <dd>{{ lead.estado or "-" }}</dd>
+                        <dd data-card-state>{{ lead.estado or "-" }}</dd>
                     </div>
                     <div class="scheduled-info-field">
                         <dt>Ultima interacao</dt>
@@ -101,7 +101,7 @@
                     </div>
                     <div class="scheduled-info-field">
                         <dt>Data agendada</dt>
-                        <dd>{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-" }}</dd>
+                        <dd data-card-schedule>{{ scheduled_datetime_label(lead) }}</dd>
                     </div>
                 </dl>
             </section>
@@ -111,7 +111,7 @@
                 <div class="scheduled-insight-stack">
                     <div class="scheduled-info-field scheduled-info-field--wide">
                         <dt>Notas rapidas</dt>
-                        <dd>{{ lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.classificacao_observacao or "-" }}</dd>
+                        <dd data-card-notes>{{ lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.classificacao_observacao or "-" }}</dd>
                     </div>
                     <div class="scheduled-info-field scheduled-info-field--wide">
                         <dt>Insights internos</dt>
@@ -119,7 +119,7 @@
                     </div>
                     <div class="scheduled-info-field scheduled-info-field--wide">
                         <dt>Tags</dt>
-                        <dd class="scheduled-info-chips">
+                        <dd class="scheduled-info-chips" data-card-tags>
                             {% for insight in insight_tags %}
                                 <span class="scheduled-info-chip">{{ insight }}</span>
                             {% endfor %}
@@ -136,20 +136,27 @@
 
             <section class="scheduled-info-section scheduled-info-section--actions">
                 <h3>A&ccedil;&otilde;es</h3>
-                <div class="scheduled-info-actions">
-                    <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir no mapa</a>
-                    <form method="post">
-                        <input type="hidden" name="lead_id" value="{{ lead.id }}">
-                        <input type="hidden" name="action" value="contactada">
-                        <button class="link-button" type="submit">Contactada</button>
-                    </form>
-                    <form method="post" class="scheduled-reschedule-form">
-                        <input type="hidden" name="lead_id" value="{{ lead.id }}">
-                        <input type="hidden" name="action" value="reagendar">
-                        <input type="date" name="data_novo_contacto" value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else today.isoformat() }}" required>
-                        <button class="link-button" type="submit">Reagendar</button>
-                    </form>
-                    <a class="link-button" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir lead completa</a>
+                <div class="scheduled-quick-actions" data-lead-id="{{ lead.id }}">
+                    <button class="quick-action-button" type="button" data-quick-action="contactado">Contactada</button>
+                    <label class="quick-date">
+                        <span>Nova data</span>
+                        <input type="date" data-quick-date value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else today.isoformat() }}">
+                    </label>
+                    <label class="quick-date quick-time">
+                        <span>Hora</span>
+                        <input type="time" data-quick-time value="{{ scheduled_time_label(lead) }}">
+                    </label>
+                    <button class="quick-action-button" type="button" data-quick-action="adiar">Reagendar</button>
+                    <button class="quick-action-button" type="button" data-quick-action="reuniao">Marcar reuni&atilde;o</button>
+                    <a class="quick-action-button quick-action-button--link" href="{{ url_for('mapa_leads', lead_id=lead.id) }}">Abrir mapa</a>
+                    <a class="quick-action-button quick-action-button--link" href="{{ url_for('mapa_leads', lead_id=lead.id, history='1') }}">Abrir lead completa</a>
+                    <textarea class="quick-note-input" data-quick-note rows="2" placeholder="Adicionar nota r&aacute;pida"></textarea>
+                    <button class="quick-action-button" type="button" data-quick-action="add_note">Guardar nota</button>
+                    <div class="quick-temperature-actions" aria-label="Temperatura da lead">
+                        <button class="quick-action-button quick-action-button--hot" type="button" data-quick-action="tag_quente">Quente</button>
+                        <button class="quick-action-button quick-action-button--cold" type="button" data-quick-action="tag_frio">Fria</button>
+                    </div>
+                    <small class="quick-action-status" data-quick-status aria-live="polite"></small>
                 </div>
             </section>
         </div>
@@ -159,18 +166,19 @@
             "nome_cliente": name,
             "empresa": lead.empresa or lead.nome_empresa or "-",
             "cidade": lead.cidade or lead.localidade or "-",
-            "comercial": lead.comercial_responsavel or "Sem comercial",
+            "comercial": lead.comercial_responsavel or "Sem operação",
             "telefone": lead.telefone or lead.contacto or "-",
             "email": lead.email or "-",
             "estado": lead.estado or "-",
-            "data_agendamento": lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else "-",
+            "data_agendamento": scheduled_datetime_label(lead),
             "notas": lead.motivo_classificacao or lead.observacoes_contacto or lead.observacoes or lead.classificacao_observacao or "-",
             "tags": lead.tag_list(),
             "insights": lead.insight_tag_list(),
             "insight_note": lead.insight_note or "",
             "ultima_interacao": ((latest.created_at.strftime("%d/%m/%Y") ~ " · " ~ latest.acao) if latest else "Sem histórico"),
             "proxima_acao": next_action,
-            "lead_url": url_for("mapa_leads", lead_id=lead.id)
+            "lead_url": url_for("mapa_leads", lead_id=lead.id),
+            "lead_id": lead.id
         }|tojson }}
     </script>
 </article>
@@ -199,7 +207,7 @@
 <main class="page-shell scheduled-page">
     <section class="scheduled-hero-v2">
         <div class="scheduled-hero-v2__copy">
-            <p class="eyebrow">Operação comercial</p>
+            <p class="eyebrow">Operação</p>
             <h1>Leads agendadas</h1>
             <p>Follow-ups, contactos adiados e oportunidades a retomar no momento certo.</p>
         </div>
@@ -283,7 +291,7 @@
             ${field("Nome cliente", data.nome_cliente)}
             ${field("Empresa", data.empresa)}
             ${field("Cidade/localidade", data.cidade)}
-            ${field("Comercial", data.comercial)}
+            ${field("Operação", data.comercial)}
             ${field("Telefone", data.telefone)}
             ${field("Email", data.email)}
             ${field("Estado atual", data.estado)}
@@ -304,6 +312,124 @@
             </div>
         </dl>
     `;
+
+    const setStatus = (card, message, type = "info") => {
+        const status = card?.querySelector("[data-quick-status]");
+        if (!status) return;
+        status.textContent = message || "";
+        status.dataset.type = type;
+        if (message) window.setTimeout(() => {
+            if (status.textContent === message) status.textContent = "";
+        }, 2600);
+    };
+
+    const removeCard = (card) => {
+        card.classList.add("scheduled-lead-card--done");
+        window.setTimeout(() => {
+            const sectionBody = card.closest(".scheduled-section-card__body");
+            card.remove();
+            if (sectionBody && !sectionBody.querySelector(".scheduled-lead-card")) {
+                sectionBody.innerHTML = `<div class="scheduled-empty"><strong>Sem leads nesta fila.</strong><span>Atualizado sem recarregar a página.</span></div>`;
+            }
+        }, 220);
+    };
+
+    const formatSchedule = (dateValue, timeValue = "") => {
+        if (!dateValue) return "-";
+        const date = new Date(`${dateValue}T00:00:00`);
+        const dateText = Number.isNaN(date.getTime()) ? dateValue : date.toLocaleDateString("pt-PT");
+        return timeValue ? `${dateText} às ${timeValue}` : dateText;
+    };
+
+    const updateCardSchedule = (card, dateValue, timeValue = "") => {
+        const pill = card?.querySelector(".scheduled-date-pill");
+        if (!pill || !dateValue) return;
+        const schedule = formatSchedule(dateValue, timeValue);
+        pill.textContent = schedule;
+        const scheduleField = card.querySelector("[data-card-schedule]");
+        if (scheduleField) scheduleField.textContent = schedule;
+        card.classList.add("scheduled-lead-card--updated");
+        window.setTimeout(() => card.classList.remove("scheduled-lead-card--updated"), 650);
+    };
+
+    const updateCardFromLead = (card, lead) => {
+        if (!card || !lead) return;
+        const state = card.querySelector("[data-card-state]");
+        const notes = card.querySelector("[data-card-notes]");
+        const tags = card.querySelector("[data-card-tags]");
+        if (state) state.textContent = lead.estado || "-";
+        if (notes) {
+            const latest = Array.isArray(lead.historico) ? lead.historico[0] : null;
+            notes.textContent = latest?.resultado || latest?.acao || lead.motivo_classificacao || lead.observacoes_contacto || lead.observacoes || "-";
+        }
+        if (tags) {
+            tags.innerHTML = `${chips(lead.insight_tags, "Sem insights")}${chips(lead.tags, "Sem tags")}`;
+        }
+        card.classList.add("scheduled-lead-card--updated");
+        window.setTimeout(() => card.classList.remove("scheduled-lead-card--updated"), 650);
+    };
+
+    const quickPayload = (card, action) => {
+        const note = card.querySelector("[data-quick-note]")?.value?.trim() || "";
+        const dateValue = card.querySelector("[data-quick-date]")?.value || "";
+        const timeValue = card.querySelector("[data-quick-time]")?.value || "";
+        if (action === "contactado") return { action: "contactado", observacao: note || "Lead contactada no accordion." };
+        if (action === "adiar") return { action: "adiar", data_novo_contacto: dateValue, hora_reuniao: timeValue, observacao: note || "Follow-up reagendado no accordion." };
+        if (action === "reuniao") return { action: "reuniao", observacao: note || "Reuniao marcada no accordion." };
+        if (action === "add_note") return { action: "add_note", observacao: note };
+        if (action === "tag_quente") return { action: "add_tag", tag: "Quente", observacao: "Lead marcada como quente." };
+        if (action === "tag_frio") return { action: "add_tag", tag: "Frio", observacao: "Lead marcada como fria." };
+        return { action };
+    };
+
+    const runQuickAction = async (button) => {
+        const card = button.closest(".scheduled-lead-card");
+        const wrap = button.closest("[data-lead-id]");
+        const leadId = wrap?.dataset.leadId;
+        const action = button.dataset.quickAction;
+        if (!card || !leadId || !action) return;
+        const payload = quickPayload(card, action);
+        if (action === "add_note" && !payload.observacao) {
+            setStatus(card, "Escreve uma nota primeiro.", "warning");
+            return;
+        }
+        if (action === "adiar" && !payload.data_novo_contacto) {
+            setStatus(card, "Escolhe uma nova data.", "warning");
+            return;
+        }
+        button.disabled = true;
+        card.classList.add("is-saving");
+        setStatus(card, "A guardar...");
+        try {
+            const response = await fetch(`/api/leads/${leadId}/action`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!response.ok) throw new Error("Erro ao guardar");
+            const updatedLead = await response.json();
+            if (action === "adiar") {
+                updateCardSchedule(card, payload.data_novo_contacto, payload.hora_reuniao);
+                updateCardFromLead(card, updatedLead);
+                setStatus(card, "Follow-up reagendado.", "success");
+            } else if (["contactado", "reuniao"].includes(action)) {
+                setStatus(card, "Atualizado.", "success");
+                removeCard(card);
+            } else {
+                if (action === "add_note") {
+                    const note = card.querySelector("[data-quick-note]");
+                    if (note) note.value = "";
+                }
+                updateCardFromLead(card, updatedLead);
+                setStatus(card, action.startsWith("tag_") ? "Temperatura atualizada." : "Nota guardada.", "success");
+            }
+        } catch (error) {
+            setStatus(card, "Não foi possível guardar.", "error");
+        } finally {
+            button.disabled = false;
+            card.classList.remove("is-saving");
+        }
+    };
 
     const closeCard = (card) => {
         const panel = card?.querySelector(".scheduled-info-panel");
@@ -340,6 +466,11 @@
     };
 
     document.addEventListener("click", (event) => {
+        const quickButton = event.target.closest("[data-quick-action]");
+        if (quickButton) {
+            runQuickAction(quickButton);
+            return;
+        }
         const button = event.target.closest(".scheduled-info-toggle");
         if (!button) return;
         const card = button.closest(".scheduled-lead-card");

@@ -1,10 +1,13 @@
-# TODO - Popup premium de clusters (Alltera)
+# TODO - Drawer de filtros do mapa (UX)
 
-- [ ] Atualizar `PlataformaApoioDecisaoComercial/static/js/mapa.js`: substituir `clusterPopupHtml(cluster)` pela versão pretendida (lista compacta, apenas nome, todas as leads, fallback “Lead sem nome”, sem cards vazios).
-- [ ] Atualizar `PlataformaApoioDecisaoComercial/static/css/styles.css`: adicionar/ajustar CSS para `cluster-popup`, `cluster-leads-list`, `cluster-lead-item`, `cluster-popup__footer`, `cluster-expand-button` e overrides Leaflet (scroll correto + footer fixo no fundo).
-- [ ] Validar rapidamente no browser: abrir popup de cluster com múltiplas leads e confirmar que:
-  - nomes aparecem (e fallback quando falta);
-  - nunca aparece card/campos vazios;
-  - lista tem scroll vertical;
-  - botão “Expandir área” fica no fundo e o popup não cresce descontroladamente.
+## Passos
+- [ ] Atualizar `templates/mapa.html`: criar `.map-filters-trigger`, `.map-filters-overlay`, `.map-filters-panel` e mover o conteúdo de `.map-toolbar` para o painel.
+- [ ] Atualizar `static/css/styles.css`: adicionar estilos do drawer (overlay, painel, trigger, responsivo, sem blur pesado).
+- [ ] Atualizar `static/js/mapa.js`: adicionar lógica mínima de open/close (toggle da classe `.open`, ESC e clique fora) sem tocar na lógica dos filtros.
+- [ ] Validar manualmente:
+  - [ ] /mapa abre sem toolbar visível
+  - [ ] abrir/fechar filtros funciona
+  - [ ] resetFilters funciona
+  - [ ] aplicação de filtros continua
+  - [ ] mobile usável
 

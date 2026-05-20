@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Utilizadores | Alltera{% endblock %}
+{% block header_title %}Utilizadores{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-users-page {
+        display: grid;
+        gap: 20px;
+    }
+
+    .users-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+    }
+
+    .users-header h1 {
+        margin: 0;
+        letter-spacing: 0;
+    }
+
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .users-table th,
+    .users-table td {
+        text-align: left;
+        padding: 14px 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        vertical-align: middle;
+    }
+
+    .users-table th {
+        color: #64748b;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+    }
+
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(20, 184, 166, 0.12);
+        color: #0f766e;
+        font-weight: 800;
+        font-size: 0.78rem;
+    }
+
+    .status-pill--off {
+        background: rgba(148, 163, 184, 0.14);
+        color: #64748b;
+    }
+
+    @media (max-width: 760px) {
+        .users-table {
+            display: block;
+            overflow-x: auto;
+        }
+        .users-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="page-shell admin-users-page">
+    <section class="panel users-header">
+        <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Utilizadores</h1>
+            <p>Listagem simples da equipa interna. Edicao de utilizadores fica preparada para uma proxima fase.</p>
+        </div>
+        <a class="button secondary" href="{{ url_for('admin_overview') }}">Voltar ao overview</a>
+    </section>
+
+    <section class="panel">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>Perfil</th>
+                    <th>Estado</th>
+                    <th>Criado em</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td><strong>{{ user.nome }}</strong></td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ "Rececionista" if user.role == "comercial" else "Admin" }}</td>
+                    <td>
+                        <span class="status-pill {% if not user.ativo %}status-pill--off{% endif %}">
+                            {{ "Ativo" if user.ativo else "Inativo" }}
+                        </span>
+                    </td>
+                    <td>{{ user.created_at.strftime("%d/%m/%Y") if user.created_at else "-" }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">Ainda nao existem utilizadores.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+{% endblock %}

@@ -7,7 +7,7 @@
 <main class="page-shell all-leads-page">
     <section class="panel all-leads-hero">
         <div>
-            <p class="eyebrow">Operação comercial</p>
+            <p class="eyebrow">Operação</p>
             <h1>Todas as Leads</h1>
             <p>Consulta de leads ativas com pesquisa rápida, filtros e ações operacionais.</p>
         </div>
@@ -21,6 +21,15 @@
     </section>
 
     <section class="panel all-leads-toolbar">
+        <form method="get" class="assignment-scope-form">
+            <label>Fila
+                <select name="scope" onchange="this.form.submit()">
+                    {% for item in assignment_scopes %}
+                    <option value="{{ item.value }}" {% if item.value == assignment_scope %}selected{% endif %}>{{ item.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </form>
         <label>Pesquisar
             <input id="allLeadsSearch" type="search" placeholder="Nome, empresa, cidade, telefone">
         </label>
@@ -30,6 +39,16 @@
                 {% for state in filters.states %}<option value="{{ state }}">{{ state }}</option>{% endfor %}
             </select>
         </label>
+        {% if current_user.role == "admin" %}
+        <label>Prioridade
+            <select id="allLeadsHeat">
+                <option value="">Todas</option>
+                <option value="hot">🔥 Quentes</option>
+                <option value="warm">🟡 Mornas</option>
+                <option value="cold">⚪ Frias</option>
+            </select>
+        </label>
+        {% endif %}
         <label>Tag
             <select id="allLeadsTag">
                 <option value="">Todas</option>
@@ -49,7 +68,7 @@
                 <option value="score_desc">Score mais alto</option>
                 <option value="next_contact">Novo contacto primeiro</option>
                 <option value="no_coords">Sem localização primeiro</option>
-                <option value="commercial">Comercial</option>
+                <option value="commercial">Operação</option>
                 <option value="city">Cidade</option>
                 <option value="name">Nome A-Z</option>
             </select>
@@ -70,6 +89,7 @@
         table: document.getElementById("allLeadsTable"),
         search: document.getElementById("allLeadsSearch"),
         state: document.getElementById("allLeadsState"),
+        heat: document.getElementById("allLeadsHeat"),
         tag: document.getElementById("allLeadsTag"),
         coords: document.getElementById("allLeadsCoords"),
         sort: document.getElementById("allLeadsSort"),
@@ -82,6 +102,10 @@
         if (!value) return "";
         const date = new Date(`${value}T00:00:00`);
         return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("pt-PT");
+    };
+    const formatSchedule = (date, time) => {
+        const dateText = formatDate(date);
+        return dateText && time ? `${dateText} às ${time}` : dateText;
     };
     const leadNotes = (lead) => String(
         lead.observacoes ||
@@ -96,10 +120,18 @@
     const contactNotes = (lead) => String(lead.observacoes_contacto || "").trim();
     const generalNotes = (lead) => String(lead.observacoes || "").trim();
     const leadScore = (lead) => Number(lead.score || 0);
+    const heatBand = (lead) => lead.heat_band || (leadScore(lead) >= 70 ? "hot" : leadScore(lead) >= 40 ? "warm" : "cold");
+    const heatLabel = (lead) => lead.heat_label || (heatBand(lead) === "hot" ? "🔥 quente" : heatBand(lead) === "warm" ? "🟡 morna" : "⚪ fria");
     const dateValue = (value, fallback = Number.MAX_SAFE_INTEGER) => {
         if (!value) return fallback;
         const time = new Date(`${value}T00:00:00`).getTime();
         return Number.isNaN(time) ? fallback : time;
+    };
+    const scheduleValue = (lead, fallback = Number.MAX_SAFE_INTEGER) => {
+        if (!lead.data_novo_contacto) return fallback;
+        const time = lead.hora_reuniao || "23:59";
+        const value = new Date(`${lead.data_novo_contacto}T${time}:00`).getTime();
+        return Number.isNaN(value) ? fallback : value;
     };
     const byText = (getter) => (a, b) => norm(getter(a)).localeCompare(norm(getter(b)), "pt");
 
@@ -110,6 +142,7 @@
             if (!hay.includes(q)) return false;
         }
         if (els.state.value && lead.estado !== els.state.value) return false;
+        if (els.heat?.value && heatBand(lead) !== els.heat.value) return false;
         if (els.tag.value && !(lead.tags || []).includes(els.tag.value)) return false;
         if (els.coords.value === "with" && !lead.tem_coordenadas) return false;
         if (els.coords.value === "without" && lead.tem_coordenadas) return false;
@@ -131,7 +164,7 @@
         const comparators = {
             important: (a, b) => importance(b) - importance(a) || tie(a, b),
             score_desc: (a, b) => leadScore(b) - leadScore(a) || tie(a, b),
-            next_contact: (a, b) => dateValue(a.data_novo_contacto) - dateValue(b.data_novo_contacto) || leadScore(b) - leadScore(a),
+            next_contact: (a, b) => scheduleValue(a) - scheduleValue(b) || leadScore(b) - leadScore(a),
             no_coords: (a, b) => Number(a.tem_coordenadas) - Number(b.tem_coordenadas) || leadScore(b) - leadScore(a),
             commercial: byText((lead) => lead.comercial_responsavel || "Sem comercial"),
             city: byText((lead) => lead.cidade || lead.localidade || "Sem cidade"),
@@ -144,8 +177,8 @@
         return `
             <div class="all-leads-details">
                 ${field("Area", lead.area_negocio || lead.tipo_cliente)}
-                ${field("Comercial", lead.comercial_responsavel)}
-                ${field("Novo contacto", formatDate(lead.data_novo_contacto))}
+                ${field("Operação", lead.comercial_responsavel)}
+                ${field("Novo contacto", formatSchedule(lead.data_novo_contacto, lead.hora_reuniao))}
             </div>
         `;
     }
@@ -208,6 +241,12 @@
                 inputType: "date",
             });
             if (!when) return;
+            const hour = await askPrompt("Hora do follow-up (opcional):", {
+                title: action === "ligar_volta" ? "Hora para ligar" : "Hora do follow-up",
+                defaultValue: lead.hora_reuniao || "",
+                inputType: "time",
+            });
+            if (hour === null) return;
             const observation = await askPrompt("Motivo/observação:", {
                 title: action === "ligar_volta" ? "Ligar de volta" : "Reagendar contacto",
                 defaultValue: action === "ligar_volta" ? "Ligar de volta" : "Ligar mais tarde",
@@ -215,6 +254,7 @@
             if (observation === null) return;
             payload.action = action === "ligar_volta" ? "ligar_volta" : "adiar";
             payload.data_novo_contacto = when;
+            payload.hora_reuniao = hour || "";
             payload.observacao = observation || "";
         } else if (action === "crm" || action === "sem_interesse") {
             const message = action === "crm"
@@ -255,7 +295,7 @@
         const previousScroll = els.table.scrollTop;
         const rows = sortedRows(allLeads.filter(matches));
         els.table.innerHTML = rows.map((lead) => `
-            <article class="all-leads-row">
+            <article class="all-leads-row" data-lead-drawer="${lead.id}">
                 <div class="all-leads-main">
                     <strong>${leadName(lead)}</strong>
                     <p>${lead.nome_empresa || "Sem empresa"} · ${lead.cidade || lead.localidade || "Sem cidade"} · ${lead.telefone || "Sem telefone"}</p>
@@ -265,7 +305,7 @@
                 </div>
                 <div class="all-leads-badges">
                     ${badge(lead.tem_coordenadas ? "Com localização" : "Sem localização", lead.tem_coordenadas ? "tag--ok" : "tag--warn")}
-                    ${badge(`Score ${leadScore(lead)}`, leadScore(lead) >= 70 ? "tag--ok" : leadScore(lead) >= 40 ? "tag--info" : "tag--soft")}
+                    <span class="priority-badge priority-badge--${heatBand(lead)}">${heatLabel(lead)} · ${leadScore(lead)}/100</span>
                     ${lead.agendada ? badge("Agendada", "tag--info") : ""}
                     ${lead.estado === "Por contactar" ? badge("Por contactar", "tag--soft") : ""}
                     ${lead.prioridade ? badge(lead.prioridade, "tag--soft") : ""}
@@ -302,8 +342,8 @@
         });
     });
 
-    [els.search, els.state, els.tag, els.coords, els.sort].forEach((el) => el?.addEventListener("input", render));
-    [els.state, els.tag, els.coords, els.sort].forEach((el) => el?.addEventListener("change", render));
+    [els.search, els.state, els.heat, els.tag, els.coords, els.sort].forEach((el) => el?.addEventListener("input", render));
+    [els.state, els.heat, els.tag, els.coords, els.sort].forEach((el) => el?.addEventListener("change", render));
     render();
 })();
 </script>

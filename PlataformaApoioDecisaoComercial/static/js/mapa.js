@@ -34,6 +34,9 @@ let leadListMode = "visible";
 let currentRouteDay = [];
 let markersRenderKey = "";
 let heatmapScriptPromise = null;
+let leadFetchController = null;
+let leadSummaryController = null;
+let lastLeadFetchKey = "";
 const LEAD_LIST_RENDER_LIMIT = 160;
 
 document.body.classList.add("map-performance-mode");
@@ -45,6 +48,7 @@ const map = L.map("map", {
     wheelPxPerZoomLevel: 90,
     closePopupOnClick: false,
 }).setView(defaultCenter, 7);
+map.getContainer().setAttribute("tabindex", "0");
 function applyMapTiles() {
     if (baseLayer) baseLayer.remove();
     baseLayer = L.tileLayer(
@@ -58,8 +62,10 @@ const els = {
     searchInput: document.getElementById("searchInput"),
     localityFilter: document.getElementById("localityFilter"),
     typeFilter: document.getElementById("typeFilter"),
+    assignmentScopeFilter: document.getElementById("assignmentScopeFilter"),
     commercialFilter: document.getElementById("commercialFilter"),
     stateFilter: document.getElementById("stateFilter"),
+    heatFilter: document.getElementById("heatFilter"),
     classificationFilter: document.getElementById("classificationFilter"),
     scheduleFilter: document.getElementById("scheduleFilter"),
     tagFilter: document.getElementById("tagFilter"),
@@ -119,6 +125,8 @@ const els = {
     mapLoading: document.getElementById("mapLoading"),
     leadListTabVisible: document.getElementById("leadListTabVisible"),
     leadListTabAll: document.getElementById("leadListTabAll"),
+    openFullLead: document.getElementById("openFullLead"),
+    focusSelectedLead: document.getElementById("focusSelectedLead"),
 };
 
 if (els.planDate) els.planDate.value = todayIso;
@@ -197,10 +205,7 @@ function leadScore(lead) {
 }
 
 function scoreBand(lead) {
-    const score = leadScore(lead);
-    if (score >= 70) return "high";
-    if (score >= 40) return "medium";
-    return "low";
+    return lead.heat_band || (leadScore(lead) >= 70 ? "hot" : leadScore(lead) >= 40 ? "warm" : "cold");
 }
 
 function scoreLabel(lead) {
@@ -208,10 +213,7 @@ function scoreLabel(lead) {
 }
 
 function priorityLabel(lead) {
-    const score = leadScore(lead);
-    if (score >= 70) return "Alta prioridade";
-    if (score >= 40) return "Media prioridade";
-    return "Baixa prioridade";
+    return lead.heat_label || (scoreBand(lead) === "hot" ? "🔥 quente" : scoreBand(lead) === "warm" ? "🟡 morna" : "⚪ fria");
 }
 
 function commercialSuggestion(lead) {
@@ -366,12 +368,37 @@ function insightSummary(lead) {
 }
 
 function setDrawerOpen(open) {
-    if (els.leadDrawer) els.leadDrawer.classList.toggle("drawer-open", open);
+    if (els.leadDrawer) {
+        els.leadDrawer.classList.toggle("open", open);
+        els.leadDrawer.classList.toggle("drawer-open", open);
+        els.leadDrawer.setAttribute("aria-hidden", String(!open));
+    }
     document.body.classList.toggle("map-drawer-open", open);
+    if (open) requestAnimationFrame(() => els.drawerClose?.focus({ preventScroll: true }));
+}
+
+async function loadLeadSummary(leadId) {
+    if (!leadId) return;
+    if (leadSummaryController) leadSummaryController.abort();
+    leadSummaryController = new AbortController();
+    try {
+        const response = await fetch(`/api/leads/${leadId}/resumo`, { signal: leadSummaryController.signal });
+        if (!response.ok) return;
+        const summary = await response.json();
+        if (!selectedLead || selectedLead.id !== leadId) return;
+        selectedLead = { ...selectedLead, ...summary };
+        leadsById.set(leadId, selectedLead);
+        allLeads = allLeads.map((lead) => (lead.id === leadId ? selectedLead : lead));
+        visibleLeads = visibleLeads.map((lead) => (lead.id === leadId ? selectedLead : lead));
+        renderDetails();
+        renderMapMiniCard();
+    } catch (error) {
+        if (error.name !== "AbortError") console.warn("Resumo da lead indisponível", error);
+    }
 }
 
 function markerIcon(lead) {
-    const classes = ["marker-pin", markerVisualClass(lead)];
+    const classes = ["marker-pin", markerVisualClass(lead), `marker-pin--heat-${scoreBand(lead)}`];
     const isNearby = nearbyLeadIds.has(lead.id);
     if (!isActive(lead)) classes.push("inactive");
     if (selectedLead && lead.id === selectedLead.id) classes.push("selected");
@@ -477,6 +504,7 @@ function passesFilters(lead) {
         (!els.typeFilter?.value || leadArea(lead) === els.typeFilter.value) &&
         (!selectedCommercial || leadCommercialKey(lead) === selectedCommercial) &&
         (!els.stateFilter?.value || lead.estado === els.stateFilter.value) &&
+        (!els.heatFilter?.value || scoreBand(lead) === els.heatFilter.value) &&
         passesScheduleFilter(lead) &&
         (!els.tagFilter?.value || (lead.tags || []).includes(els.tagFilter.value)) &&
         (!els.insightFilter?.value || leadInsights(lead).includes(els.insightFilter.value))
@@ -515,6 +543,17 @@ function debounce(fn, delay = 200) {
     return (...args) => {
         window.clearTimeout(timer);
         timer = window.setTimeout(() => fn(...args), delay);
+    };
+}
+
+function currentBoundsParams() {
+    const bounds = map.getBounds();
+    if (!bounds?.isValid?.()) return {};
+    return {
+        north: bounds.getNorth().toFixed(6),
+        south: bounds.getSouth().toFixed(6),
+        east: bounds.getEast().toFixed(6),
+        west: bounds.getWest().toFixed(6),
     };
 }
 
@@ -600,7 +639,7 @@ function renderMarkers({ force = false } = {}) {
         const marker = L.marker([lead.latitude, lead.longitude], { icon: markerIcon(lead), zIndexOffset: zIndex, lead });
         marker.on("click", () => {
             marker.bindPopup(popupHtml(lead), { maxWidth: 260 }).openPopup();
-            selectLead(lead.id);
+            openLeadDrawer(lead.id);
         });
         if (clusterLayer) clusterLayer.addLayer(marker);
         else marker.addTo(map);
@@ -651,7 +690,7 @@ async function renderHeatmap() {
     if (!els.heatmapToggle.checked) return;
     const points = visibleLeads
         .filter((lead) => isActive(lead) && hasCoordinates(lead))
-        .map((lead) => [lead.latitude, lead.longitude, 0.65]);
+        .map((lead) => [lead.latitude, lead.longitude, Math.max(0.25, leadScore(lead) / 100)]);
     heatLayer = L.heatLayer(points, {
         radius: 34,
         blur: 22,
@@ -809,6 +848,7 @@ function selectLead(id) {
         els.exportPlan.disabled = true;
         nearbyLeads = [];
         nearbyLeadIds = new Set();
+        if (leadSummaryController) leadSummaryController.abort();
         setDrawerOpen(false);
         drawRadius();
         refreshMarkerState();
@@ -816,7 +856,10 @@ function selectLead(id) {
         renderDetails();
         renderMapMiniCard();
         renderNearbyList();
-        requestAnimationFrame(() => map.invalidateSize());
+        requestAnimationFrame(() => {
+            map.invalidateSize();
+            map.getContainer().focus({ preventScroll: true });
+        });
         return;
     }
     selectedLead = leadsById.get(id) || null;
@@ -829,6 +872,7 @@ function selectLead(id) {
     renderDetails();
     renderMapMiniCard();
     renderNearbyList();
+    if (selectedLead) loadLeadSummary(selectedLead.id);
     if (selectedLead && hasCoordinates(selectedLead)) {
         const marker = markers.get(selectedLead.id);
         const markerLatLng = marker?.getLatLng?.();
@@ -842,6 +886,12 @@ function selectLead(id) {
     }
     requestAnimationFrame(() => map.invalidateSize());
 }
+
+function openLeadDrawer(leadId) {
+    selectLead(leadId);
+}
+
+window.openLeadDrawer = openLeadDrawer;
 
 function clusterLeadFromMarker(marker) {
     if (marker?.lead && typeof marker.lead === "object") return marker.lead;
@@ -932,7 +982,7 @@ function openClusterPopup(cluster) {
     requestAnimationFrame(() => {
         const container = popup.getElement();
         container?.querySelectorAll("[data-cluster-lead-id]").forEach((button) => {
-            button.addEventListener("click", () => selectLead(Number(button.dataset.clusterLeadId)));
+            button.addEventListener("click", () => openLeadDrawer(Number(button.dataset.clusterLeadId)));
         });
         container?.querySelector("[data-cluster-expand]")?.addEventListener("click", () => expandClusterArea(cluster));
     });
@@ -1013,6 +1063,7 @@ function renderDetails() {
     });
     if (els.generatePlan) els.generatePlan.disabled = !selectedLead || !isActive(selectedLead) || !hasCoordinates(selectedLead);
     if (els.dayContactPlan) els.dayContactPlan.disabled = !selectedLead || !hasCoordinates(selectedLead);
+    if (els.focusSelectedLead) els.focusSelectedLead.disabled = !selectedLead || !hasCoordinates(selectedLead);
 
     if (!selectedLead) {
         els.selectedState.textContent = "—";
@@ -1032,11 +1083,19 @@ function renderDetails() {
         els.addTag.disabled = true;
         if (els.leadNoteInput) els.leadNoteInput.value = "";
         if (els.addLeadNote) els.addLeadNote.disabled = true;
+        if (els.openFullLead) {
+            els.openFullLead.href = "#";
+            els.openFullLead.setAttribute("aria-disabled", "true");
+        }
         return;
     }
     els.leadDetails.classList.remove("empty-state");
     els.addTag.disabled = false;
     if (els.addLeadNote) els.addLeadNote.disabled = false;
+    if (els.openFullLead) {
+        els.openFullLead.href = `/mapa?lead_id=${selectedLead.id}&history=1`;
+        els.openFullLead.setAttribute("aria-disabled", "false");
+    }
     const acc = document.getElementById("actionsAccordion");
     if (acc) acc.open = Boolean(selectedLead);
     els.selectedState.textContent = selectedLead.estado;
@@ -1729,6 +1788,7 @@ function resetFilters() {
     els.typeFilter.value = "";
     if (els.commercialFilter) els.commercialFilter.value = "";
     els.stateFilter.value = "";
+    if (els.heatFilter) els.heatFilter.value = "";
     els.classificationFilter.value = "ativos";
     if (els.scheduleFilter) els.scheduleFilter.value = "";
     if (els.territoryMode) els.territoryMode.value = "";
@@ -1755,6 +1815,55 @@ function setMode(mode) {
 
 function bindEvents() {
     const debouncedApplyFilters = debounce(applyFilters, 200);
+
+    // Drawer de filtros do mapa (UX-only): open/close via classe .open
+    const elsFilters = {
+        trigger: document.getElementById("mapFiltersTrigger"),
+        panel: document.getElementById("mapFiltersPanel"),
+        overlay: document.getElementById("mapFiltersOverlay"),
+        close: document.getElementById("mapFiltersClose"),
+    };
+
+    const refreshMapSize = () => {
+        requestAnimationFrame(() => map.invalidateSize());
+        setTimeout(() => map.invalidateSize(), 180);
+    };
+
+    const setFiltersOpen = (open) => {
+        if (!elsFilters.panel || !elsFilters.trigger) return;
+        elsFilters.panel.classList.toggle("open", open);
+        elsFilters.panel.setAttribute("aria-hidden", String(!open));
+        elsFilters.trigger.setAttribute("aria-expanded", String(open));
+        if (elsFilters.overlay) {
+            elsFilters.overlay.classList.toggle("is-open", open);
+            elsFilters.overlay.setAttribute("aria-hidden", String(!open));
+        }
+        document.body.classList.toggle("map-filters-open", open);
+        refreshMapSize();
+    };
+
+    const toggleFilters = () => {
+        if (!elsFilters.panel) return;
+        const isOpen = elsFilters.panel.classList.contains("open");
+        setFiltersOpen(!isOpen);
+    };
+
+    if (elsFilters.trigger) {
+        elsFilters.trigger.addEventListener("click", (e) => {
+            e.preventDefault();
+            toggleFilters();
+        });
+    }
+    if (elsFilters.overlay) {
+        elsFilters.overlay.addEventListener("click", () => setFiltersOpen(false));
+    }
+    if (elsFilters.close) {
+        elsFilters.close.addEventListener("click", () => setFiltersOpen(false));
+    }
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") setFiltersOpen(false);
+    });
+
     const debouncedRadiusUpdate = debounce(() => {
         updateNearby();
         refreshMarkerState();
@@ -1766,6 +1875,7 @@ function bindEvents() {
         els.typeFilter,
         els.commercialFilter,
         els.stateFilter,
+        els.heatFilter,
         els.classificationFilter,
         els.scheduleFilter,
         els.tagFilter,
@@ -1774,6 +1884,13 @@ function bindEvents() {
     ].filter(Boolean).forEach((element) => {
         element.addEventListener("input", debouncedApplyFilters);
     });
+    if (els.assignmentScopeFilter) {
+        els.assignmentScopeFilter.addEventListener("change", () => {
+            selectedBulkIds = new Set();
+            selectedLead = null;
+            loadLeads();
+        });
+    }
     [els.historyFilter, els.heatmapToggle].filter(Boolean).forEach((element) => {
         element.addEventListener("change", debouncedApplyFilters);
     });
@@ -1819,7 +1936,7 @@ function bindEvents() {
                 return;
             }
             const row = event.target.closest(".lead-row");
-            if (row) selectLead(Number(row.dataset.id));
+            if (row) openLeadDrawer(Number(row.dataset.id));
         });
         els.leadsList.addEventListener("change", (event) => {
             const checkbox = event.target.closest("[data-bulk-id]");
@@ -1843,13 +1960,32 @@ function bindEvents() {
     document.querySelectorAll("[data-action]").forEach((button) => {
         button.addEventListener("click", () => performAction(button.dataset.action));
     });
+    els.openFullLead?.addEventListener("click", (event) => {
+        if (!selectedLead) event.preventDefault();
+    });
+    els.focusSelectedLead?.addEventListener("click", () => {
+        if (!selectedLead || !hasCoordinates(selectedLead)) return;
+        map.closePopup();
+        map.flyTo([selectedLead.latitude, selectedLead.longitude], Math.max(map.getZoom(), 14), {
+            animate: true,
+            duration: 0.22,
+            easeLinearity: 0.3,
+        });
+    });
     if (els.drawerClose) els.drawerClose.addEventListener("click", () => selectLead(null));
     if (els.drawerBackdrop) els.drawerBackdrop.addEventListener("click", () => selectLead(null));
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && selectedLead) selectLead(null);
+    });
     map.on("click", () => selectLead(null));
-    map.on("moveend zoomend", renderMapGeoStats);
+    const debouncedViewportLoad = debounce(() => loadLeads({ viewportOnly: true }), 260);
+    map.on("moveend zoomend", () => {
+        renderMapGeoStats();
+        debouncedViewportLoad();
+    });
 }
 
-async function loadLeads() {
+async function loadLeads({ force = false, viewportOnly = true } = {}) {
     setMapLoading(true);
     const params = new URLSearchParams(window.location.search);
     const toFiniteNumber = (value) => {
@@ -1864,13 +2000,34 @@ async function loadLeads() {
     const urlLng = toFiniteNumber(params.get("lng"));
     const currentId = selectedLead?.id || (Number.isFinite(urlLeadId) && urlLeadId > 0 ? urlLeadId : null);
     let response;
-    try {
-        response = await fetch("/api/leads?history=1");
-    } catch (error) {
+    const fetchParams = new URLSearchParams({ lite: "1" });
+    if (els.assignmentScopeFilter?.value) fetchParams.set("scope", els.assignmentScopeFilter.value);
+    if (currentId) fetchParams.set("lead_id", String(currentId));
+    if (viewportOnly) {
+        const boundsParams = currentBoundsParams();
+        Object.entries(boundsParams).forEach(([key, value]) => fetchParams.set(key, value));
+    }
+    const fetchKey = fetchParams.toString();
+    if (!force && fetchKey === lastLeadFetchKey && allLeads.length) {
         setMapLoading(false);
+        return;
+    }
+    lastLeadFetchKey = fetchKey;
+    if (leadFetchController) leadFetchController.abort();
+    const controller = new AbortController();
+    leadFetchController = controller;
+    try {
+        response = await fetch(`/api/leads?${fetchKey}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Erro ao carregar leads do mapa");
+    } catch (error) {
+        if (leadFetchController === controller) setMapLoading(false);
+        if (leadFetchController === controller) lastLeadFetchKey = "";
+        if (error?.name === "AbortError") return;
         throw error;
     }
-    allLeads = (await response.json()).map((lead) => ({
+    const payload = await response.json();
+    if (leadFetchController !== controller) return;
+    allLeads = payload.map((lead) => ({
         ...lead,
         id: Number(lead?.id),
         latitude: lead?.latitude === "" || lead?.latitude == null ? null : Number(lead.latitude),
@@ -1886,7 +2043,7 @@ async function loadLeads() {
     setDrawerOpen(Boolean(selectedLead));
     applyFilters();
     renderOperationalInsights();
-    setMapLoading(false);
+    if (leadFetchController === controller) setMapLoading(false);
     if (currentId && selectedLead) {
         const alreadyVisible = visibleLeads.some((lead) => lead.id === selectedLead.id);
         if (!alreadyVisible) {
@@ -1923,6 +2080,8 @@ function applyCityOffsets() {
 async function init() {
     updateRadiusUi();
     bindEvents();
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 250);
 
     // Integra a pesquisa global do header (base.html) com os filtros do mapa.
     // O mapa usa els.searchInput (id="searchInput").
@@ -1953,6 +2112,7 @@ async function init() {
     }
 
     await loadLeads();
+    requestAnimationFrame(() => map.invalidateSize());
 }
 
 init();

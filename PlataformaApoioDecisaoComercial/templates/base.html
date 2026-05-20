@@ -23,105 +23,99 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <aside class="sidebar" aria-label="Navegação principal">
-        <div class="sidebar__aura" aria-hidden="true"></div>
-        <div class="sidebar__brand">
-            <div class="sidebar__logo" aria-hidden="true">
-                <img src="{{ url_for('static', filename='favicon-main.png') }}" alt="">
-            </div>
-            <div class="sidebar__brand-text">
-                <div class="sidebar__name">Alltera</div>
-                <div class="sidebar__subtitle">Planeamento comercial geográfico</div>
-            </div>
-        </div>
-
-        <div class="sidebar__divider"></div>
-
-        <nav class="sidebar__nav" aria-label="Menu">
-            <a class="sidebar__link" data-tooltip="Dashboard" href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Dashboard</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Mapa de Leads" href="{{ url_for('mapa_leads') }}" {% if request.endpoint == 'mapa_leads' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Mapa de Leads</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Planeamento" href="{{ url_for('planeamento') }}" {% if request.endpoint == 'planeamento' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Planeamento</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Importar Leads" href="{{ url_for('importar_leads') }}" {% if request.endpoint == 'importar_leads' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Importar Leads</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Sem Coordenadas" href="{{ url_for('sem_coordenadas') }}" {% if request.endpoint == 'sem_coordenadas' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Sem Coordenadas</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Leads Inativas" href="{{ url_for('leads_inativas') }}" {% if request.endpoint == 'leads_inativas' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Leads Inativas</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Leads Esquecidas" href="{{ url_for('esquecidas') }}" {% if request.endpoint == 'esquecidas' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Leads Esquecidas</span>
-            </a>
-            <a class="sidebar__link" data-tooltip="Agendadas" href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Agendadas</span>
-                {% if scheduled_sidebar_count %}
-                <strong class="sidebar__badge">{{ scheduled_sidebar_count }}</strong>
-                {% endif %}
-            </a>
-            <a class="sidebar__link" data-tooltip="Histórico" href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>
-                <span class="sidebar__icon" aria-hidden="true"></span>
-                <span>Histórico</span>
-            </a>
-        </nav>
-
-        <div class="sidebar__footer" aria-hidden="true">
-            <div class="sidebar__mini-card">
-                <div class="sidebar__pulse"></div>
-                <div>
-                    <strong>Alltera Field Planning</strong>
-                    <span>Sistema operacional comercial</span>
-                </div>
-            </div>
-        </div>
-        <button class="sidebar__collapse" id="sidebarToggle" type="button" aria-label="Recolher menu" aria-expanded="true">
-            <span aria-hidden="true"></span>
-        </button>
-    </aside>
-
     <div class="app-shell">
-        <header class="topbar topbar--minimal" aria-label="Barra superior">
-            <div class="topbar__title">{% block header_title %}Alltera Lead Planner{% endblock %}</div>
+        <header class="topbar topbar--minimal" id="appTopbar" aria-label="Barra superior">
+            <a class="topnav-brand" href="{{ url_for('admin_overview') if current_user.is_authenticated and current_user.role == 'admin' else (url_for('mapa_leads') if current_user.is_authenticated else url_for('login')) }}" aria-label="Alltera">
+                <span class="topnav-brand__logo" aria-hidden="true">
+                    <img src="{{ url_for('static', filename='favicon-main.png') }}" alt="">
+                </span>
+                <span>Alltera</span>
+            </a>
 
-            {# Pesquisa contextual apenas em páginas que fazem sentido #}
-            {% set ep = request.endpoint %}
-            {% if ep in ["mapa_leads", "esquecidas", "sem_coordenadas", "agendadas", "historico"] %}
-                {# Nota: a pesquisa usa #globalSearchInput e #globalSearchResults; o JS já trata ausência via optional chaining #}
-                <div class="global-search" role="search">
-                    <div class="global-search__icon" aria-hidden="true"></div>
-                    <input id="globalSearchInput" type="search" placeholder="Pesquisar..." autocomplete="off" aria-label="Pesquisa">
-                    <div class="global-search__results" id="globalSearchResults" hidden></div>
-                </div>
+            {% if current_user.is_authenticated %}
+            <nav class="topnav-pill" aria-label="Navegação principal">
+                {% if current_user.role == "admin" %}
+                <a href="{{ url_for('admin_overview') }}" {% if request.endpoint == 'admin_overview' %}aria-current="page"{% endif %}>Overview</a>
+                <a href="{{ url_for('mapa_leads') }}" {% if request.endpoint == 'mapa_leads' %}aria-current="page"{% endif %}>Mapa</a>
+                <a href="{{ url_for('todas_leads') }}" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>Leads</a>
+                <a href="{{ url_for('admin_users') }}" {% if request.endpoint == 'admin_users' %}aria-current="page"{% endif %}>Equipa</a>
+                <a href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>Auditoria</a>
+                <a href="{{ url_for('importar_leads') }}" {% if request.endpoint == 'importar_leads' %}aria-current="page"{% endif %}>Importar Leads</a>
+                {% else %}
+                <a href="{{ url_for('mapa_leads') }}" {% if request.endpoint == 'mapa_leads' %}aria-current="page"{% endif %}>Mapa</a>
+                <a href="{{ url_for('todas_leads') }}" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>Leads</a>
+                <a href="{{ url_for('esquecidas') }}" {% if request.endpoint == 'esquecidas' %}aria-current="page"{% endif %}>Follow-ups</a>
+                <a href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>
+                    Agendadas
+                    {% if scheduled_sidebar_count %}
+                    <strong class="topnav-badge">{{ scheduled_sidebar_count }}</strong>
+                    {% endif %}
+                </a>
+                {% endif %}
+            </nav>
             {% endif %}
 
-            <div class="topbar__spacer"></div>
             <div class="topbar__actions">
                 {% if current_user.is_authenticated %}
-                <span class="topbar-user" title="{{ current_user.email }}">{{ current_user.nome }}</span>
-                <a class="topbar-icon-button" href="{{ url_for('logout') }}" title="Terminar sessao" aria-label="Terminar sessao">
-                    <span aria-hidden="true">Sair</span>
-                </a>
+                {% set display_name = current_user.nome or current_user.email %}
+                {% set first_name = display_name.split()[0] %}
+                <div class="notifications-menu" id="notificationsMenu">
+                    <button class="notifications-trigger" id="notificationsButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="notificationsDropdown" title="Notificações operacionais">
+                        <span aria-hidden="true">🔔</span>
+                        {% if operational_notifications.count > 0 %}
+                        <strong>{{ operational_notifications.count }}</strong>
+                        {% endif %}
+                    </button>
+                    <div class="notifications-dropdown" id="notificationsDropdown" role="menu" aria-labelledby="notificationsButton" hidden>
+                        <header class="notifications-dropdown__header">
+                            <strong>Hoje</strong>
+                            <span>{{ operational_notifications.count }} tarefas</span>
+                        </header>
+                        <div class="notifications-dropdown__list">
+                            {% for item in operational_notifications["items"] %}
+                            <a class="notification-item notification-item--{{ item.kind }}" href="{{ item.url }}" role="menuitem">
+                                <span class="notification-item__time">{{ item.time }}</span>
+                                <span class="notification-item__body">
+                                    <strong>{{ item.lead }}</strong>
+                                    <small>{{ item.action }}</small>
+                                </span>
+                            </a>
+                            {% else %}
+                            <p class="notifications-empty">Sem tarefas operacionais para agora.</p>
+                            {% endfor %}
+                        </div>
+                        <a class="notifications-dropdown__footer" href="{{ url_for('agendadas') }}">Ver agenda</a>
+                    </div>
+                </div>
+                <div class="profile-menu" id="profileMenu">
+                    <button class="profile-trigger" id="profileMenuButton" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="profileDropdown">
+                        <span class="profile-avatar" aria-hidden="true">{{ display_name[:1]|upper }}<i></i></span>
+                        <span class="profile-trigger__name">{{ first_name }}</span>
+                    </button>
+                    <div class="profile-dropdown" id="profileDropdown" role="menu" aria-labelledby="profileMenuButton" hidden>
+                        <div class="profile-dropdown__header">
+                            <span class="profile-avatar profile-avatar--large" aria-hidden="true">{{ display_name[:1]|upper }}<i></i></span>
+                            <div>
+                                <strong>{{ display_name }}</strong>
+                                <small>{{ current_user.email }}</small>
+                                <em>{{ "Admin" if current_user.role == "admin" else "Rececionista" }}</em>
+                            </div>
+                        </div>
+                        <div class="profile-dropdown__divider"></div>
+                        <a href="{{ url_for('todas_leads') }}" role="menuitem">Perfil</a>
+                        {% if current_user.role != "admin" %}
+                        <a href="{{ url_for('meu_desempenho') }}" role="menuitem">Meu desempenho</a>
+                        {% endif %}
+                        <button class="profile-dropdown__theme" id="themeToggle" type="button" role="menuitem">
+                            <span>Aparência</span>
+                            <small id="themeToggleState">Claro</small>
+                        </button>
+                        <button type="button" role="menuitem" disabled>Definições</button>
+                        <div class="profile-dropdown__divider"></div>
+                        <a class="profile-dropdown__danger" href="{{ url_for('logout') }}" role="menuitem">Sair</a>
+                    </div>
+                </div>
                 {% endif %}
-                <a class="topbar-icon-button" href="{{ url_for('todas_leads') }}" title="Todas as Leads" aria-label="Todas as Leads" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>
-                    <span aria-hidden="true">👤</span>
-                </a>
-                <button class="theme-toggle topbar-icon-button" id="themeToggle" type="button" title="Alternar modo escuro" aria-label="Alternar modo escuro">
-                    <span class="theme-icon" aria-hidden="true">◐</span>
-                </button>
             </div>
         </header>
 
@@ -156,20 +150,104 @@
 
         {% block scripts %}{% endblock %}
     </div>
+    <button class="back-to-top" id="backToTop" type="button" aria-label="Voltar ao topo">
+        <span aria-hidden="true">↑</span>
+    </button>
+    {% if current_user.is_authenticated %}
+    <aside class="command-palette" id="commandPalette" aria-hidden="true">
+        <button type="button" class="command-palette__backdrop" id="commandPaletteBackdrop" tabindex="-1" aria-hidden="true"></button>
+        <section class="command-palette__panel" role="dialog" aria-modal="true" aria-labelledby="commandPaletteTitle">
+            <header class="command-palette__header">
+                <div>
+                    <p class="eyebrow">Command Palette</p>
+                    <h2 id="commandPaletteTitle">Pesquisa global</h2>
+                </div>
+                <kbd>Esc</kbd>
+            </header>
+            <label class="command-palette__search">
+                <span aria-hidden="true">⌕</span>
+                <input id="commandPaletteInput" type="search" autocomplete="off" placeholder="Pesquisar lead, telefone, email, cidade ou tag...">
+            </label>
+            <div class="command-palette__results" id="commandPaletteResults" role="listbox"></div>
+        </section>
+    </aside>
+    <aside class="global-lead-drawer" id="globalLeadDrawer" aria-hidden="true">
+        <button type="button" class="global-lead-drawer__backdrop" id="globalLeadDrawerBackdrop" tabindex="-1" aria-hidden="true"></button>
+        <section class="global-lead-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="globalLeadDrawerTitle">
+            <header class="global-lead-drawer__header">
+                <div>
+                    <p class="eyebrow">Lead</p>
+                    <h2 id="globalLeadDrawerTitle">Detalhe rápido</h2>
+                </div>
+                <button type="button" class="global-lead-drawer__close" id="globalLeadDrawerClose" aria-label="Fechar detalhe">&times;</button>
+            </header>
+            <div class="global-lead-drawer__body" id="globalLeadDrawerBody">
+                <p class="global-lead-drawer__empty">Seleciona uma lead para ver detalhes.</p>
+            </div>
+        </section>
+    </aside>
+    {% endif %}
     <script>
         (function () {
             const themeKey = "alltera.theme";
 
-            const globalSearch = document.querySelector(".global-search");
-            // Controla acessibilidade/consistência: se não houver pesquisa no DOM, evita handlers desnecessários.
-            // (Quando a pesquisa estiver desativada por página, estes elementos não existem.)
             const themeButton = document.getElementById("themeToggle");
+            const profileMenu = document.getElementById("profileMenu");
+            const profileButton = document.getElementById("profileMenuButton");
+            const profileDropdown = document.getElementById("profileDropdown");
+            const notificationsMenu = document.getElementById("notificationsMenu");
+            const notificationsButton = document.getElementById("notificationsButton");
+            const notificationsDropdown = document.getElementById("notificationsDropdown");
+            const closeNotifications = () => {
+                if (!notificationsButton || !notificationsDropdown) return;
+                notificationsDropdown.hidden = true;
+                notificationsButton.setAttribute("aria-expanded", "false");
+            };
+            const closeProfileMenu = () => {
+                if (!profileButton || !profileDropdown) return;
+                profileDropdown.hidden = true;
+                profileButton.setAttribute("aria-expanded", "false");
+            };
+            const toggleProfileMenu = () => {
+                if (!profileButton || !profileDropdown) return;
+                const open = profileDropdown.hidden;
+                profileDropdown.hidden = !open;
+                profileButton.setAttribute("aria-expanded", String(open));
+                if (open) closeNotifications();
+            };
+            const toggleNotifications = () => {
+                if (!notificationsButton || !notificationsDropdown) return;
+                const open = notificationsDropdown.hidden;
+                notificationsDropdown.hidden = !open;
+                notificationsButton.setAttribute("aria-expanded", String(open));
+                if (open) closeProfileMenu();
+            };
+            notificationsButton?.addEventListener("click", (event) => {
+                event.stopPropagation();
+                toggleNotifications();
+            });
+            profileButton?.addEventListener("click", (event) => {
+                event.stopPropagation();
+                toggleProfileMenu();
+            });
+            document.addEventListener("click", (event) => {
+                if (profileMenu && !profileMenu.contains(event.target)) closeProfileMenu();
+                if (notificationsMenu && !notificationsMenu.contains(event.target)) closeNotifications();
+            });
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    closeProfileMenu();
+                    closeNotifications();
+                }
+            });
             const applyTheme = (theme) => {
                 const dark = theme === "dark";
                 document.body.classList.toggle("dark-mode", dark);
                 if (themeButton) {
-                    themeButton.innerHTML = `<span class="theme-icon" aria-hidden="true">${dark ? "☀" : "◐"}</span>`;
                     themeButton.setAttribute("title", dark ? "Ativar modo claro" : "Ativar modo escuro");
+                    themeButton.setAttribute("aria-label", dark ? "Ativar modo claro" : "Ativar modo escuro");
+                    const themeState = themeButton.querySelector("#themeToggleState");
+                    if (themeState) themeState.textContent = dark ? "Escuro" : "Claro";
                 }
                 window.dispatchEvent(new CustomEvent("alltera:theme", { detail: { theme } }));
             };
@@ -182,80 +260,34 @@
                 });
             }
 
-            const searchInput = globalSearch ? document.getElementById("globalSearchInput") : null;
-            const searchResults = globalSearch ? document.getElementById("globalSearchResults") : null;
-            let searchTimer = null;
-            const renderResults = (items) => {
-                if (!searchResults) return;
-                if (!items.length) {
-                    searchResults.hidden = true;
-                    searchResults.innerHTML = "";
-                    return;
+            const appTopbar = document.getElementById("appTopbar");
+            const backToTop = document.getElementById("backToTop");
+            let lastScrollY = window.scrollY || 0;
+            let ticking = false;
+            const isProfileOpen = () => Boolean(profileDropdown && !profileDropdown.hidden);
+            const isNotificationsOpen = () => Boolean(notificationsDropdown && !notificationsDropdown.hidden);
+            const updateScrollChrome = () => {
+                const currentY = window.scrollY || 0;
+                const scrollingDown = currentY > lastScrollY;
+                const nearTop = currentY < 80;
+                if (appTopbar) {
+                    const shouldHide = scrollingDown && currentY > 150 && !isProfileOpen() && !isNotificationsOpen();
+                    appTopbar.classList.toggle("topbar--hidden", shouldHide);
+                    if (nearTop || isProfileOpen() || isNotificationsOpen()) appTopbar.classList.remove("topbar--hidden");
                 }
-                searchResults.innerHTML = items.map((item) => `
-                    <a class="global-search__item" href="${item.url}">
-                        <strong>${item.title || "Sem nome"}</strong>
-                        <span>${item.subtitle || ""}</span>
-                        <small>${item.phone || "Sem telefone"} · ${item.commercial || "Sem comercial"}</small>
-                    </a>
-                `).join("");
-                searchResults.hidden = false;
+                backToTop?.classList.toggle("back-to-top--visible", currentY > 420);
+                lastScrollY = Math.max(currentY, 0);
+                ticking = false;
             };
-            if (searchInput) {
-                document.addEventListener("keydown", (event) => {
-                    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-                        event.preventDefault();
-                        searchInput.focus();
-                        searchInput.select();
-                        globalSearch?.classList.add("global-search--active");
-                    }
-                    if (event.key === "Escape" && document.activeElement === searchInput) {
-                        searchInput.blur();
-                        renderResults([]);
-                        globalSearch?.classList.remove("global-search--active");
-                    }
-                });
-                searchInput.addEventListener("input", () => {
-                    const query = searchInput.value.trim();
-                    clearTimeout(searchTimer);
-                    if (query.length < 2) {
-                        renderResults([]);
-                        return;
-                    }
-                    searchTimer = setTimeout(async () => {
-                        try {
-                            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-                            const payload = await response.json();
-                            renderResults(payload.results || []);
-                        } catch (_error) {
-                            renderResults([]);
-                        }
-                    }, 160);
-                });
-                document.addEventListener("click", (event) => {
-                    if (!event.target.closest(".global-search")) renderResults([]);
-                });
-                searchInput.addEventListener("blur", () => globalSearch?.classList.remove("global-search--active"));
-            }
-
-            const key = "alltera.sidebar.collapsed";
-            const button = document.getElementById("sidebarToggle");
-            const apply = (collapsed) => {
-                document.body.classList.toggle("sidebar-collapsed", collapsed);
-                if (button) {
-                    button.setAttribute("aria-expanded", String(!collapsed));
-                    button.setAttribute("aria-label", collapsed ? "Expandir menu" : "Recolher menu");
+            window.addEventListener("scroll", () => {
+                if (!ticking) {
+                    window.requestAnimationFrame(updateScrollChrome);
+                    ticking = true;
                 }
-            };
-            apply(localStorage.getItem(key) === "1");
-            if (button) {
-                button.addEventListener("click", () => {
-                    const collapsed = !document.body.classList.contains("sidebar-collapsed");
-                    localStorage.setItem(key, collapsed ? "1" : "0");
-                    apply(collapsed);
-                    window.dispatchEvent(new Event("resize"));
-                });
-            }
+            }, { passive: true });
+            backToTop?.addEventListener("click", () => {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            });
 
             const scrollKey = `alltera.scroll.${window.location.pathname}`;
             const saveScroll = () => {
@@ -281,6 +313,206 @@
                 if (!form) return;
                 if (field.hasAttribute("onchange") || form.method.toLowerCase() === "get") saveScroll();
             }, true);
+
+            const leadDrawer = document.getElementById("globalLeadDrawer");
+            const leadDrawerBody = document.getElementById("globalLeadDrawerBody");
+            const leadDrawerTitle = document.getElementById("globalLeadDrawerTitle");
+            const leadDrawerClose = document.getElementById("globalLeadDrawerClose");
+            const leadDrawerBackdrop = document.getElementById("globalLeadDrawerBackdrop");
+            let activeLeadId = null;
+            const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+            const leadName = (lead) => lead.nome_cliente || lead.nome_empresa || lead.empresa || "Lead sem nome";
+            const valueOrDash = (value) => escapeHtml(value || "-");
+            const chips = (items) => {
+                const values = Array.isArray(items) ? items.filter(Boolean) : [];
+                return values.length ? values.map((item) => `<span>${escapeHtml(item)}</span>`).join("") : `<span class="is-muted">Sem tags</span>`;
+            };
+            const timeline = (items) => {
+                const values = Array.isArray(items) ? items.slice(0, 5) : [];
+                return values.length ? values.map((item) => `<li><strong>${escapeHtml(item.acao || "Evento")}</strong><span>${escapeHtml(item.created_at || "")}</span><p>${escapeHtml(item.observacao || item.resultado || "")}</p></li>`).join("") : `<li class="is-empty">Sem histórico recente.</li>`;
+            };
+            const openLeadDrawerShell = () => {
+                if (!leadDrawer) return;
+                leadDrawer.classList.add("open");
+                leadDrawer.setAttribute("aria-hidden", "false");
+                document.body.classList.add("lead-drawer-open");
+            };
+            const closeLeadDrawer = () => {
+                if (!leadDrawer) return;
+                leadDrawer.classList.remove("open");
+                leadDrawer.setAttribute("aria-hidden", "true");
+                document.body.classList.remove("lead-drawer-open");
+                activeLeadId = null;
+            };
+            const renderLeadDrawer = (lead) => {
+                if (!leadDrawerBody || !leadDrawerTitle) return;
+                const name = leadName(lead);
+                leadDrawerTitle.textContent = name;
+                const fullUrl = `/mapa?lead_id=${encodeURIComponent(lead.id)}&history=1`;
+                const mapUrl = lead.latitude && lead.longitude ? `/mapa?lead_id=${encodeURIComponent(lead.id)}&lat=${encodeURIComponent(lead.latitude)}&lng=${encodeURIComponent(lead.longitude)}` : `/mapa?lead_id=${encodeURIComponent(lead.id)}`;
+                leadDrawerBody.innerHTML = `
+                    <section class="global-lead-summary"><strong>${escapeHtml(name)}</strong><span>${valueOrDash(lead.empresa || lead.nome_empresa)}</span></section>
+                    <dl class="global-lead-fields">
+                        <div><dt>Telefone</dt><dd>${valueOrDash(lead.telefone || lead.contacto)}</dd></div>
+                        <div><dt>Email</dt><dd>${valueOrDash(lead.email)}</dd></div>
+                        <div><dt>Cidade</dt><dd>${valueOrDash(lead.cidade || lead.localidade)}</dd></div>
+                        <div><dt>Estado</dt><dd>${valueOrDash(lead.estado)}</dd></div>
+                    </dl>
+                    <section class="global-lead-section"><h3>Tags</h3><div class="global-lead-tags">${chips([...(lead.insight_tags || []), ...(lead.tags || [])])}</div></section>
+                    <section class="global-lead-section"><h3>Notas rápidas</h3><p>${valueOrDash(lead.motivo_classificacao || lead.observacoes_contacto || lead.observacoes || lead.classificacao_observacao)}</p></section>
+                    <section class="global-lead-section"><h3>Timeline</h3><ol class="global-lead-timeline">${timeline(lead.historico)}</ol></section>
+                    <div class="global-lead-actions">
+                        <button type="button" data-global-lead-action="contactado">Contactada</button>
+                        <button type="button" data-global-lead-action="adiar">Reagendar</button>
+                        <button type="button" data-global-lead-action="reuniao">Marcar reunião</button>
+                        <a href="${fullUrl}">Abrir página completa</a>
+                        <a href="${mapUrl}">Abrir no mapa</a>
+                    </div>
+                `;
+            };
+            const openLeadDrawer = async (leadId) => {
+                if (!leadDrawer || !leadDrawerBody || !leadId) return;
+                activeLeadId = leadId;
+                leadDrawerBody.innerHTML = `<p class="global-lead-drawer__empty">A carregar lead...</p>`;
+                openLeadDrawerShell();
+                try {
+                    const response = await fetch(`/api/leads/${encodeURIComponent(leadId)}/resumo`);
+                    if (!response.ok) throw new Error("Erro ao carregar lead");
+                    const lead = await response.json();
+                    if (String(activeLeadId) === String(leadId)) renderLeadDrawer(lead);
+                } catch (error) {
+                    leadDrawerBody.innerHTML = `<p class="global-lead-drawer__empty">Não foi possível carregar esta lead.</p>`;
+                }
+            };
+            window.AllteraLeadDrawer = { open: openLeadDrawer, close: closeLeadDrawer };
+            const runLeadAction = async (action) => {
+                if (!activeLeadId || !action) return;
+                const dialog = window.AllteraDialog;
+                const askPrompt = async (message, options = {}) => (dialog ? dialog.prompt(message, options) : prompt(message, options.defaultValue || ""));
+                const payload = { action, observacao: "" };
+                if (action === "adiar") {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const date = await askPrompt("Data de novo contacto:", { title: "Reagendar contacto", defaultValue: today, inputType: "date" });
+                    if (!date) return;
+                    const hour = await askPrompt("Hora do follow-up (opcional):", { title: "Hora do follow-up", defaultValue: "", inputType: "time" });
+                    if (hour === null) return;
+                    payload.data_novo_contacto = date;
+                    payload.hora_reuniao = hour || "";
+                    payload.observacao = "Follow-up reagendado no drawer.";
+                } else if (action === "reuniao") {
+                    payload.observacao = "Reunião marcada no drawer.";
+                } else if (action === "contactado") {
+                    payload.observacao = "Lead contactada no drawer.";
+                }
+                const response = await fetch(`/api/leads/${encodeURIComponent(activeLeadId)}/action`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                if (response.ok) await openLeadDrawer(activeLeadId);
+            };
+            document.addEventListener("click", (event) => {
+                const action = event.target.closest("[data-global-lead-action]");
+                if (action) {
+                    event.preventDefault();
+                    runLeadAction(action.dataset.globalLeadAction);
+                    return;
+                }
+                const control = event.target.closest("a, button, input, select, textarea, summary, label");
+                const trigger = event.target.closest("[data-lead-drawer]");
+                if (trigger && !control) {
+                    event.preventDefault();
+                    openLeadDrawer(trigger.dataset.leadDrawer);
+                }
+            });
+            leadDrawerClose?.addEventListener("click", closeLeadDrawer);
+            leadDrawerBackdrop?.addEventListener("click", closeLeadDrawer);
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") closeLeadDrawer();
+            });
+
+            const commandPalette = document.getElementById("commandPalette");
+            const commandPaletteInput = document.getElementById("commandPaletteInput");
+            const commandPaletteResults = document.getElementById("commandPaletteResults");
+            const commandPaletteBackdrop = document.getElementById("commandPaletteBackdrop");
+            const commandActions = [
+                { title: "Mapa", subtitle: "Abrir mapa de leads", url: "{{ url_for('mapa_leads') }}" },
+                { title: "Leads", subtitle: "Abrir lista de leads", url: "{{ url_for('todas_leads') }}" },
+                { title: "Agendadas", subtitle: "Follow-ups e chamadas", url: "{{ url_for('agendadas') }}" },
+                { title: "Importar Leads", subtitle: "Carregar Excel/CSV", url: "{{ url_for('importar_leads') }}" },
+            ];
+            let commandSearchTimer = null;
+            const closeCommandPalette = () => {
+                if (!commandPalette) return;
+                commandPalette.classList.remove("open");
+                commandPalette.setAttribute("aria-hidden", "true");
+                if (commandPaletteInput) commandPaletteInput.value = "";
+            };
+            const openCommandPalette = () => {
+                if (!commandPalette || !commandPaletteInput) return;
+                closeProfileMenu();
+                closeNotifications();
+                commandPalette.classList.add("open");
+                commandPalette.setAttribute("aria-hidden", "false");
+                renderCommandResults([]);
+                requestAnimationFrame(() => commandPaletteInput.focus({ preventScroll: true }));
+            };
+            const commandActionHtml = (action) => `
+                <a class="command-palette__item" href="${action.url}" data-command-action>
+                    <span class="command-palette__icon">↗</span>
+                    <span><strong>${escapeHtml(action.title)}</strong><small>${escapeHtml(action.subtitle)}</small></span>
+                </a>
+            `;
+            const commandLeadHtml = (lead) => `
+                <button class="command-palette__item" type="button" data-command-lead="${lead.id}">
+                    <span class="command-palette__icon">•</span>
+                    <span><strong>${escapeHtml(lead.title || "Lead sem nome")}</strong><small>${escapeHtml([lead.subtitle, lead.phone].filter(Boolean).join(" · "))}</small></span>
+                </button>
+            `;
+            const renderCommandResults = (leads, searching = false) => {
+                if (!commandPaletteResults) return;
+                const leadHtml = leads.length
+                    ? `<div class="command-palette__group"><p>Leads</p>${leads.map(commandLeadHtml).join("")}</div>`
+                    : "";
+                const status = searching ? `<p class="command-palette__empty">A pesquisar...</p>` : (!leads.length && commandPaletteInput?.value.trim() ? `<p class="command-palette__empty">Sem leads encontradas.</p>` : "");
+                commandPaletteResults.innerHTML = `${status}${leadHtml}<div class="command-palette__group"><p>Ações rápidas</p>${commandActions.map(commandActionHtml).join("")}</div>`;
+            };
+            const searchCommandLeads = async () => {
+                const q = commandPaletteInput?.value.trim() || "";
+                if (!q) {
+                    renderCommandResults([]);
+                    return;
+                }
+                renderCommandResults([], true);
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+                    const data = response.ok ? await response.json() : { results: [] };
+                    renderCommandResults(Array.isArray(data.results) ? data.results : []);
+                } catch (error) {
+                    if (commandPaletteResults) commandPaletteResults.innerHTML = `<p class="command-palette__empty">Não foi possível pesquisar agora.</p>`;
+                }
+            };
+            commandPaletteInput?.addEventListener("input", () => {
+                clearTimeout(commandSearchTimer);
+                commandSearchTimer = setTimeout(searchCommandLeads, 180);
+            });
+            commandPaletteBackdrop?.addEventListener("click", closeCommandPalette);
+            commandPaletteResults?.addEventListener("click", (event) => {
+                const leadButton = event.target.closest("[data-command-lead]");
+                if (!leadButton) return;
+                closeCommandPalette();
+                openLeadDrawer(leadButton.dataset.commandLead);
+            });
+            document.addEventListener("keydown", (event) => {
+                const isMac = navigator.platform.toLowerCase().includes("mac");
+                const commandK = (isMac ? event.metaKey : event.ctrlKey) && event.key.toLowerCase() === "k";
+                if (commandK) {
+                    event.preventDefault();
+                    openCommandPalette();
+                    return;
+                }
+                if (event.key === "Escape") closeCommandPalette();
+            });
         })();
     </script>
     <script src="{{ url_for('static', filename='js/animations.js') }}"></script>

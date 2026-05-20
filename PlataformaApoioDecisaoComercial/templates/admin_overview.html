@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Overview | Alltera{% endblock %}
+{% block header_title %}Gestao Alltera{% endblock %}
+
+{% block extra_head %}
+<style>
+    .admin-page {
+        display: grid;
+        gap: 22px;
+    }
+
+    .admin-hero {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 22px;
+        border: 1px solid rgba(20, 184, 166, 0.22);
+        background:
+            linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(15, 23, 42, 0.88)),
+            #0f172a;
+        color: #f8fafc;
+    }
+
+    .admin-hero h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4.2rem);
+        letter-spacing: 0;
+    }
+
+    .admin-hero p {
+        max-width: 680px;
+        color: #cbd5e1;
+    }
+
+    .admin-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 14px;
+    }
+
+    .admin-metric {
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.86));
+        color: #f8fafc;
+        padding: 18px;
+        border-radius: 8px;
+    }
+
+    .admin-metric span {
+        display: block;
+        color: #94a3b8;
+        font-weight: 700;
+        font-size: 0.82rem;
+        margin-bottom: 10px;
+    }
+
+    .admin-metric strong {
+        font-size: 2.1rem;
+        letter-spacing: 0;
+    }
+
+    .admin-panels {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
+        gap: 18px;
+    }
+
+    .admin-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .admin-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        padding: 12px 0;
+    }
+
+    .admin-list-item:last-child {
+        border-bottom: 0;
+    }
+
+    .admin-list-item small,
+    .admin-role-card span {
+        color: #64748b;
+    }
+
+    .admin-role-grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .admin-role-card {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        border: 1px solid rgba(15, 118, 110, 0.16);
+        border-radius: 8px;
+        padding: 14px;
+    }
+
+    .operator-performance-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .operator-card {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.03);
+    }
+
+    .operator-card__top,
+    .operator-card__meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .operator-card__top strong {
+        color: #0f172a;
+    }
+
+    .operator-card__top small,
+    .operator-card__meta span {
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 800;
+    }
+
+    .operator-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .operator-stats span {
+        display: grid;
+        gap: 3px;
+        padding: 8px;
+        border-radius: 8px;
+        background: rgba(15, 118, 110, 0.08);
+        color: #64748b;
+        font-size: 0.7rem;
+        font-weight: 800;
+    }
+
+    .operator-stats b {
+        color: #0f172a;
+        font-size: 1rem;
+    }
+
+    .operator-progress {
+        height: 7px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.18);
+    }
+
+    .operator-progress i {
+        display: block;
+        height: 100%;
+        width: var(--value);
+        border-radius: inherit;
+        background: linear-gradient(90deg, #0f766e, #14b8a6);
+    }
+
+    body.dark-mode .operator-card {
+        background: rgba(15, 23, 42, 0.58);
+        border-color: rgba(45, 212, 191, 0.12);
+    }
+
+    body.dark-mode .operator-card__top strong,
+    body.dark-mode .operator-stats b {
+        color: #f8fafc;
+    }
+
+    body.dark-mode .operator-card__top small,
+    body.dark-mode .operator-card__meta span,
+    body.dark-mode .operator-stats span {
+        color: #94a3b8;
+    }
+
+    body.dark-mode .operator-stats span {
+        background: rgba(45, 212, 191, 0.08);
+    }
+
+    .admin-activity {
+        max-height: 330px;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        padding-right: 4px;
+    }
+
+    .activity-item {
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .activity-item:last-child {
+        border-bottom: 0;
+    }
+
+    .activity-dot {
+        width: 8px;
+        height: 8px;
+        margin-top: 7px;
+        border-radius: 999px;
+        background: #14b8a6;
+        box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+    }
+
+    .activity-body {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .activity-body strong {
+        color: #0f172a;
+        font-size: 0.95rem;
+    }
+
+    .activity-body span,
+    .activity-body small {
+        color: #64748b;
+        line-height: 1.45;
+    }
+
+    body.dark-mode .activity-body strong {
+        color: #f8fafc;
+    }
+
+    body.dark-mode .activity-body span,
+    body.dark-mode .activity-body small {
+        color: #94a3b8;
+    }
+
+    @media (max-width: 900px) {
+        .admin-hero,
+        .admin-list-item {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .admin-panels {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="page-shell admin-page">
+    <section class="panel admin-hero">
+        <div>
+            <p class="eyebrow">Overview admin</p>
+            <h1>Gestao da operacao</h1>
+            <p>Visao executiva leve para acompanhar rececionistas, atividade e qualidade do funil sem interferir no trabalho diario da equipa.</p>
+        </div>
+        <a class="button" href="{{ url_for('admin_users') }}">Ver utilizadores</a>
+    </section>
+
+    <section class="admin-metric-grid" aria-label="Metricas principais">
+        <article class="admin-metric"><span>Total de leads</span><strong>{{ metrics.total_leads }}</strong></article>
+        <article class="admin-metric"><span>Leads contactadas</span><strong>{{ metrics.contacted_leads }}</strong></article>
+        <article class="admin-metric"><span>Reunioes/agendadas</span><strong>{{ metrics.scheduled_leads }}</strong></article>
+        <article class="admin-metric"><span>Follow-ups pendentes</span><strong>{{ metrics.pending_followups }}</strong></article>
+        <article class="admin-metric"><span>Utilizadores ativos</span><strong>{{ metrics.active_users }}</strong></article>
+    </section>
+
+    <section class="admin-panels">
+        <article class="panel">
+            <p class="eyebrow">Utilizadores recentes</p>
+            <div class="admin-list">
+                {% for user in recent_users %}
+                <div class="admin-list-item">
+                    <div>
+                        <strong>{{ user.nome }}</strong>
+                        <small>{{ user.email }}</small>
+                    </div>
+                    <span class="badge">{{ "Rececionista" if user.role == "comercial" else "Admin" }}</span>
+                </div>
+                {% else %}
+                <p class="empty-state empty-state--quiet">Ainda nao existem utilizadores.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel">
+            <p class="eyebrow">Equipa ativa</p>
+            <div class="admin-role-grid">
+                <div class="admin-role-card">
+                    <span>Admins</span>
+                    <strong>{{ users_by_role.admin }}</strong>
+                </div>
+                <div class="admin-role-card">
+                    <span>Rececionistas</span>
+                    <strong>{{ users_by_role.comercial }}</strong>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="panel">
+        <p class="eyebrow">Performance por rececionista</p>
+        <div class="operator-performance-list">
+            {% for item in operator_performance %}
+            <article class="operator-card">
+                <div class="operator-card__top">
+                    <div>
+                        <strong>{{ item.user.nome }}</strong>
+                        <small>{{ item.user.email }}</small>
+                    </div>
+                    <span class="badge">{{ item.taxa_concretizacao }}%</span>
+                </div>
+                <div class="operator-stats" aria-label="Metricas da rececionista">
+                    <span><b>{{ item.contactos }}</b>Contactos</span>
+                    <span><b>{{ item.reunioes }}</b>Reunioes</span>
+                    <span><b>{{ item.followups }}</b>Follow-ups</span>
+                    <span><b>{{ item.total_acoes }}</b>Acoes</span>
+                </div>
+                <div class="operator-progress" aria-hidden="true">
+                    <i style="--value: {{ item.taxa_concretizacao if item.taxa_concretizacao <= 100 else 100 }}%;"></i>
+                </div>
+                <div class="operator-card__meta">
+                    <span>Taxa de concretizacao</span>
+                    <span>{% if item.ultima_atividade %}Ultima atividade: {{ item.ultima_atividade.strftime("%d/%m/%Y %H:%M") }}{% else %}Sem atividade registada ainda{% endif %}</span>
+                </div>
+            </article>
+            {% else %}
+            <p class="empty-state empty-state--quiet">Ainda nao existem rececionistas ativas.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <p class="eyebrow">Atividade recente</p>
+        <div class="admin-activity" aria-label="Atividade recente">
+            {% for item in recent_activity %}
+            <article class="activity-item">
+                <span class="activity-dot" aria-hidden="true"></span>
+                <div class="activity-body">
+                    <strong>{{ item.user.nome if item.user else item.comercial_responsavel or "Equipa Alltera" }}</strong>
+                    <span>{{ item.acao }}{% if item.lead %} em {{ item.lead.nome_cliente or item.lead.nome_empresa }}{% endif %}</span>
+                    <small>{{ item.created_at.strftime("%d/%m/%Y %H:%M") if item.created_at else "" }}{% if item.observacao %} · {{ item.observacao[:120] }}{% endif %}</small>
+                </div>
+            </article>
+            {% else %}
+            <article class="activity-item">
+                <span class="activity-dot" aria-hidden="true"></span>
+                <div class="activity-body">
+                    <strong>Rita</strong>
+                    <span>Marcou reuniao</span>
+                    <small>Exemplo de atividade futura</small>
+                </div>
+            </article>
+            <article class="activity-item">
+                <span class="activity-dot" aria-hidden="true"></span>
+                <div class="activity-body">
+                    <strong>Irina</strong>
+                    <span>Reagendou follow-up</span>
+                    <small>Exemplo de atividade futura</small>
+                </div>
+            </article>
+            <article class="activity-item">
+                <span class="activity-dot" aria-hidden="true"></span>
+                <div class="activity-body">
+                    <strong>Bernardo</strong>
+                    <span>Importou leads</span>
+                    <small>Exemplo de atividade futura</small>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+</main>
+{% endblock %}

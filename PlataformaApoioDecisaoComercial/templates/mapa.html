@@ -13,11 +13,35 @@
 {% endblock %}
 
 {% block content %}
-<main class="sales-layout sales-layout--map-primary map-page-layout">
-    <section class="map-panel map-panel--primary map-shell">
+<main class="map-page map-page-layout">
+    <button type="button" class="map-filters-trigger" id="mapFiltersTrigger" aria-label="Abrir filtros do mapa" aria-expanded="false" aria-controls="mapFiltersPanel">
+        <span class="map-filters-trigger__icon" aria-hidden="true"></span>
+        <span class="map-filters-trigger__text">Filtros</span>
+        <span class="map-filters-trigger__badge" id="mapFiltersActiveBadge" aria-hidden="true" hidden>•</span>
+    </button>
+
+    <div class="map-filters-overlay" id="mapFiltersOverlay" aria-hidden="true" tabindex="-1"></div>
+
+    <aside class="map-filters-panel" id="mapFiltersPanel" role="dialog" aria-modal="true" aria-labelledby="mapFiltersPanelTitle" aria-hidden="true" tabindex="-1">
+        <div class="map-filters-panel__head">
+            <h2 id="mapFiltersPanelTitle">Filtros</h2>
+            <button type="button" class="map-filters-panel__close" id="mapFiltersClose" aria-label="Fechar filtros" title="Fechar">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
         <div class="map-toolbar" aria-label="Filtros do mapa">
+
             <label>
-                <span>Comercial</span>
+                <span>Fila</span>
+                <select id="assignmentScopeFilter">
+                    {% for item in assignment_scopes %}
+                    <option value="{{ item.value }}" {% if item.value == assignment_scope %}selected{% endif %}>{{ item.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Operação</span>
                 <select id="commercialFilter">
                     {% for item in options.mapa_comerciais %}
                     <option value="{{ item.value }}">{{ item.label }}</option>
@@ -28,6 +52,19 @@
                 <span>Estado</span>
                 <select id="stateFilter"><option value="">Todos</option>{% for item in options.estados %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
             </label>
+            {% if current_user.role == "admin" %}
+            <label>
+                <span>Prioridade</span>
+                <select id="heatFilter">
+                    <option value="">Todas</option>
+                    <option value="hot">🔥 Quentes</option>
+                    <option value="warm">🟡 Mornas</option>
+                    <option value="cold">⚪ Frias</option>
+                </select>
+            </label>
+            {% else %}
+            <select id="heatFilter" hidden aria-hidden="true"><option value="">Todas</option></select>
+            {% endif %}
             <label>
                 <span>Tag</span>
                 <select id="tagFilter"><option value="">Todas</option>{% for item in options.tags %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
@@ -52,12 +89,15 @@
             <select id="territoryMode">
                 <option value="">Sem overlay</option>
                 <option value="cidade">Por cidade</option>
-                <option value="comercial">Por comercial</option>
+                <option value="comercial">Por operação</option>
                 <option value="estado">Por estado</option>
             </select>
             <input id="historyFilter" type="checkbox">
             <input id="heatmapToggle" type="checkbox">
         </div>
+    </aside>
+
+    <section class="map-panel map-panel--primary map-shell">
         {% if metrics.total == 0 %}
         <div class="map-empty-state">
             <strong>Ainda não existem leads importadas.</strong>
@@ -87,11 +127,12 @@
         </div>
     </section>
 
-    <aside class="details-panel details-drawer map-right-panel" id="leadDrawer" aria-label="Detalhe da lead">
-        <button type="button" class="drawer-backdrop" id="drawerBackdrop" tabindex="-1" aria-hidden="true"></button>
-        <div class="drawer-scroll">
-            <div class="drawer-header">
-                <h2 class="drawer-title">Lead selecionada</h2>
+    <aside class="lead-drawer details-panel details-drawer map-right-panel" id="leadDrawer" aria-label="Detalhe da lead" aria-hidden="true">
+
+        <button type="button" class="lead-drawer-overlay drawer-backdrop" id="drawerBackdrop" tabindex="-1" aria-hidden="true"></button>
+        <div class="lead-drawer-content drawer-scroll" role="dialog" aria-modal="true" aria-labelledby="leadDrawerTitle">
+            <div class="lead-drawer-header drawer-header">
+                <h2 class="drawer-title" id="leadDrawerTitle">Lead selecionada</h2>
                 <button type="button" class="drawer-close" id="drawerClose" title="Fechar painel" aria-label="Fechar painel">
                     <span aria-hidden="true">&times;</span>
                 </button>
@@ -106,12 +147,12 @@
                 <details class="accordion" id="actionsAccordion">
                     <summary>Ações rápidas</summary>
                     <div class="actions-grid actions-grid--compact">
-                        <button class="button secondary" data-action="ligar_volta" disabled>Ligar de volta</button>
-                        <button class="button secondary" data-action="adiar" disabled>Adiar</button>
-                        <button class="button secondary" data-action="sem_interesse" disabled>Sem interesse</button>
-                        <button class="button secondary" data-action="crm" disabled>Já tratado / no CRM</button>
+                        <button class="button secondary" data-action="contactado" disabled>Contactada</button>
+                        <button class="button secondary" data-action="adiar" disabled>Reagendar</button>
+                        <button class="button secondary" data-action="crm" disabled>Marcar reunião</button>
+                        <a class="button secondary" id="openFullLead" href="#" aria-disabled="true">Abrir lead completa</a>
+                        <button class="button secondary" id="focusSelectedLead" type="button" disabled>Abrir no mapa</button>
                         <button class="button secondary" data-action="corrigir_estado" disabled>Corrigir estado</button>
-                        <button class="button secondary" data-action="update_coordinates" disabled>Coordenadas</button>
                     </div>
                 </details>
             </section>
@@ -206,4 +247,3 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="{{ url_for('static', filename='js/mapa.js') }}"></script>
 {% endblock %}
-

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Meu desempenho | Alltera{% endblock %}
+{% block header_title %}Meu desempenho{% endblock %}
+
+{% block content %}
+<main class="page-shell personal-performance-page">
+    <section class="personal-performance-hero">
+        <div>
+            <p class="eyebrow">Operação pessoal</p>
+            <h1>Meu desempenho</h1>
+            <p>Acompanha contactos, reuniões e follow-ups registados por ti.</p>
+        </div>
+        <div class="personal-performance-hero__meta">
+            <span>{{ current_user.nome or current_user.email }}</span>
+            <strong>{{ "Admin" if current_user.role == "admin" else "Rececionista" }}</strong>
+        </div>
+    </section>
+
+    {% set metrics = performance.metrics %}
+    <section class="personal-performance-metrics">
+        <article>
+            <span>Contactos hoje</span>
+            <strong>{{ metrics.contacts_today }}</strong>
+        </article>
+        <article>
+            <span>Contactos 7 dias</span>
+            <strong>{{ metrics.contacts_7 }}</strong>
+        </article>
+        <article>
+            <span>Reuniões marcadas</span>
+            <strong>{{ metrics.meetings }}</strong>
+        </article>
+        <article>
+            <span>Taxa de concretização</span>
+            <strong>{{ metrics.conversion_rate }}%</strong>
+        </article>
+        <article>
+            <span>Follow-ups pendentes</span>
+            <strong>{{ metrics.pending_followups }}</strong>
+        </article>
+        <article>
+            <span>Última atividade</span>
+            <strong>{{ metrics.last_activity.strftime("%d/%m %H:%M") if metrics.last_activity else "—" }}</strong>
+        </article>
+    </section>
+
+    <section class="personal-performance-panel">
+        <header>
+            <div>
+                <p class="eyebrow">Timeline</p>
+                <h2>Atividade recente</h2>
+            </div>
+        </header>
+
+        {% if performance.has_history %}
+        <ol class="personal-performance-timeline">
+            {% for entry in performance.timeline %}
+            <li>
+                <time datetime="{{ entry.created_at.isoformat() if entry.created_at else '' }}">
+                    {{ entry.created_at.strftime("%d/%m/%Y %H:%M") if entry.created_at else "Sem data" }}
+                </time>
+                <div>
+                    <strong>{{ entry.acao }}</strong>
+                    <span>{{ entry.lead.nome_empresa if entry.lead else "Lead removida" }}</span>
+                    {% if entry.observacao %}
+                    <p>{{ entry.observacao }}</p>
+                    {% endif %}
+                </div>
+                {% if entry.lead %}
+                <a href="{{ url_for('mapa_leads', lead_id=entry.lead.id) }}">Abrir</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+        {% else %}
+        <div class="personal-performance-empty">
+            <strong>Ainda sem histórico operacional.</strong>
+            <span>Quando registares contactos, reuniões ou follow-ups, eles aparecem aqui.</span>
+        </div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

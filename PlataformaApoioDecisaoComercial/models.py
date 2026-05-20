@@ -31,6 +31,9 @@ class User(UserMixin, db.Model):
     def is_active(self):
         return bool(self.ativo)
 
+    historico = db.relationship("HistoricoLead", back_populates="user", lazy="dynamic")
+    assigned_leads = db.relationship("Lead", back_populates="assigned_to", lazy="dynamic")
+
 
 class Lead(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -65,8 +68,11 @@ class Lead(db.Model):
     tags = db.Column(db.String(300), nullable=True)
     insight_tags = db.Column(db.String(400), nullable=True)
     insight_note = db.Column(db.Text, nullable=True)
+    assigned_to_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    assigned_to = db.relationship("User", back_populates="assigned_leads")
 
     historico = db.relationship(
         "HistoricoLead",
@@ -76,6 +82,9 @@ class Lead(db.Model):
     )
 
     def to_dict(self, include_history=False):
+        heat_score = self.heat_score()
+        heat_band = self.heat_band(heat_score)
+        heat_label = self.heat_label(heat_band)
         data = {
             "id": self.id,
             "nome_cliente": self.nome_cliente or self.nome_empresa,
@@ -108,10 +117,17 @@ class Lead(db.Model):
             "tags": self.tag_list(),
             "insight_tags": self.insight_tag_list(),
             "insight_note": self.insight_note or "",
+            "assigned_to_id": self.assigned_to_id,
+            "assigned_to_nome": self.assigned_to.nome if self.assigned_to else "",
+            "assigned_to_email": self.assigned_to.email if self.assigned_to else "",
+            "assigned_to_initials": "".join(part[:1] for part in (self.assigned_to.nome.split() if self.assigned_to else []))[:2].upper(),
             "created_at": self.created_at.isoformat() if self.created_at else "",
             "updated_at": self.updated_at.isoformat() if self.updated_at else "",
-            "score": self.operational_score(),
-            "score_band": self.priority_band(),
+            "score": heat_score,
+            "score_band": self.priority_band(heat_score),
+            "heat_score": heat_score,
+            "heat_band": heat_band,
+            "heat_label": heat_label,
         }
         if include_history:
             data["historico"] = [item.to_dict() for item in self.historico]
@@ -153,6 +169,27 @@ class Lead(db.Model):
         estado = self._normalized_text(self.estado)
         obs = self._normalized_text(" ".join(filter(None, [self.observacoes, self.observacoes_contacto, self.reuniao_info])))
         age = self.last_contact_age_days()
+        history_items = list(self.historico or [])
+        followup_count = sum(
+            1
+            for item in history_items
+            if "followup" in self._normalized_text(item.tipo_acao or item.acao)
+            or "adiar" in self._normalized_text(item.acao)
+        )
+        meeting_count = sum(
+            1
+            for item in history_items
+            if "reuniao" in self._normalized_text(item.tipo_acao or item.acao)
+            or "crm" in self._normalized_text(item.acao)
+        )
+        response_count = sum(
+            1
+            for item in history_items
+            if any(
+                token in self._normalized_text(" ".join([item.acao or "", item.observacao or "", item.resultado or ""]))
+                for token in ["contactada", "contactado", "atendeu", "resposta", "nota adicionada"]
+            )
+        )
 
         if self.telefone or self.email:
             score += 5
@@ -174,10 +211,22 @@ class Lead(db.Model):
             score += 10
         if any(token in obs for token in ["nao atendeu", "não atendeu", "sem resposta", "chamada perdida"]):
             score += 10
+        if followup_count >= 4:
+            score += 14
+        elif followup_count >= 2:
+            score += 8
+        elif followup_count == 1:
+            score += 4
+        if response_count:
+            score += min(12, response_count * 4)
+        if meeting_count:
+            score += 18
         if any(token in estado for token in ["sem interesse"]):
             score -= 45
         if "ja tratado" in estado or "jatratado" in estado or "crm" in estado:
-            score -= 40
+            score += 12
+        if any(token in estado for token in ["reuniao"]):
+            score += 18
         if age is None:
             score += 18
         elif age >= 45:
@@ -193,8 +242,28 @@ class Lead(db.Model):
 
         return max(0, min(100, score))
 
-    def priority_band(self):
-        score = self.operational_score()
+    def heat_score(self):
+        return self.operational_score()
+
+    def heat_band(self, score=None):
+        score = self.heat_score() if score is None else score
+        if score >= 70:
+            return "hot"
+        if score >= 40:
+            return "warm"
+        return "cold"
+
+    def heat_label(self, band=None):
+        band = band or self.heat_band()
+        labels = {
+            "hot": "🔥 quente",
+            "warm": "🟡 morna",
+            "cold": "⚪ fria",
+        }
+        return labels[band]
+
+    def priority_band(self, score=None):
+        score = self.operational_score() if score is None else score
         if score >= 70:
             return "Alta prioridade"
         if score >= 40:
@@ -205,18 +274,26 @@ class Lead(db.Model):
 class HistoricoLead(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lead_id = db.Column(db.Integer, db.ForeignKey("lead.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     acao = db.Column(db.String(120), nullable=False)
+    tipo_acao = db.Column(db.String(80), nullable=True, index=True)
     observacao = db.Column(db.Text, nullable=True)
+    resultado = db.Column(db.String(120), nullable=True)
     comercial_responsavel = db.Column(db.String(80), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", back_populates="historico")
 
     def to_dict(self):
         return {
             "id": self.id,
             "lead_id": self.lead_id,
             "acao": self.acao,
+            "tipo_acao": self.tipo_acao or "",
             "observacao": self.observacao or "",
+            "resultado": self.resultado or "",
             "comercial_responsavel": self.comercial_responsavel or "",
+            "user": self.user.nome if self.user else "",
             "created_at": self.created_at.strftime("%Y-%m-%d %H:%M"),
         }
 

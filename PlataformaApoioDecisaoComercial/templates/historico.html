@@ -36,7 +36,7 @@
     <section class="panel history-panel">
         <div class="history-table">
             {% for entry in entries %}
-            <article class="history-entry" data-action-text="{{ entry.acao|lower }}">
+            <article class="history-entry" data-action-text="{{ (entry.tipo_acao or entry.acao)|lower }}">
                 <div class="history-entry__date">
                     <strong>{{ entry.created_at.strftime("%d/%m") }}</strong>
                     <span>{{ entry.created_at.strftime("%H:%M") }}</span>
@@ -44,10 +44,10 @@
                 <div class="history-entry__body">
                     <div class="history-entry__top">
                         <strong>{{ entry.acao }}</strong>
-                        <span class="tag action-badge">{{ entry.comercial_responsavel or "Sem comercial" }}</span>
+                        <span class="tag action-badge">{{ entry.tipo_acao or "atividade" }}</span>
                     </div>
-                    <span>{{ entry.lead.nome_empresa }}</span>
-                    <p>{{ entry.observacao or "Sem observacao" }}</p>
+                    <span>{{ entry.lead.nome_empresa if entry.lead else "Lead removida" }} · {{ entry.user.nome if entry.user else entry.comercial_responsavel or "Sem utilizador" }}</span>
+                    <p>{{ entry.observacao or "Sem observacao" }}{% if entry.resultado %} · {{ entry.resultado }}{% endif %}</p>
                 </div>
             </article>
             {% else %}

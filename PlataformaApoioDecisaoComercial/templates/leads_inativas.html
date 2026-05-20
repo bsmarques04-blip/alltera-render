@@ -102,6 +102,7 @@
                     <input type="hidden" name="lead_id" value="{{ lead.id }}">
                     <input type="hidden" name="action" value="adiar">
                     <label>Nova data<input type="date" name="data_novo_contacto" value="{{ lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else '' }}"></label>
+                    <label>Hora<input type="time" name="hora_reuniao" value="{{ lead.hora_reuniao or '' }}"></label>
                     <button class="button secondary" type="submit">Adiar contacto</button>
                 </form>
                 <a class="button secondary" href="{{ url_for('historico', lead_id=lead.id) }}">Ver histórico</a>
