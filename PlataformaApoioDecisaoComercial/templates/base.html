@@ -27,9 +27,8 @@
         <header class="topbar topbar--minimal" id="appTopbar" aria-label="Barra superior">
             <a class="topnav-brand" href="{{ url_for('admin_overview') if current_user.is_authenticated and current_user.role == 'admin' else (url_for('mapa_leads') if current_user.is_authenticated else url_for('login')) }}" aria-label="Alltera">
                 <span class="topnav-brand__logo" aria-hidden="true">
-                    <img src="{{ url_for('static', filename='favicon-main.png') }}" alt="">
+                    <img src="{{ url_for('static', filename='alltera-logo.png') }}" alt="">
                 </span>
-                <span>Alltera</span>
             </a>
 
             {% if current_user.is_authenticated %}

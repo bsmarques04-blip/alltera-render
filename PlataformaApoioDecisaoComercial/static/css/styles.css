@@ -9929,7 +9929,7 @@ body.sidebar-collapsed .app-shell {
     align-self: center;
     display: inline-flex;
     align-items: center;
-    gap: 9px;
+    gap: 0;
     min-width: max-content;
     color: #0f172a;
     font-size: 0.92rem;
@@ -9938,21 +9938,22 @@ body.sidebar-collapsed .app-shell {
 }
 
 .topnav-brand__logo {
-    width: 32px;
-    height: 32px;
-    display: inline-grid;
-    place-items: center;
-    overflow: hidden;
-    border: 1px solid rgba(15, 23, 42, 0.09);
-    border-radius: 999px;
-    background: #ffffff;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    width: 128px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    overflow: visible;
 }
 
 .topnav-brand__logo img {
-    width: 22px;
-    height: 22px;
+    width: 100%;
+    height: auto;
+    max-height: 38px;
     object-fit: contain;
+}
+
+body.dark-mode .topnav-brand__logo img {
+    filter: brightness(1.55) contrast(1.06) drop-shadow(0 1px 8px rgba(94, 234, 212, 0.12));
 }
 
 .topnav-pill {
@@ -10087,7 +10088,6 @@ body.dark-mode .topnav-brand {
     color: #f8fafc;
 }
 
-body.dark-mode .topnav-brand__logo,
 body.dark-mode .topnav-pill {
     border-color: rgba(148, 163, 184, 0.14);
     background: rgba(15, 23, 42, 0.94);
@@ -10166,6 +10166,33 @@ body.dark-mode .back-to-top {
 
     :root {
         --topbar-height: 126px;
+    }
+}
+
+@media (min-width: 721px) {
+    body.map-performance-mode {
+        --topbar-height: 72px;
+    }
+
+    body.map-performance-mode .topbar.topbar--minimal {
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+        height: var(--topbar-height) !important;
+        min-height: var(--topbar-height) !important;
+        max-height: var(--topbar-height) !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    body.map-performance-mode .topnav-pill {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        width: auto !important;
+        justify-self: center !important;
+    }
+
+    body.map-performance-mode .topbar.topbar--minimal .topbar__actions {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
     }
 }
 
@@ -10342,6 +10369,110 @@ body.dark-mode .lead-drawer-header {
     }
 }
 
+/* Canonical app header: one fixed topbar across all pages, including /mapa. */
+:root {
+    --app-header-height: 72px;
+    --map-header-gap: 8px;
+    --topbar-height: var(--app-header-height);
+}
+
+.topbar,
+.topbar.topbar--minimal,
+body.map-performance-mode .topbar.topbar--minimal {
+    height: var(--app-header-height) !important;
+    min-height: var(--app-header-height) !important;
+    max-height: var(--app-header-height) !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+    grid-template-rows: 1fr !important;
+    align-items: center !important;
+    align-content: center !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+.topnav-brand,
+.topnav-pill,
+.topbar.topbar--minimal .topbar__actions,
+body.map-performance-mode .topnav-pill,
+body.map-performance-mode .topbar.topbar--minimal .topbar__actions {
+    grid-row: 1 !important;
+    align-self: center !important;
+}
+
+.topnav-brand {
+    grid-column: 1 !important;
+    justify-self: start !important;
+}
+
+.topnav-pill,
+body.map-performance-mode .topnav-pill {
+    grid-column: 2 !important;
+    justify-self: center !important;
+    width: auto !important;
+    max-width: min(760px, calc(100vw - 360px)) !important;
+}
+
+.topbar.topbar--minimal .topbar__actions,
+body.map-performance-mode .topbar.topbar--minimal .topbar__actions {
+    grid-column: 3 !important;
+    justify-self: end !important;
+}
+
+.sales-layout {
+    height: calc(100vh - var(--app-header-height)) !important;
+    min-height: calc(100vh - var(--app-header-height)) !important;
+}
+
+.map-page-layout,
+body.map-performance-mode .map-page-layout {
+    height: calc(100vh - var(--app-header-height) - var(--map-header-gap)) !important;
+    min-height: calc(100vh - var(--app-header-height) - var(--map-header-gap)) !important;
+    margin-top: var(--map-header-gap) !important;
+    padding: 0 !important;
+    padding-top: 0 !important;
+}
+
+body.map-performance-mode .map-right-panel .lead-drawer-content {
+    top: calc(var(--app-header-height) + var(--map-header-gap) + 14px) !important;
+}
+
+@media (max-width: 1120px) {
+    :root {
+        --app-header-height: 72px;
+        --map-header-gap: 8px;
+        --topbar-height: var(--app-header-height);
+    }
+
+    .topnav-pill,
+    body.map-performance-mode .topnav-pill {
+        max-width: min(560px, calc(100vw - 280px)) !important;
+    }
+}
+
+@media (max-width: 720px) {
+    :root {
+        --app-header-height: 72px;
+        --map-header-gap: 8px;
+        --topbar-height: var(--app-header-height);
+    }
+
+    .topbar.topbar--minimal,
+    body.map-performance-mode .topbar.topbar--minimal {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    .topnav-brand__logo {
+        width: 92px !important;
+    }
+
+    .topnav-pill,
+    body.map-performance-mode .topnav-pill {
+        max-width: calc(100vw - 190px) !important;
+    }
+}
+
 /* Admin overview contrast */
 body:not(.dark-mode) .admin-page .admin-hero {
     border-color: rgba(15, 118, 110, 0.16) !important;
@@ -10490,25 +10621,22 @@ body.login-page {
 .login-brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
 }
 
 .login-brand__mark {
-    width: 42px;
-    height: 42px;
-    display: grid;
-    place-items: center;
+    width: 168px;
+    height: auto;
+    display: flex;
+    align-items: center;
     flex: 0 0 auto;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.06);
 }
 
 .login-brand__mark img {
-    width: 30px;
-    height: 30px;
+    width: 100%;
+    height: auto;
     display: block;
-    border-radius: 8px;
+    filter: brightness(1.45) contrast(1.06) drop-shadow(0 1px 10px rgba(94, 234, 212, 0.12));
 }
 
 .login-brand__text {
