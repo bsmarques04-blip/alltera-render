@@ -384,17 +384,18 @@ function setDrawerOpen(open) {
 
 async function loadLeadSummary(leadId) {
     if (!leadId) return;
+    const normalizedLeadId = Number(leadId);
     if (leadSummaryController) leadSummaryController.abort();
     leadSummaryController = new AbortController();
     try {
-        const response = await fetch(`/api/leads/${leadId}/resumo`, { signal: leadSummaryController.signal });
+        const response = await fetch(`/api/leads/${encodeURIComponent(leadId)}/resumo`, { signal: leadSummaryController.signal });
         if (!response.ok) return;
         const summary = await response.json();
-        if (!selectedLead || selectedLead.id !== leadId) return;
+        if (!selectedLead || Number(selectedLead.id) !== normalizedLeadId) return;
         selectedLead = { ...selectedLead, ...summary };
-        leadsById.set(leadId, selectedLead);
-        allLeads = allLeads.map((lead) => (lead.id === leadId ? selectedLead : lead));
-        visibleLeads = visibleLeads.map((lead) => (lead.id === leadId ? selectedLead : lead));
+        leadsById.set(normalizedLeadId, selectedLead);
+        allLeads = allLeads.map((lead) => (Number(lead.id) === normalizedLeadId ? selectedLead : lead));
+        visibleLeads = visibleLeads.map((lead) => (Number(lead.id) === normalizedLeadId ? selectedLead : lead));
         renderDetails();
         renderMapMiniCard();
     } catch (error) {
@@ -1104,7 +1105,7 @@ function renderDetails() {
             </section>
         `;
         els.leadDetails.classList.add("empty-state");
-        els.leadHistory.innerHTML = "—";
+        els.leadHistory.innerHTML = `<p class="lead-drawer-timeline-empty">Sem histórico.</p>`;
         els.tagList.innerHTML = "—";
         els.addTag.disabled = true;
         if (els.leadNoteInput) els.leadNoteInput.value = "";
@@ -1177,14 +1178,21 @@ function renderDetails() {
             bulkAction("assign_commercial", { ids: [selectedLead.id], comercial: suggestion.key });
         });
     }
-    els.leadHistory.innerHTML = selectedLead.historico?.length
-        ? selectedLead.historico
+    const timeline = Array.isArray(selectedLead.timeline) && selectedLead.timeline.length
+        ? selectedLead.timeline
+        : (Array.isArray(selectedLead.historico) ? selectedLead.historico : []);
+    els.leadHistory.innerHTML = timeline.length
+        ? timeline
               .map(
                   (item) =>
-                      `<article class="history-item"><strong>${displayValue(item.created_at)} &middot; ${displayValue(item.acao)}</strong><p>${displayValue(item.observacao, "")}</p></article>`
+                      `<article class="lead-drawer-timeline-item">
+                          <strong>${displayValue(item.titulo || item.acao || "Evento")}</strong>
+                          <span>${displayValue([item.created_at, item.utilizador || item.user].filter(Boolean).join(" · "), "")}</span>
+                          <p>${displayValue(item.descricao || item.observacao || item.resultado, "")}</p>
+                      </article>`
               )
               .join("")
-        : "Sem histórico.";
+        : `<p class="lead-drawer-timeline-empty">Sem histórico.</p>`;
     els.tagList.innerHTML = selectedLead.tags?.length
         ? selectedLead.tags.map((tag) => `<span class="tag removable-tag" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} &times;</span>`).join("")
         : "Sem tags.";

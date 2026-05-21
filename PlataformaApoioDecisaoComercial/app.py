@@ -4241,12 +4241,29 @@ def register_routes(app):
         # Resumo leve para o drawer: a timeline completa continua fora do payload inicial do mapa.
         history = (
             HistoricoLead.query
+            .options(joinedload(HistoricoLead.user))
             .filter(HistoricoLead.lead_id == lead.id)
             .order_by(HistoricoLead.created_at.desc())
             .limit(5)
             .all()
         )
-        item["historico"] = [entry.to_dict() for entry in history]
+        timeline = []
+        for entry in history:
+            timeline.append({
+                "id": entry.id,
+                "lead_id": entry.lead_id,
+                "titulo": entry.acao or "Evento",
+                "acao": entry.acao or "Evento",
+                "tipo_acao": entry.tipo_acao or "",
+                "observacao": entry.observacao or "",
+                "descricao": entry.observacao or entry.resultado or "",
+                "resultado": entry.resultado or "",
+                "utilizador": entry.user.nome if entry.user else "",
+                "user": entry.user.nome if entry.user else "",
+                "created_at": entry.created_at.strftime("%d/%m/%Y %H:%M") if entry.created_at else "",
+            })
+        item["timeline"] = timeline
+        item["historico"] = timeline
         return jsonify(item)
 
     @app.route("/api/search")

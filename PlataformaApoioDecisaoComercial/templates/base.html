@@ -340,7 +340,10 @@
             };
             const timeline = (items) => {
                 const values = Array.isArray(items) ? items.slice(0, 5) : [];
-                return values.length ? values.map((item) => `<li><strong>${escapeHtml(item.acao || "Evento")}</strong><span>${escapeHtml(item.created_at || "")}</span><p>${escapeHtml(item.observacao || item.resultado || "")}</p></li>`).join("") : `<li class="is-empty">Sem histórico recente.</li>`;
+                return values.length ? values.map((item) => {
+                    const description = item.descricao || item.observacao || item.resultado || "";
+                    return `<li class="lead-drawer-timeline-item"><strong>${escapeHtml(item.titulo || item.acao || "Evento")}</strong><span>${escapeHtml([item.created_at, item.utilizador || item.user].filter(Boolean).join(" · "))}</span>${description ? `<p>${escapeHtml(description)}</p>` : ""}</li>`;
+                }).join("") : `<li class="lead-drawer-timeline-empty">Sem histórico.</li>`;
             };
             const leadEditUrl = (lead) => {
                 if (!lead?.id) return "#";
@@ -424,7 +427,7 @@
                     <section class="lead-drawer-block global-lead-section"><h3>Observações</h3><p>${lead.observacoes ? escapeHtml(lead.observacoes) : "Sem observações"}</p></section>
                     <section class="lead-drawer-block global-lead-section"><h3>Observações do contacto</h3><p>${lead.observacoes_contacto ? escapeHtml(lead.observacoes_contacto) : "Sem observações de contacto"}</p></section>
                     <section class="lead-drawer-block global-lead-section"><h3>Tags</h3><div class="global-lead-tags">${chips([...(lead.insight_tags || []), ...(lead.tags || [])])}</div></section>
-                    <section class="lead-drawer-block global-lead-section"><h3>Timeline</h3><ol class="global-lead-timeline">${timeline(lead.historico)}</ol></section>
+                    <section class="lead-drawer-block global-lead-section"><h3>Timeline</h3><ol class="global-lead-timeline">${timeline(lead.timeline || lead.historico)}</ol></section>
                 `;
             };
             const openLeadDrawer = async (leadId) => {
