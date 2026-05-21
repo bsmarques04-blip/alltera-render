@@ -14,6 +14,12 @@
     </section>
 
     <form class="panel manual-lead-form" method="post">
+        {% if edit_lead %}
+        <input type="hidden" name="lead_id" value="{{ edit_lead.id }}">
+        {% endif %}
+        {% if form.get('next') %}
+        <input type="hidden" name="next" value="{{ form.get('next') }}">
+        {% endif %}
         {% if duplicate %}
         <p class="message inline-message">Já existe uma lead com dados equivalentes: {{ duplicate.nome_cliente or duplicate.nome_empresa }}.</p>
         {% endif %}

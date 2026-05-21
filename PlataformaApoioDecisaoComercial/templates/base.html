@@ -187,6 +187,7 @@
                 <button type="button" data-global-lead-action="contactado" disabled>Contactada</button>
                 <button type="button" data-global-lead-action="adiar" disabled>Reagendar</button>
                 <button type="button" data-global-lead-action="reuniao" disabled>Marcar reunião</button>
+                <a id="globalLeadEditLink" href="#" aria-disabled="true">Editar lead</a>
                 <a id="globalLeadFullLink" href="#" aria-disabled="true">Abrir página completa</a>
                 <a id="globalLeadMapLink" href="#" aria-disabled="true">Abrir no mapa</a>
             </footer>
@@ -328,6 +329,7 @@
             const leadDrawerFooter = document.getElementById("globalLeadDrawerFooter");
             const globalLeadFullLink = document.getElementById("globalLeadFullLink");
             const globalLeadMapLink = document.getElementById("globalLeadMapLink");
+            const globalLeadEditLink = document.getElementById("globalLeadEditLink");
             let activeLeadId = null;
             const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
             const leadName = (lead) => lead.nome_cliente || lead.nome_empresa || lead.empresa || "Lead sem nome";
@@ -340,12 +342,38 @@
                 const values = Array.isArray(items) ? items.slice(0, 5) : [];
                 return values.length ? values.map((item) => `<li><strong>${escapeHtml(item.acao || "Evento")}</strong><span>${escapeHtml(item.created_at || "")}</span><p>${escapeHtml(item.observacao || item.resultado || "")}</p></li>`).join("") : `<li class="is-empty">Sem histórico recente.</li>`;
             };
+            const leadEditUrl = (lead) => {
+                if (!lead?.id) return "#";
+                const params = new URLSearchParams({
+                    lead_id: lead.id,
+                    next: window.location.pathname + window.location.search,
+                    nome_cliente: lead.nome_cliente || "",
+                    empresa: lead.empresa || lead.nome_empresa || "",
+                    nome_empresa: lead.nome_empresa || "",
+                    cidade: lead.cidade || lead.localidade || "",
+                    localidade: lead.localidade || lead.cidade || "",
+                    morada: lead.morada || "",
+                    codigo_postal: lead.codigo_postal || "",
+                    telefone: lead.telefone || "",
+                    email: lead.email || "",
+                    area_negocio: lead.area_negocio || lead.tipo_cliente || "",
+                    tipo_cliente: lead.tipo_cliente || lead.area_negocio || "",
+                    comercial_responsavel: lead.comercial_responsavel || "",
+                    observacoes: lead.observacoes || "",
+                    observacoes_contacto: lead.observacoes_contacto || "",
+                });
+                return `/leads/nova?${params}`;
+            };
             const setGlobalLeadActions = (enabled, lead = null) => {
                 leadDrawerFooter?.querySelectorAll("button").forEach((button) => {
                     button.disabled = !enabled;
                 });
                 const fullUrl = lead?.id ? `/mapa?lead_id=${encodeURIComponent(lead.id)}&history=1` : "#";
                 const mapUrl = lead?.id ? (lead.latitude && lead.longitude ? `/mapa?lead_id=${encodeURIComponent(lead.id)}&lat=${encodeURIComponent(lead.latitude)}&lng=${encodeURIComponent(lead.longitude)}` : `/mapa?lead_id=${encodeURIComponent(lead.id)}`) : "#";
+                if (globalLeadEditLink) {
+                    globalLeadEditLink.href = enabled ? leadEditUrl(lead) : "#";
+                    globalLeadEditLink.setAttribute("aria-disabled", String(!enabled));
+                }
                 if (globalLeadFullLink) {
                     globalLeadFullLink.href = fullUrl;
                     globalLeadFullLink.setAttribute("aria-disabled", String(!enabled));

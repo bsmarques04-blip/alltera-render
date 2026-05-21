@@ -154,28 +154,6 @@
                 <div id="leadHistory" class="lead-timeline empty-state">—</div>
             </section>
 
-            <section class="panel panel--inset lead-note-panel">
-                <div class="panel-head panel-head--tight">
-                    <h3>Notas rápidas</h3>
-                </div>
-                <textarea id="leadNoteInput" rows="3" placeholder="Adicionar nota"></textarea>
-                <button class="button secondary full" id="addLeadNote" type="button" disabled>Guardar nota</button>
-            </section>
-
-            <section class="panel panel--inset nearby-panel">
-                <div class="panel-head panel-head--tight">
-                    <h3 id="nearbyTitle">Leads próximas em 10 km</h3>
-                    <span class="tag" id="nearbyCount">0</span>
-                </div>
-                <label class="range-control">Raio de proximidade
-                    <span><strong id="nearbyRadiusValue">10</strong> km</span>
-                    <input id="nearbyRadius" type="range" min="1" max="50" value="10">
-                </label>
-                <p class="hint hint--tight" id="nearbyRadiusText">Raio de <strong>10 km</strong> em torno da lead selecionada. Inclui contactos a retomar (ex.: não atendeu, ligar depois).</p>
-                <div id="nearbyList" class="nearby-list nearby-list--compact empty-state">Selecione uma lead com localização no mapa.</div>
-                <button type="button" class="button full" id="dayContactPlan" disabled>Criar lista de contactos da zona</button>
-            </section>
-
             <details class="accordion panel panel--inset">
                 <summary>Tags</summary>
                 <label class="label-inline">Adicionar
@@ -184,59 +162,59 @@
                 <button class="button secondary full" id="addTag" type="button" disabled>Adicionar tag</button>
                 <div id="tagList" class="tag-list tag-list--compact empty-state">—</div>
             </details>
-
-            <section class="panel panel--inset plan-controls plan-controls--legacy">
-                <div class="panel-head panel-head--tight">
-                    <h3>Lista de contactos da zona</h3>
-                </div>
-                <label>Máx. leads<input id="planMax" type="number" min="1" max="25" value="12"></label>
-                <button class="button secondary full" id="generatePlan" type="button" disabled>Criar lista de contactos</button>
-                <button class="button secondary full" id="exportPlan" type="button" disabled>Exportar Excel</button>
-            </section>
-
-            <section class="panel panel--inset" id="planPanel">
-                <div class="panel-head panel-head--tight"><h3>Resumo do plano</h3></div>
-                <div id="planSummary" class="empty-state empty-state--quiet">—</div>
-                <div id="visitPlan" class="visit-plan visit-plan--compact"></div>
-            </section>
-
-            <section hidden aria-hidden="true">
-                <span id="listCount">0</span>
-                <button type="button" id="leadListTabVisible" data-lead-list-mode="visible"></button>
-                <button type="button" id="leadListTabAll" data-lead-list-mode="all"></button>
-                <div id="mapBulkActions" hidden>
-                    <strong id="bulkSelectedCount">0</strong>
-                    <select id="bulkCommercial">
-                        {% for item in options.mapa_comerciais %}
-                        {% if item.value %}
-                        <option value="{{ item.value }}">{{ item.label }}</option>
-                        {% endif %}
-                        {% endfor %}
-                    </select>
-                    <select id="bulkState">
-                        {% for item in options.estados %}
-                        <option value="{{ item }}">{{ item }}</option>
-                        {% endfor %}
-                    </select>
-                    <button id="bulkAssign" type="button"></button>
-                    <button id="bulkClearCommercial" type="button"></button>
-                    <button id="bulkSetState" type="button"></button>
-                    <button id="bulkIgnore" type="button"></button>
-                    <button id="bulkExport" type="button"></button>
-                    <button id="bulkPlan" type="button"></button>
-                </div>
-                <div id="leadsList"></div>
-            </section>
             </div>
 
             <div class="lead-drawer-footer" id="leadDrawerActions">
                 <button class="button secondary" data-action="contactado" disabled>Contactada</button>
                 <button class="button secondary" data-action="adiar" disabled>Reagendar</button>
                 <button class="button secondary" data-action="crm" disabled>Marcar reunião</button>
+                <a class="button secondary" id="editLeadLink" href="#" aria-disabled="true">Editar lead</a>
                 <a class="button secondary" id="openFullLead" href="#" aria-disabled="true">Abrir página completa</a>
                 <button class="button secondary" id="focusSelectedLead" type="button" disabled>Abrir no mapa</button>
             </div>
     </aside>
+
+    <section class="map-technical-controls" hidden aria-hidden="true">
+        <textarea id="leadNoteInput" rows="3"></textarea>
+        <button id="addLeadNote" type="button" disabled></button>
+        <span id="nearbyCount">0</span>
+        <strong id="nearbyRadiusValue">10</strong>
+        <input id="nearbyRadius" type="range" min="1" max="50" value="10">
+        <p id="nearbyRadiusText"></p>
+        <h3 id="nearbyTitle">Leads próximas em 10 km</h3>
+        <div id="nearbyList"></div>
+        <button type="button" id="dayContactPlan" disabled></button>
+        <input id="planMax" type="number" min="1" max="25" value="12">
+        <button id="generatePlan" type="button" disabled></button>
+        <button id="exportPlan" type="button" disabled></button>
+        <div id="planSummary"></div>
+        <div id="visitPlan"></div>
+        <span id="listCount">0</span>
+        <button type="button" id="leadListTabVisible" data-lead-list-mode="visible"></button>
+        <button type="button" id="leadListTabAll" data-lead-list-mode="all"></button>
+        <div id="mapBulkActions" hidden>
+            <strong id="bulkSelectedCount">0</strong>
+            <select id="bulkCommercial">
+                {% for item in options.mapa_comerciais %}
+                {% if item.value %}
+                <option value="{{ item.value }}">{{ item.label }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+            <select id="bulkState">
+                {% for item in options.estados %}
+                <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+            <button id="bulkAssign" type="button"></button>
+            <button id="bulkClearCommercial" type="button"></button>
+            <button id="bulkSetState" type="button"></button>
+            <button id="bulkIgnore" type="button"></button>
+            <button id="bulkExport" type="button"></button>
+            <button id="bulkPlan" type="button"></button>
+        </div>
+        <div id="leadsList"></div>
+    </section>
 </main>
 {% endblock %}
 

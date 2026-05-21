@@ -38,6 +38,9 @@ let leadFetchController = null;
 let leadSummaryController = null;
 let lastLeadFetchKey = "";
 const LEAD_LIST_RENDER_LIMIT = 160;
+const initialUrlParams = new URLSearchParams(window.location.search);
+const initialFocusLeadId = Number(initialUrlParams.get("lead_id")) || null;
+let hasConsumedInitialFocus = !initialFocusLeadId;
 
 document.body.classList.add("map-performance-mode");
 
@@ -94,6 +97,7 @@ const els = {
     visitPlan: document.getElementById("visitPlan"),
     leadsList: document.getElementById("leadsList"),
     listCount: document.getElementById("listCount"),
+    editLeadLink: document.getElementById("editLeadLink"),
     leadDrawer: document.getElementById("leadDrawer"),
     drawerClose: document.getElementById("drawerClose"),
     drawerBackdrop: document.getElementById("drawerBackdrop"),
@@ -894,6 +898,26 @@ function openLeadDrawer(leadId) {
 
 window.openLeadDrawer = openLeadDrawer;
 
+function consumeInitialFocus() {
+    if (hasConsumedInitialFocus) return;
+    hasConsumedInitialFocus = true;
+    try {
+        sessionStorage.removeItem("alltera.focusLead");
+        sessionStorage.removeItem("alltera.selectedLead");
+        sessionStorage.removeItem("alltera.openLead");
+        localStorage.removeItem("alltera.focusLead");
+        localStorage.removeItem("alltera.selectedLead");
+        localStorage.removeItem("alltera.openLead");
+    } catch {
+        // Storage can be unavailable in restrictive browser modes.
+    }
+    const url = new URL(window.location.href);
+    ["lead_id", "focusLead", "selectedLead", "openLead", "highlightLead", "lat", "lng"].forEach((key) => {
+        url.searchParams.delete(key);
+    });
+    history.replaceState(history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function clusterLeadFromMarker(marker) {
     if (marker?.lead && typeof marker.lead === "object") return marker.lead;
     if (marker?.options?.lead && typeof marker.options.lead === "object") return marker.options.lead;
@@ -1089,6 +1113,10 @@ function renderDetails() {
             els.openFullLead.href = "#";
             els.openFullLead.setAttribute("aria-disabled", "true");
         }
+        if (els.editLeadLink) {
+            els.editLeadLink.href = "#";
+            els.editLeadLink.setAttribute("aria-disabled", "true");
+        }
         return;
     }
     els.leadDetails.classList.remove("empty-state");
@@ -1097,6 +1125,10 @@ function renderDetails() {
     if (els.openFullLead) {
         els.openFullLead.href = `/mapa?lead_id=${selectedLead.id}&history=1`;
         els.openFullLead.setAttribute("aria-disabled", "false");
+    }
+    if (els.editLeadLink) {
+        els.editLeadLink.href = leadEditUrl(selectedLead);
+        els.editLeadLink.setAttribute("aria-disabled", "false");
     }
     const acc = document.getElementById("actionsAccordion");
     if (acc) acc.open = Boolean(selectedLead);
@@ -1213,6 +1245,29 @@ function escapeHtml(value) {
 function displayValue(value, fallback = "-") {
     const text = String(value ?? "").trim();
     return text ? escapeHtml(text) : fallback;
+}
+
+function leadEditUrl(lead) {
+    if (!lead?.id) return "#";
+    const params = new URLSearchParams({
+        lead_id: lead.id,
+        next: window.location.pathname,
+        nome_cliente: lead.nome_cliente || "",
+        empresa: lead.empresa || lead.nome_empresa || "",
+        nome_empresa: lead.nome_empresa || "",
+        cidade: lead.cidade || lead.localidade || "",
+        localidade: lead.localidade || lead.cidade || "",
+        morada: lead.morada || "",
+        codigo_postal: lead.codigo_postal || "",
+        telefone: lead.telefone || "",
+        email: lead.email || "",
+        area_negocio: lead.area_negocio || lead.tipo_cliente || "",
+        tipo_cliente: lead.tipo_cliente || lead.area_negocio || "",
+        comercial_responsavel: lead.comercial_responsavel || "",
+        observacoes: lead.observacoes || "",
+        observacoes_contacto: lead.observacoes_contacto || "",
+    });
+    return `/leads/nova?${params}`;
 }
 
 function detailLine(label, value) {
@@ -2039,10 +2094,11 @@ async function loadLeads({ force = false, viewportOnly = true } = {}) {
         const parsed = Number(trimmed);
         return Number.isFinite(parsed) ? parsed : Number.NaN;
     };
-    const urlLeadId = toFiniteNumber(params.get("lead_id"));
+    const focusLeadId = !hasConsumedInitialFocus && initialFocusLeadId ? initialFocusLeadId : null;
+    const selectedLeadId = selectedLead?.id || null;
     const urlLat = toFiniteNumber(params.get("lat"));
     const urlLng = toFiniteNumber(params.get("lng"));
-    const currentId = selectedLead?.id || (Number.isFinite(urlLeadId) && urlLeadId > 0 ? urlLeadId : null);
+    const currentId = selectedLeadId || focusLeadId;
     let response;
     const fetchParams = new URLSearchParams({ lite: "1" });
     if (els.assignmentScopeFilter?.value) fetchParams.set("scope", els.assignmentScopeFilter.value);
@@ -2079,25 +2135,31 @@ async function loadLeads({ force = false, viewportOnly = true } = {}) {
     }));
     leadsById = new Map(allLeads.map((lead) => [lead.id, lead]));
     applyCityOffsets();
-    if (currentId) {
+    if (focusLeadId) {
         if (els.classificationFilter) els.classificationFilter.value = "";
         if (els.historyFilter) els.historyFilter.checked = true;
     }
-    selectedLead = currentId ? leadsById.get(currentId) || null : selectedLead;
+    if (selectedLeadId) {
+        selectedLead = leadsById.get(selectedLeadId) || selectedLead;
+    } else if (focusLeadId) {
+        selectedLead = leadsById.get(focusLeadId) || null;
+    }
     setDrawerOpen(Boolean(selectedLead));
     applyFilters();
     renderOperationalInsights();
     if (leadFetchController === controller) setMapLoading(false);
-    if (currentId && selectedLead) {
+    if (focusLeadId && selectedLead) {
         const alreadyVisible = visibleLeads.some((lead) => lead.id === selectedLead.id);
         if (!alreadyVisible) {
             visibleLeads = [selectedLead, ...visibleLeads];
             renderMarkers();
         }
-        selectLead(currentId);
+        selectLead(focusLeadId);
+        consumeInitialFocus();
         return;
     }
-    if (Number.isFinite(urlLat) && Number.isFinite(urlLng)) {
+    if (!hasConsumedInitialFocus) consumeInitialFocus();
+    if (!selectedLeadId && Number.isFinite(urlLat) && Number.isFinite(urlLng)) {
         // Respeita deep-link com coordenadas, mas sem aproximar demasiado.
         map.flyTo([urlLat, urlLng], 11, { animate: true, duration: 0.32, easeLinearity: 0.25 });
     }

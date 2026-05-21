@@ -188,8 +188,10 @@
             ? `/mapa?lead_id=${lead.id}&lat=${encodeURIComponent(lead.latitude)}&lng=${encodeURIComponent(lead.longitude)}`
             : "";
         const editParams = new URLSearchParams({
+            lead_id: lead.id,
             next: "/todas-leads",
             nome_cliente: lead.nome_cliente || "",
+            empresa: lead.empresa || lead.nome_empresa || "",
             nome_empresa: lead.nome_empresa || "",
             cidade: lead.cidade || lead.localidade || "",
             localidade: lead.localidade || lead.cidade || "",
@@ -201,6 +203,7 @@
             tipo_cliente: lead.tipo_cliente || "",
             comercial_responsavel: lead.comercial_responsavel || "",
             observacoes: lead.observacoes || "",
+            observacoes_contacto: lead.observacoes_contacto || "",
         }).toString();
         const editUrl = `/leads/nova?${editParams}`;
         return `

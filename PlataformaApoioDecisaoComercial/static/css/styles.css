@@ -8440,10 +8440,6 @@ body.dark-mode .file-preview-card span {
     pointer-events: none;
 }
 
-.global-lead-drawer .global-lead-drawer__footer a:last-child {
-    grid-column: span 2;
-}
-
 .command-palette {
     position: fixed;
     inset: 0;
@@ -10293,7 +10289,9 @@ body.dark-mode .back-to-top {
 .lead-drawer {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 24px);
+    height: auto;
+    max-height: calc(100vh - var(--app-header-height, 88px) - 28px);
+    overflow: hidden;
 }
 
 .map-page-layout {
@@ -10355,7 +10353,7 @@ body.dark-mode .back-to-top {
 .lead-drawer.map-right-panel,
 body.map-performance-mode .lead-drawer.map-right-panel {
     position: fixed !important;
-    top: calc(var(--topbar-height) + 14px) !important;
+    top: calc(var(--app-header-height, 88px) + 12px) !important;
     right: 16px !important;
     bottom: 16px !important;
     left: auto !important;
@@ -10363,8 +10361,8 @@ body.map-performance-mode .lead-drawer.map-right-panel {
     display: flex !important;
     flex-direction: column !important;
     width: min(430px, calc(100vw - 32px)) !important;
-    height: calc(100vh - var(--topbar-height) - 30px) !important;
-    max-height: none !important;
+    height: auto !important;
+    max-height: calc(100vh - var(--app-header-height, 88px) - 28px) !important;
     min-height: 0 !important;
     gap: 0 !important;
     padding: 0 !important;
@@ -10449,7 +10447,7 @@ body.map-drawer-open .lead-drawer-overlay {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 12px 12px 22px;
+    padding: 12px 12px 28px;
     overflow-x: hidden;
     overflow-y: auto;
     background: #0b1423;
@@ -10474,7 +10472,7 @@ body.map-drawer-open .lead-drawer-overlay {
 
 .lead-drawer-footer {
     flex: 0 0 auto;
-    position: sticky;
+    position: relative;
     bottom: 0;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10609,11 +10607,13 @@ body.dark-mode .insight-pill {
 @media (max-width: 720px) {
     .lead-drawer.map-right-panel,
     body.map-performance-mode .lead-drawer.map-right-panel {
-        top: calc(var(--topbar-height) + 8px);
-        right: 8px;
-        bottom: 8px;
+        top: 8px !important;
+        right: 8px !important;
+        bottom: 8px !important;
+        left: 8px !important;
         width: calc(100vw - 16px) !important;
-        height: calc(100vh - var(--topbar-height) - 16px) !important;
+        height: auto !important;
+        max-height: calc(100vh - 16px) !important;
         max-width: calc(100vw - 16px) !important;
         border-radius: 14px;
     }
@@ -10707,7 +10707,21 @@ body.map-performance-mode .map-page-layout {
 }
 
 body.map-performance-mode .lead-drawer.map-right-panel {
-    top: calc(var(--app-header-height) + var(--map-header-gap) + 14px) !important;
+    top: calc(var(--app-header-height, 88px) + 12px) !important;
+    bottom: 16px !important;
+    height: auto !important;
+    max-height: calc(100vh - var(--app-header-height, 88px) - 28px) !important;
+}
+
+@media (max-width: 720px) {
+    body.map-performance-mode .lead-drawer.map-right-panel {
+        top: 8px !important;
+        right: 8px !important;
+        bottom: 8px !important;
+        left: 8px !important;
+        height: auto !important;
+        max-height: calc(100vh - 16px) !important;
+    }
 }
 
 @media (max-width: 1120px) {

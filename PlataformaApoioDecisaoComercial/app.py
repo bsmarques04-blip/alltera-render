@@ -2184,10 +2184,12 @@ def normalize_lead(row):
     return lead
 
 
-def build_duplicate_indexes():
+def build_duplicate_indexes(exclude_lead_id=None):
     phone_index = {}
     fallback_index = {}
     for lead in Lead.query.all():
+        if exclude_lead_id and lead.id == exclude_lead_id:
+            continue
         for phone in extract_phone_numbers(lead.telefone):
             phone_index.setdefault(phone, lead)
         key = dedupe_fallback_key(lead.to_dict())
@@ -2196,16 +2198,39 @@ def build_duplicate_indexes():
     return phone_index, fallback_index
 
 
-def detect_duplicate(lead, phone_index=None, fallback_index=None):
+def detect_duplicate(lead, phone_index=None, fallback_index=None, exclude_lead_id=None):
     phone_index = phone_index or {}
     fallback_index = fallback_index or {}
     for phone in extract_phone_numbers(lead.get("telefone")):
-        if phone in phone_index:
-            return phone_index[phone], f"telefone:{phone}"
+        duplicate = phone_index.get(phone)
+        if duplicate and duplicate.id != exclude_lead_id:
+            return duplicate, f"telefone:{phone}"
     key = dedupe_fallback_key(lead)
-    if key and key in fallback_index:
-        return fallback_index[key], key
+    duplicate = fallback_index.get(key) if key else None
+    if duplicate and duplicate.id != exclude_lead_id:
+        return duplicate, key
     return None, ""
+
+
+def update_manual_lead(lead, lead_data):
+    editable_fields = {
+        "nome_cliente",
+        "area_negocio",
+        "cidade",
+        "empresa",
+        "nome_empresa",
+        "tipo_cliente",
+        "morada",
+        "codigo_postal",
+        "localidade",
+        "contacto",
+        "telefone",
+        "email",
+        "observacoes",
+        "observacoes_contacto",
+    }
+    for field in editable_fields:
+        setattr(lead, field, lead_data[field])
 
 
 def index_saved_lead(lead_obj, phone_index, fallback_index):
@@ -3683,20 +3708,35 @@ def register_routes(app):
     @app.route("/leads/nova", methods=["GET", "POST"])
     @login_required
     def adicionar_lead():
+        edit_lead_id = request.form.get("lead_id", type=int) if request.method == "POST" else request.args.get("lead_id", type=int)
+        edit_lead = Lead.query.get_or_404(edit_lead_id) if edit_lead_id else None
         if request.method == "POST":
             lead_data = build_manual_lead(request.form)
             if not clean_text(lead_data["nome_cliente"] or lead_data["nome_empresa"]):
                 flash("Indica o Nome Cliente ou a Empresa.", "error")
-                return render_template("adicionar_lead.html", form=request.form)
+                return render_template("adicionar_lead.html", form=request.form, edit_lead=edit_lead)
             if not clean_text(request.form.get("cidade") or request.form.get("morada") or request.form.get("codigo_postal")):
                 flash("Indica pelo menos Cidade, Morada ou Código Postal.", "error")
-                return render_template("adicionar_lead.html", form=request.form)
+                return render_template("adicionar_lead.html", form=request.form, edit_lead=edit_lead)
 
-            phone_index, fallback_index = build_duplicate_indexes()
-            duplicate, reason = detect_duplicate(lead_data, phone_index, fallback_index)
+            phone_index, fallback_index = build_duplicate_indexes(exclude_lead_id=edit_lead.id if edit_lead else None)
+            duplicate, reason = detect_duplicate(
+                lead_data,
+                phone_index,
+                fallback_index,
+                exclude_lead_id=edit_lead.id if edit_lead else None,
+            )
             if duplicate:
-                flash(f"Lead duplicada encontrada ({reason}). Não foi criada uma nova lead.", "error")
-                return render_template("adicionar_lead.html", form=request.form, duplicate=duplicate)
+                action = "guardada" if edit_lead else "criada uma nova lead"
+                flash(f"Lead duplicada encontrada ({reason}). Não foi {action}.", "error")
+                return render_template("adicionar_lead.html", form=request.form, duplicate=duplicate, edit_lead=edit_lead)
+
+            if edit_lead:
+                update_manual_lead(edit_lead, lead_data)
+                add_history(edit_lead, "Lead editada manualmente", "Dados atualizados diretamente na aplicação.")
+                db.session.commit()
+                flash("Lead guardada com sucesso.", "success")
+                return redirect(request.form.get("next") or url_for("mapa_leads"))
 
             lead = Lead(**lead_data)
             db.session.add(lead)
@@ -3717,7 +3757,7 @@ def register_routes(app):
             return redirect(url_for("mapa_leads"))
 
         prefill = {key: value for key, value in request.args.items() if value is not None}
-        return render_template("adicionar_lead.html", form=prefill)
+        return render_template("adicionar_lead.html", form=prefill, edit_lead=edit_lead)
 
     @app.route("/api/import/sheets", methods=["POST"])
     @login_required
