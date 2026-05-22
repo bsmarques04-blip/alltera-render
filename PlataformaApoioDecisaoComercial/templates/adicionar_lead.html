@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Adicionar Lead | Alltera{% endblock %}
+{% block title %}Nova lead | Alltera{% endblock %}
 
 {% block content %}
 <main class="page-shell">
     <section class="panel import-hero import-hero--premium">
         <div>
             <p class="eyebrow">Entrada manual</p>
-            <h1>Adicionar lead</h1>
-            <p>Regista uma oportunidade pontual para aparecer no mapa e apoiar a decisão de contactos por zona.</p>
+            <h1>{% if edit_lead %}Editar lead{% else %}Nova lead{% endif %}</h1>
+            <p>Regista uma oportunidade pontual para aparecer no mapa e apoiar a decisao de contactos por zona.</p>
         </div>
-        <a class="button secondary" href="{{ form.get('next') or url_for('mapa_leads') }}">Voltar</a>
+        <a class="button secondary" href="{{ form.get('next') or url_for('todas_leads') }}">Voltar</a>
     </section>
 
     <form class="panel manual-lead-form" method="post">
@@ -21,24 +21,27 @@
         <input type="hidden" name="next" value="{{ form.get('next') }}">
         {% endif %}
         {% if duplicate %}
-        <p class="message inline-message">Já existe uma lead com dados equivalentes: {{ duplicate.nome_cliente or duplicate.nome_empresa }}.</p>
+        <p class="message inline-message">Ja existe uma lead com dados equivalentes: {{ duplicate.nome_cliente or duplicate.nome_empresa }}.</p>
         {% endif %}
 
         <section class="manual-lead-grid">
-            <label>Nome Cliente
+            <label>Nome cliente
                 <input name="nome_cliente" value="{{ form.get('nome_cliente', '') }}" placeholder="Nome do contacto">
             </label>
-            <label>Empresa
+            <label>Empresa / Nome empresa
                 <input name="empresa" value="{{ form.get('empresa', '') }}" placeholder="Nome da empresa">
             </label>
-            <label>Área de negócio
+            <label>Area de negocio
                 <input name="area_negocio" value="{{ form.get('area_negocio', '') }}" placeholder="Restaurante, hotel, horeca...">
             </label>
-            <label>Contacto telefónico
+            <label>Contacto telefonico
                 <input name="telefone" value="{{ form.get('telefone', '') }}" placeholder="+351 912 345 678">
             </label>
             <label>Email
                 <input name="email" type="email" value="{{ form.get('email', '') }}" placeholder="email@empresa.pt">
+            </label>
+            <label>NIF
+                <input name="nif" value="{{ form.get('nif', '') }}" placeholder="Numero fiscal">
             </label>
             <label>Cidade
                 <input name="cidade" value="{{ form.get('cidade', '') }}" placeholder="Lisboa">
@@ -46,23 +49,45 @@
             <label>Morada
                 <input name="morada" value="{{ form.get('morada', '') }}" placeholder="Rua, avenida ou zona">
             </label>
-            <label>Código Postal
+            <label>Codigo postal
                 <input name="codigo_postal" value="{{ form.get('codigo_postal', '') }}" placeholder="1000-000">
+            </label>
+            <label>Estado inicial
+                <select name="estado">
+                    {% for state in lead_states %}
+                    <option value="{{ state }}" {% if form.get('estado', 'Por contactar') == state %}selected{% endif %}>{{ state }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Prioridade
+                <select name="prioridade">
+                    {% for priority in priority_options %}
+                    <option value="{{ priority }}" {% if form.get('prioridade', 'Baixa') == priority %}selected{% endif %}>{{ priority }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="manual-lead-grid__wide">Tags
+                <input name="tags" value="{{ form.get('tags', '') }}" list="manualLeadTags" placeholder="Quente, VIP, Recuperar">
+                <datalist id="manualLeadTags">
+                    {% for tag in tag_options %}
+                    <option value="{{ tag }}"></option>
+                    {% endfor %}
+                </datalist>
             </label>
         </section>
 
-        <label>Observações
+        <label>Observacoes
             <textarea name="observacoes" rows="4" placeholder="Notas gerais">{{ form.get('observacoes', '') }}</textarea>
         </label>
-        <label>Observações do contacto
+        <label>Observacoes do contacto
             <textarea name="observacoes_contacto" rows="4" placeholder="Contexto do contacto">{{ form.get('observacoes_contacto', '') }}</textarea>
         </label>
 
         <div class="sheet-actions">
             <button class="button" type="submit">Guardar lead</button>
-            <a class="button secondary" href="{{ form.get('next') or url_for('mapa_leads') }}">Cancelar</a>
+            <a class="button secondary" href="{{ form.get('next') or url_for('todas_leads') }}">Cancelar</a>
         </div>
-        <p class="hint">Obrigatório: Nome Cliente ou Empresa; e Cidade, Morada ou Código Postal. O telefone é normalizado e usado para evitar duplicados.</p>
+        <p class="hint">Obrigatorio: Nome cliente ou Empresa; e Cidade, Morada ou Codigo postal. O telefone e recomendado, normalizado e usado para evitar duplicados.</p>
     </form>
 </main>
 {% endblock %}

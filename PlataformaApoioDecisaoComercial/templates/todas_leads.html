@@ -11,6 +11,12 @@
             <h1>Todas as Leads</h1>
             <p>Consulta de leads ativas com pesquisa rápida, filtros e ações operacionais.</p>
         </div>
+        {% if current_user.role in ["admin", "comercial", "rececionista"] %}
+        <a class="button all-leads-new-button" href="{{ url_for('adicionar_lead', next=url_for('todas_leads')) }}">
+            <span class="add-lead-button__icon" aria-hidden="true"></span>
+            Nova lead
+        </a>
+        {% endif %}
     </section>
 
     <section class="metric-grid dashboard-metrics">
