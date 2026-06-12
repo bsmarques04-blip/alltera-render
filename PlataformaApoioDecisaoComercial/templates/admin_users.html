@@ -58,6 +58,42 @@
         color: #64748b;
     }
 
+    .status-pill--pending {
+        background: rgba(245, 158, 11, 0.14);
+        color: #b45309;
+    }
+
+    .status-pill--rejected {
+        background: rgba(239, 68, 68, 0.12);
+        color: #b91c1c;
+    }
+
+    .user-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .user-actions form {
+        margin: 0;
+    }
+
+    .user-actions button {
+        min-height: 32px;
+        border: 0;
+        border-radius: 999px;
+        padding: 0 12px;
+        background: rgba(15, 118, 110, 0.12);
+        color: #0f766e;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .user-actions button.danger {
+        background: rgba(239, 68, 68, 0.12);
+        color: #b91c1c;
+    }
+
     @media (max-width: 760px) {
         .users-table {
             display: block;
@@ -77,7 +113,7 @@
         <div>
             <p class="eyebrow">Admin</p>
             <h1>Utilizadores</h1>
-            <p>Listagem simples da equipa interna. Edicao de utilizadores fica preparada para uma proxima fase.</p>
+            <p>Revê pedidos de acesso e gere utilizadores ativos da equipa interna.</p>
         </div>
         <a class="button secondary" href="{{ url_for('admin_overview') }}">Voltar ao overview</a>
     </section>
@@ -89,8 +125,10 @@
                     <th>Nome</th>
                     <th>Email</th>
                     <th>Perfil</th>
-                    <th>Estado</th>
+                    <th>Aprovação</th>
+                    <th>Ativo</th>
                     <th>Criado em</th>
+                    <th>Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -100,15 +138,46 @@
                     <td>{{ user.email }}</td>
                     <td>{{ "Rececionista" if user.role == "comercial" else "Admin" }}</td>
                     <td>
+                        <span class="status-pill {% if user.approval_status == 'pending' %}status-pill--pending{% elif user.approval_status == 'rejected' %}status-pill--rejected{% endif %}">
+                            {% if user.approval_status == "pending" %}Pendente{% elif user.approval_status == "rejected" %}Rejeitado{% else %}Aprovado{% endif %}
+                        </span>
+                    </td>
+                    <td>
                         <span class="status-pill {% if not user.ativo %}status-pill--off{% endif %}">
                             {{ "Ativo" if user.ativo else "Inativo" }}
                         </span>
                     </td>
                     <td>{{ user.created_at.strftime("%d/%m/%Y") if user.created_at else "-" }}</td>
+                    <td>
+                        <div class="user-actions">
+                            {% if user.approval_status == "pending" %}
+                            <form method="post" action="{{ url_for('admin_user_approval', user_id=user.id) }}">
+                                <input type="hidden" name="action" value="approve">
+                                <button type="submit">Aprovar</button>
+                            </form>
+                            <form method="post" action="{{ url_for('admin_user_approval', user_id=user.id) }}">
+                                <input type="hidden" name="action" value="reject">
+                                <button class="danger" type="submit">Rejeitar</button>
+                            </form>
+                            {% elif user.approval_status == "approved" and user.ativo %}
+                            <form method="post" action="{{ url_for('admin_user_approval', user_id=user.id) }}">
+                                <input type="hidden" name="action" value="deactivate">
+                                <button class="danger" type="submit" {% if user.id == current_user.id %}disabled{% endif %}>Desativar</button>
+                            </form>
+                            {% elif user.approval_status == "approved" and not user.ativo %}
+                            <form method="post" action="{{ url_for('admin_user_approval', user_id=user.id) }}">
+                                <input type="hidden" name="action" value="activate">
+                                <button type="submit">Ativar</button>
+                            </form>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5">Ainda nao existem utilizadores.</td>
+                    <td colspan="7">Ainda nao existem utilizadores.</td>
                 </tr>
                 {% endfor %}
             </tbody>

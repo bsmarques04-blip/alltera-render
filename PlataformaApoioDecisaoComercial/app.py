@@ -25,7 +25,7 @@ from flask_migrate import Migrate
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, PatternFill
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, case, or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload, selectinload
 from werkzeug.datastructures import FileStorage
@@ -3658,8 +3658,47 @@ def register_routes(app):
     @login_required
     @admin_required
     def admin_users():
-        users = User.query.order_by(User.ativo.desc(), User.role.asc(), User.nome.asc()).all()
+        users = User.query.order_by(
+            case((User.approval_status == "pending", 0), else_=1),
+            User.ativo.desc(),
+            User.role.asc(),
+            User.nome.asc(),
+        ).all()
         return render_template("admin_users.html", users=users)
+
+    @app.route("/admin/users/<int:user_id>/approval", methods=["POST"])
+    @login_required
+    @admin_required
+    def admin_user_approval(user_id):
+        user = User.query.get_or_404(user_id)
+        action = request.form.get("action")
+        if user.id == current_user.id and action in {"reject", "deactivate"}:
+            flash("Nao podes desativar o teu proprio utilizador.", "error")
+            return redirect(url_for("admin_users"))
+        if action == "approve":
+            user.approval_status = "approved"
+            user.ativo = True
+            user.approved_at = datetime.utcnow()
+            user.approved_by_id = current_user.id
+            flash("Utilizador aprovado.", "success")
+        elif action == "reject":
+            user.approval_status = "rejected"
+            user.ativo = False
+            flash("Pedido de utilizador rejeitado.", "success")
+        elif action == "deactivate":
+            user.ativo = False
+            flash("Utilizador desativado.", "success")
+        elif action == "activate":
+            if user.approval_status != "approved":
+                flash("So podes ativar utilizadores aprovados.", "error")
+                return redirect(url_for("admin_users"))
+            user.ativo = True
+            flash("Utilizador ativado.", "success")
+        else:
+            flash("Acao invalida.", "error")
+            return redirect(url_for("admin_users"))
+        db.session.commit()
+        return redirect(url_for("admin_users"))
 
     @app.route("/meu-desempenho")
     @login_required
