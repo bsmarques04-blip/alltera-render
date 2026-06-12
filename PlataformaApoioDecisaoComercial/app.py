@@ -359,9 +359,10 @@ def create_app():
     login_manager.login_message = "Inicia sessao para aceder a Alltera."
     login_manager.login_message_category = "warning"
     with app.app_context():
-        if db.engine.url.drivername == "sqlite" and not is_flask_db_command():
-            db.create_all()
-            configure_sqlite_connection()
+        if not is_flask_db_command():
+            if db.engine.dialect.name == "sqlite":
+                db.create_all()
+                configure_sqlite_connection()
             migrate_database()
 
     @login_manager.user_loader
@@ -466,18 +467,39 @@ def rebuild_legacy_lead_table_if_needed():
 
 
 def migrate_database():
-    rebuild_legacy_lead_table_if_needed()
-    user_columns = {row[1] for row in db.session.execute(db.text("PRAGMA table_info(users)")).fetchall()}
-    user_migrations = {
-        "approval_status": "ALTER TABLE users ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'approved'",
-        "approved_at": "ALTER TABLE users ADD COLUMN approved_at DATETIME",
-        "approved_by_id": "ALTER TABLE users ADD COLUMN approved_by_id INTEGER",
-    }
+    dialect = db.engine.dialect.name
+    if dialect == "sqlite":
+        user_columns = {row[1] for row in db.session.execute(db.text("PRAGMA table_info(users)")).fetchall()}
+        user_migrations = {
+            "approval_status": "ALTER TABLE users ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'approved'",
+            "approved_at": "ALTER TABLE users ADD COLUMN approved_at DATETIME",
+            "approved_by_id": "ALTER TABLE users ADD COLUMN approved_by_id INTEGER",
+        }
+    elif dialect == "postgresql":
+        user_columns = {
+            row[0]
+            for row in db.session.execute(db.text(
+                "SELECT column_name FROM information_schema.columns WHERE table_name='users'"
+            )).fetchall()
+        }
+        user_migrations = {
+            "approval_status": "ALTER TABLE users ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'",
+            "approved_at": "ALTER TABLE users ADD COLUMN approved_at TIMESTAMP NULL",
+            "approved_by_id": "ALTER TABLE users ADD COLUMN approved_by_id INTEGER NULL",
+        }
+    else:
+        user_columns = set()
+        user_migrations = {}
+
     for column, sql in user_migrations.items():
         if column not in user_columns:
             db.session.execute(db.text(sql))
     db.session.commit()
 
+    if dialect != "sqlite":
+        return
+
+    rebuild_legacy_lead_table_if_needed()
     columns = {row[1] for row in db.session.execute(db.text("PRAGMA table_info(lead)")).fetchall()}
     migrations = {
         "nome_cliente": "ALTER TABLE lead ADD COLUMN nome_cliente VARCHAR(180)",
