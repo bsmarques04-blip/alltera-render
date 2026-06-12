@@ -38,7 +38,7 @@
             {% for entry in entries %}
             <article class="history-entry" data-action-text="{{ (entry.tipo_acao or entry.acao)|lower }}">
                 <div class="history-entry__date">
-                    <strong>{{ entry.created_at.strftime("%d/%m") }}</strong>
+                    <strong>{{ entry.created_at.strftime("%d/%m/%Y") }}</strong>
                     <span>{{ entry.created_at.strftime("%H:%M") }}</span>
                 </div>
                 <div class="history-entry__body">
@@ -46,8 +46,21 @@
                         <strong>{{ entry.acao }}</strong>
                         <span class="tag action-badge">{{ entry.tipo_acao or "atividade" }}</span>
                     </div>
-                    <span>{{ entry.lead.nome_empresa if entry.lead else "Lead removida" }} · {{ entry.user.nome if entry.user else entry.comercial_responsavel or "Sem utilizador" }}</span>
-                    <p>{{ entry.observacao or "Sem observacao" }}{% if entry.resultado %} · {{ entry.resultado }}{% endif %}</p>
+                    <dl class="history-entry__meta">
+                        <div>
+                            <dt>Lead</dt>
+                            <dd>{{ entry.lead.nome_empresa if entry.lead else "Lead removida" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Utilizador</dt>
+                            <dd>{{ entry.user.nome if entry.user else entry.comercial_responsavel or "Sem utilizador" }}</dd>
+                        </div>
+                        <div>
+                            <dt>Tipo de ação</dt>
+                            <dd>{{ entry.tipo_acao or entry.acao or "atividade" }}</dd>
+                        </div>
+                    </dl>
+                    <p class="history-entry__observation"><strong>Observação</strong>{{ entry.observacao or "Sem observação" }}{% if entry.resultado %} · {{ entry.resultado }}{% endif %}</p>
                 </div>
             </article>
             {% else %}

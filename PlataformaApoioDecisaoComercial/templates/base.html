@@ -39,6 +39,7 @@
                 <a href="{{ url_for('todas_leads') }}" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>Leads</a>
                 <a href="{{ url_for('leads_inativas') }}" {% if request.endpoint == 'leads_inativas' %}aria-current="page"{% endif %}>Leads inativas</a>
                 <a href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>Agendadas</a>
+                <a href="{{ url_for('notas_equipa') }}" {% if request.endpoint == 'notas_equipa' %}aria-current="page"{% endif %}>Notas da Equipa</a>
                 <a href="{{ url_for('admin_users') }}" {% if request.endpoint == 'admin_users' %}aria-current="page"{% endif %}>Equipa</a>
                 <a href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>Auditoria</a>
                 <a href="{{ url_for('importar_leads') }}" {% if request.endpoint == 'importar_leads' %}aria-current="page"{% endif %}>Importar Leads</a>
@@ -47,6 +48,7 @@
                 <a href="{{ url_for('todas_leads') }}" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>Leads</a>
                 <a href="{{ url_for('leads_inativas') }}" {% if request.endpoint == 'leads_inativas' %}aria-current="page"{% endif %}>Leads inativas</a>
                 <a href="{{ url_for('esquecidas') }}" {% if request.endpoint == 'esquecidas' %}aria-current="page"{% endif %}>Follow-ups</a>
+                <a href="{{ url_for('notas_equipa') }}" {% if request.endpoint == 'notas_equipa' %}aria-current="page"{% endif %}>Notas da Equipa</a>
                 <a href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>
                     Agendadas
                     {% if scheduled_sidebar_count %}
@@ -341,11 +343,50 @@
                 const values = Array.isArray(items) ? items.filter(Boolean) : [];
                 return values.length ? values.map((item) => `<span>${escapeHtml(item)}</span>`).join("") : `<span class="is-muted">Sem tags</span>`;
             };
+            const normalizeTimelineText = (value) => String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const timelineDateParts = (value) => {
+                const text = String(value || "").trim();
+                if (!text) return { date: "-", time: "-" };
+                const [date = "-", time = "-"] = text.split(/\s+/);
+                return { date, time: time || "-" };
+            };
+            const timelineActionLabel = (item) => {
+                const raw = String(item.tipo_acao || item.acao || item.titulo || "atividade");
+                const key = normalizeTimelineText(raw);
+                if (key.includes("import") || key.includes("criada")) return "Lead criada";
+                if (key.includes("contact")) return "Contacto efetuado";
+                if (key.includes("reuniao") || key.includes("crm")) return "Reunião marcada";
+                if (key.includes("followup") || key.includes("adiar") || key.includes("reagend")) return "Follow-up reagendado";
+                if (key.includes("estado")) return "Estado alterado";
+                return raw;
+            };
+            const timelineActionKind = (item) => {
+                const key = normalizeTimelineText([item.tipo_acao, item.acao, item.titulo].filter(Boolean).join(" "));
+                if (key.includes("import") || key.includes("criada")) return "created";
+                if (key.includes("contact")) return "contact";
+                if (key.includes("reuniao") || key.includes("crm")) return "meeting";
+                if (key.includes("followup") || key.includes("adiar") || key.includes("reagend")) return "followup";
+                if (key.includes("estado")) return "state";
+                return "default";
+            };
             const timeline = (items) => {
                 const values = Array.isArray(items) ? items.slice(0, 5) : [];
                 return values.length ? values.map((item) => {
+                    const parts = timelineDateParts(item.created_at);
+                    const action = timelineActionLabel(item);
                     const description = item.descricao || item.observacao || item.resultado || "";
-                    return `<li class="lead-drawer-timeline-item"><strong>${escapeHtml(item.titulo || item.acao || "Evento")}</strong><span>${escapeHtml([item.created_at, item.utilizador || item.user].filter(Boolean).join(" · "))}</span>${description ? `<p>${escapeHtml(description)}</p>` : ""}</li>`;
+                    const user = item.utilizador || item.user || "Sem utilizador";
+                    return `<li class="lead-drawer-timeline-item lead-drawer-timeline-item--${timelineActionKind(item)}">
+                        <div class="lead-drawer-timeline-date"><strong>${escapeHtml(parts.date)}</strong><span>${escapeHtml(parts.time)}</span></div>
+                        <div class="lead-drawer-timeline-content">
+                            <div class="lead-drawer-timeline-head">
+                                <strong>${escapeHtml(action)}</strong>
+                                <span class="lead-drawer-timeline-type">${escapeHtml(item.tipo_acao || item.acao || "atividade")}</span>
+                            </div>
+                            <span class="lead-drawer-timeline-user">${escapeHtml(user)}</span>
+                            <p>${description ? escapeHtml(description) : "Sem observação"}</p>
+                        </div>
+                    </li>`;
                 }).join("") : `<li class="lead-drawer-timeline-empty">Sem histórico.</li>`;
             };
             const leadEditUrl = (lead) => {
@@ -582,4 +623,3 @@
     <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
 </body>
 </html>
-

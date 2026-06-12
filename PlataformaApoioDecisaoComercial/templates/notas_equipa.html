@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Notas da Equipa | Alltera{% endblock %}
+{% block header_title %}Notas da Equipa{% endblock %}
+
+{% block extra_head %}
+<style>
+    .team-notes-page {
+        display: grid;
+        gap: 20px;
+    }
+
+    .team-notes-hero {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+    }
+
+    .team-notes-hero h1 {
+        margin: 0;
+        letter-spacing: 0;
+    }
+
+    .team-notes-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.4fr) minmax(0, 1fr);
+        gap: 18px;
+    }
+
+    .team-note-form {
+        display: grid;
+        gap: 12px;
+    }
+
+    .team-note-form label {
+        display: grid;
+        gap: 7px;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .team-note-form input,
+    .team-note-form textarea {
+        width: 100%;
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 8px;
+        padding: 11px 12px;
+        background: rgba(255, 255, 255, 0.88);
+        color: #0f172a;
+        font: inherit;
+        outline: none;
+    }
+
+    .team-note-form textarea {
+        min-height: 130px;
+        resize: vertical;
+    }
+
+    .team-note-form input:focus,
+    .team-note-form textarea:focus {
+        border-color: rgba(15, 118, 110, 0.72);
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+    }
+
+    .team-notes-list {
+        display: grid;
+        gap: 14px;
+    }
+
+    .team-note {
+        display: grid;
+        gap: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 8px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.72);
+    }
+
+    .team-note__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .team-note__header h2 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.05rem;
+        letter-spacing: 0;
+    }
+
+    .team-note__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        color: #64748b;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+
+    .team-note__body {
+        margin: 0;
+        color: #334155;
+        line-height: 1.65;
+        white-space: pre-wrap;
+    }
+
+    .team-note__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .team-note__actions details {
+        flex: 1 1 100%;
+    }
+
+    .team-note__actions summary {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0 14px;
+        background: rgba(15, 118, 110, 0.1);
+        color: #0f766e;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .team-note__delete {
+        margin: 0;
+    }
+
+    body.dark-mode .team-note,
+    body.dark-mode .team-note-form input,
+    body.dark-mode .team-note-form textarea {
+        border-color: rgba(45, 212, 191, 0.12);
+        background: rgba(15, 23, 42, 0.58);
+        color: #f8fafc;
+    }
+
+    body.dark-mode .team-note__header h2 {
+        color: #f8fafc;
+    }
+
+    body.dark-mode .team-note__body {
+        color: #cbd5e1;
+    }
+
+    @media (max-width: 900px) {
+        .team-notes-hero {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .team-notes-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="page-shell team-notes-page">
+    <section class="panel team-notes-hero">
+        <div>
+            <p class="eyebrow">Operação interna</p>
+            <h1>Notas da Equipa</h1>
+            <p>Regista notas rápidas para alinhamento operacional da equipa comercial.</p>
+        </div>
+    </section>
+
+    <section class="team-notes-layout">
+        <article class="panel">
+            <p class="eyebrow">Nova nota</p>
+            <form class="team-note-form" method="post" action="{{ url_for('notas_equipa') }}">
+                <label>Título
+                    <input type="text" name="titulo" maxlength="140" placeholder="Ex.: Prioridade da semana" required>
+                </label>
+                <label>Nota
+                    <textarea name="conteudo" placeholder="Escreve uma nota operacional curta..." required></textarea>
+                </label>
+                <button class="button" type="submit">Guardar nota</button>
+            </form>
+        </article>
+
+        <section class="team-notes-list" aria-label="Notas internas">
+            {% for note in notes %}
+            <article class="team-note">
+                <header class="team-note__header">
+                    <div>
+                        <h2>{{ note.titulo }}</h2>
+                        <div class="team-note__meta">
+                            <span>{{ note.autor.nome if note.autor else "Equipa Alltera" }}</span>
+                            <span>{{ note.updated_at.strftime("%d/%m/%Y %H:%M") if note.updated_at else note.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+                        </div>
+                    </div>
+                </header>
+                <p class="team-note__body">{{ note.conteudo }}</p>
+                <div class="team-note__actions">
+                    <details>
+                        <summary>Editar</summary>
+                        <form class="team-note-form" method="post" action="{{ url_for('atualizar_nota_equipa', note_id=note.id) }}">
+                            <label>Título
+                                <input type="text" name="titulo" maxlength="140" value="{{ note.titulo }}" required>
+                            </label>
+                            <label>Nota
+                                <textarea name="conteudo" required>{{ note.conteudo }}</textarea>
+                            </label>
+                            <button class="button secondary" type="submit">Atualizar nota</button>
+                        </form>
+                    </details>
+                    <form class="team-note__delete" method="post" action="{{ url_for('apagar_nota_equipa', note_id=note.id) }}">
+                        <button class="button secondary" type="submit">Apagar</button>
+                    </form>
+                </div>
+            </article>
+            {% else %}
+            <article class="panel">
+                <p class="empty-state empty-state--quiet">Ainda não existem notas internas.</p>
+            </article>
+            {% endfor %}
+        </section>
+    </section>
+</main>
+{% endblock %}

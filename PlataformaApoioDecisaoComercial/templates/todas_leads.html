@@ -79,6 +79,7 @@
                 <option value="name">Nome A-Z</option>
             </select>
         </label>
+        <a class="button secondary" id="allLeadsExport" href="{{ url_for('exportar_todas_leads', scope=assignment_scope) }}">Exportar Excel</a>
     </section>
 
     <section class="panel table-card all-leads-table-wrap">
@@ -99,6 +100,7 @@
         tag: document.getElementById("allLeadsTag"),
         coords: document.getElementById("allLeadsCoords"),
         sort: document.getElementById("allLeadsSort"),
+        export: document.getElementById("allLeadsExport"),
     };
     const norm = (v) => String(v || "").toLowerCase();
     const leadName = (lead) => lead.nome_cliente || lead.nome || lead.empresa || lead.nome_empresa || "Lead sem nome";
@@ -177,6 +179,19 @@
             name: tie,
         };
         return [...rows].sort(comparators[sort] || comparators.important);
+    }
+
+    function updateExportLink() {
+        if (!els.export) return;
+        const params = new URLSearchParams();
+        params.set("scope", "{{ assignment_scope }}");
+        if (els.search.value.trim()) params.set("q", els.search.value.trim());
+        if (els.state.value) params.set("state", els.state.value);
+        if (els.heat?.value) params.set("heat", els.heat.value);
+        if (els.tag.value) params.set("tag", els.tag.value);
+        if (els.coords.value) params.set("coords", els.coords.value);
+        if (els.sort.value) params.set("sort", els.sort.value);
+        els.export.href = `/todas-leads/exportar?${params.toString()}`;
     }
 
     function details(lead) {
@@ -302,6 +317,7 @@
 
     function render() {
         const previousScroll = els.table.scrollTop;
+        updateExportLink();
         const rows = sortedRows(allLeads.filter(matches));
         els.table.innerHTML = rows.map((lead) => `
             <article class="all-leads-row" data-lead-drawer="${lead.id}">

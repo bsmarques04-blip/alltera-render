@@ -36,6 +36,7 @@ class User(UserMixin, db.Model):
 
     historico = db.relationship("HistoricoLead", back_populates="user", lazy="dynamic")
     assigned_leads = db.relationship("Lead", back_populates="assigned_to", lazy="dynamic")
+    notas_equipa = db.relationship("EquipaNota", back_populates="autor", lazy="dynamic")
 
 
 class Lead(db.Model):
@@ -335,3 +336,16 @@ class GeocodingCache(db.Model):
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class EquipaNota(db.Model):
+    __tablename__ = "equipa_nota"
+
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(140), nullable=False)
+    conteudo = db.Column(db.Text, nullable=False)
+    autor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    autor = db.relationship("User", back_populates="notas_equipa")

@@ -32,9 +32,9 @@ from werkzeug.datastructures import FileStorage
 import click
 
 try:
-    from .models import GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, User, db
+    from .models import EquipaNota, GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, User, db
 except ImportError:
-    from models import GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, User, db
+    from models import EquipaNota, GeocodingCache, HistoricoLead, Lead, PlanoReunioes, PossivelDuplicado, User, db
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -495,6 +495,34 @@ def migrate_database():
         if column not in user_columns:
             db.session.execute(db.text(sql))
     db.session.commit()
+
+    if dialect == "sqlite":
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS equipa_nota (
+                id INTEGER PRIMARY KEY,
+                titulo VARCHAR(140) NOT NULL,
+                conteudo TEXT NOT NULL,
+                autor_id INTEGER,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                FOREIGN KEY(autor_id) REFERENCES users (id)
+            )
+        """))
+        db.session.execute(db.text("CREATE INDEX IF NOT EXISTS ix_equipa_nota_autor_id ON equipa_nota (autor_id)"))
+        db.session.commit()
+    elif dialect == "postgresql":
+        db.session.execute(db.text("""
+            CREATE TABLE IF NOT EXISTS equipa_nota (
+                id SERIAL PRIMARY KEY,
+                titulo VARCHAR(140) NOT NULL,
+                conteudo TEXT NOT NULL,
+                autor_id INTEGER REFERENCES users (id),
+                created_at TIMESTAMP NOT NULL,
+                updated_at TIMESTAMP NOT NULL
+            )
+        """))
+        db.session.execute(db.text("CREATE INDEX IF NOT EXISTS ix_equipa_nota_autor_id ON equipa_nota (autor_id)"))
+        db.session.commit()
 
     if dialect != "sqlite":
         return
@@ -2784,8 +2812,12 @@ def history_matches(entry, tokens):
 
 def admin_overview_context():
     today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
     since = datetime.utcnow() - timedelta(days=30)
-    total_leads = Lead.query.count()
+    leads_snapshot = Lead.query.all()
+    total_leads = len(leads_snapshot)
+    active_leads = sum(1 for lead in leads_snapshot if is_active_lead(lead, today))
+    inactive_leads = total_leads - active_leads
     contacted_leads = Lead.query.filter(Lead.estado != "Por contactar").count()
     scheduled_leads = Lead.query.filter(
         (Lead.data_novo_contacto.isnot(None)) | (Lead.data_reuniao.isnot(None))
@@ -2794,7 +2826,11 @@ def admin_overview_context():
         Lead.data_novo_contacto.isnot(None),
         Lead.data_novo_contacto <= today,
     ).count()
-    active_users = User.query.filter_by(ativo=True).count()
+    active_users_query = User.query.filter(User.ativo.is_(True))
+    active_users = active_users_query.count()
+    today_activity = HistoricoLead.query.filter(HistoricoLead.created_at >= today_start).all()
+    treated_today_tokens = ["reuniao_marcada", "reuniao", "crm", "cliente existente", "sem interesse", "estado alterado"]
+    treated_today = sum(1 for entry in today_activity if history_matches(entry, treated_today_tokens))
     recent_activity = (
         HistoricoLead.query.options(joinedload(HistoricoLead.user), joinedload(HistoricoLead.lead))
         .order_by(HistoricoLead.created_at.desc())
@@ -2838,17 +2874,20 @@ def admin_overview_context():
     return {
         "metrics": {
             "total_leads": total_leads,
+            "active_leads": active_leads,
+            "inactive_leads": inactive_leads,
             "contacted_leads": contacted_leads,
             "scheduled_leads": scheduled_leads,
             "pending_followups": pending_followups,
+            "treated_today": treated_today,
             "active_users": active_users,
         },
         "users_by_role": {
-            "admin": User.query.filter_by(role="admin", ativo=True).count(),
-            "comercial": User.query.filter_by(role="comercial", ativo=True).count(),
+            "admin": active_users_query.filter(User.role == "admin").count(),
+            "comercial": active_users_query.filter(User.role == "comercial").count(),
         },
         "operator_performance": operator_performance,
-        "recent_users": User.query.order_by(User.created_at.desc()).limit(5).all(),
+        "recent_users": active_users_query.order_by(User.created_at.desc()).limit(5).all(),
         "recent_activity": recent_activity,
     }
 
@@ -3210,6 +3249,131 @@ def search_leads(query, limit=8):
         if len(results) >= limit:
             break
     return results
+
+
+def all_leads_payload(scope=None):
+    scope = scope if scope is not None else requested_assignment_scope()
+    query = apply_assignment_scope(Lead.query.options(joinedload(Lead.assigned_to), selectinload(Lead.historico)), scope)
+    leads = [
+        lead
+        for lead in query.order_by(Lead.nome_empresa.asc()).all()
+        if is_active_lead(lead)
+    ]
+    payload = []
+    tags = set()
+    states = set()
+    for lead in leads:
+        item = lead.to_dict(include_history=False)
+        item["estado"] = normalize_legacy_state(item["estado"])
+        item["ativa"] = is_active_lead(lead)
+        item["agendada"] = is_scheduled_lead(lead)
+        item["tem_coordenadas"] = valid_coordinates(lead.latitude, lead.longitude)
+        item["comercial_responsavel"] = display_commercial(item.get("comercial_responsavel"))
+        payload.append(item)
+        states.add(item["estado"])
+        for tag in item.get("tags", []):
+            if tag:
+                tags.add(tag)
+    return leads, payload, {"states": sorted(states), "tags": sorted(tags)}
+
+
+def all_leads_filtered_for_export(scope=None):
+    _, leads, _ = all_leads_payload(scope)
+    query = normalize_lookup(request.args.get("q"))
+    state = request.args.get("state") or ""
+    heat = request.args.get("heat") or ""
+    tag = request.args.get("tag") or ""
+    coords = request.args.get("coords") or ""
+    sort = request.args.get("sort") or "important"
+
+    def lead_name(lead):
+        return lead.get("nome_cliente") or lead.get("nome") or lead.get("empresa") or lead.get("nome_empresa") or "Lead sem nome"
+
+    def matches(lead):
+        if query:
+            haystack = normalize_lookup(" ".join([
+                lead_name(lead),
+                lead.get("nome_empresa") or "",
+                lead.get("cidade") or "",
+                lead.get("localidade") or "",
+                lead.get("telefone") or "",
+            ]))
+            if query not in haystack:
+                return False
+        if state and lead.get("estado") != state:
+            return False
+        if heat and lead.get("heat_band") != heat:
+            return False
+        if tag and tag not in (lead.get("tags") or []):
+            return False
+        if coords == "with" and not lead.get("tem_coordenadas"):
+            return False
+        if coords == "without" and lead.get("tem_coordenadas"):
+            return False
+        return True
+
+    def schedule_value(lead):
+        value = lead.get("data_novo_contacto")
+        if not value:
+            return (date.max.isoformat(), "99:99")
+        return (value, lead.get("hora_reuniao") or "23:59")
+
+    def importance(lead):
+        value = int(lead.get("score") or 0) * 10
+        if lead.get("agendada"):
+            value += 140
+        if not lead.get("tem_coordenadas"):
+            value += 35
+        if lead.get("data_novo_contacto"):
+            value += 25
+        if not lead.get("comercial_responsavel"):
+            value += 15
+        return value
+
+    rows = [lead for lead in leads if matches(lead)]
+    sorters = {
+        "important": lambda lead: (-importance(lead), normalize_lookup(lead_name(lead))),
+        "score_desc": lambda lead: (-(lead.get("score") or 0), normalize_lookup(lead_name(lead))),
+        "next_contact": lambda lead: (*schedule_value(lead), -(lead.get("score") or 0)),
+        "no_coords": lambda lead: (1 if lead.get("tem_coordenadas") else 0, -(lead.get("score") or 0)),
+        "commercial": lambda lead: normalize_lookup(lead.get("comercial_responsavel") or "Sem comercial"),
+        "city": lambda lead: normalize_lookup(lead.get("cidade") or lead.get("localidade") or "Sem cidade"),
+        "name": lambda lead: normalize_lookup(lead_name(lead)),
+    }
+    return sorted(rows, key=sorters.get(sort, sorters["important"]))
+
+
+def build_leads_export_workbook(leads):
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Leads"
+    headers = ["Nome", "Empresa", "Cidade", "Estado", "Comercial", "Próximo contacto", "Email", "Telefone"]
+    worksheet.append(headers)
+    for lead in leads:
+        next_contact = lead.get("data_novo_contacto") or ""
+        if next_contact and lead.get("hora_reuniao"):
+            next_contact = f"{next_contact} {lead.get('hora_reuniao')}"
+        worksheet.append([
+            lead.get("nome_cliente") or lead.get("nome_empresa") or "",
+            lead.get("nome_empresa") or lead.get("empresa") or "",
+            lead.get("cidade") or lead.get("localidade") or "",
+            lead.get("estado") or "",
+            lead.get("comercial_responsavel") or "",
+            next_contact,
+            lead.get("email") or "",
+            lead.get("telefone") or "",
+        ])
+    for cell in worksheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="0F766E")
+        cell.alignment = Alignment(vertical="center")
+    for column in worksheet.columns:
+        width = max(len(str(cell.value or "")) for cell in column) + 2
+        worksheet.column_dimensions[get_column_letter(column[0].column)].width = min(max(width, 14), 34)
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output
 
 
 def operational_score(lead):
@@ -3681,6 +3845,54 @@ def register_routes(app):
         flash("Sessao terminada com seguranca.", "success")
         return redirect(url_for("login"))
 
+    @app.route("/notas-equipa", methods=["GET", "POST"])
+    @login_required
+    def notas_equipa():
+        if request.method == "POST":
+            title = clean_text(request.form.get("titulo"))
+            content = clean_text(request.form.get("conteudo"))
+            if not title:
+                flash("Indica um titulo para a nota.", "error")
+            elif not content:
+                flash("Escreve o conteudo da nota.", "error")
+            else:
+                note = EquipaNota(titulo=title, conteudo=content, autor_id=current_user.id)
+                db.session.add(note)
+                db.session.commit()
+                flash("Nota criada.", "success")
+                return redirect(url_for("notas_equipa"))
+        notes = (
+            EquipaNota.query.options(joinedload(EquipaNota.autor))
+            .order_by(EquipaNota.updated_at.desc(), EquipaNota.created_at.desc())
+            .all()
+        )
+        return render_template("notas_equipa.html", notes=notes)
+
+    @app.route("/notas-equipa/<int:note_id>/editar", methods=["POST"])
+    @login_required
+    def atualizar_nota_equipa(note_id):
+        note = EquipaNota.query.get_or_404(note_id)
+        title = clean_text(request.form.get("titulo"))
+        content = clean_text(request.form.get("conteudo"))
+        if not title or not content:
+            flash("Titulo e conteudo sao obrigatorios.", "error")
+            return redirect(url_for("notas_equipa"))
+        note.titulo = title
+        note.conteudo = content
+        note.updated_at = datetime.utcnow()
+        db.session.commit()
+        flash("Nota atualizada.", "success")
+        return redirect(url_for("notas_equipa"))
+
+    @app.route("/notas-equipa/<int:note_id>/apagar", methods=["POST"])
+    @login_required
+    def apagar_nota_equipa(note_id):
+        note = EquipaNota.query.get_or_404(note_id)
+        db.session.delete(note)
+        db.session.commit()
+        flash("Nota apagada.", "success")
+        return redirect(url_for("notas_equipa"))
+
     @app.route("/admin")
     @login_required
     @admin_required
@@ -3764,30 +3976,10 @@ def register_routes(app):
     @login_required
     def todas_leads():
         scope = requested_assignment_scope()
-        query = apply_assignment_scope(Lead.query.options(joinedload(Lead.assigned_to), selectinload(Lead.historico)), scope)
-        leads = [
-            lead
-            for lead in query.order_by(Lead.nome_empresa.asc()).all()
-            if is_active_lead(lead)
-        ]
+        leads, payload, filters = all_leads_payload(scope)
         total = len(leads)
         with_coords = sum(1 for lead in leads if valid_coordinates(lead.latitude, lead.longitude))
         scheduled = sum(1 for lead in leads if is_scheduled_lead(lead))
-        payload = []
-        tags = set()
-        states = set()
-        for lead in leads:
-            item = lead.to_dict(include_history=False)
-            item["estado"] = normalize_legacy_state(item["estado"])
-            item["ativa"] = is_active_lead(lead)
-            item["agendada"] = is_scheduled_lead(lead)
-            item["tem_coordenadas"] = valid_coordinates(lead.latitude, lead.longitude)
-            item["comercial_responsavel"] = display_commercial(item.get("comercial_responsavel"))
-            payload.append(item)
-            states.add(item["estado"])
-            for tag in item.get("tags", []):
-                if tag:
-                    tags.add(tag)
         return render_template(
             "todas_leads.html",
             leads=payload,
@@ -3797,9 +3989,21 @@ def register_routes(app):
                 "without_coords": total - with_coords,
                 "scheduled": scheduled,
             },
-            filters={"states": sorted(states), "tags": sorted(tags)},
+            filters=filters,
             assignment_scope=scope,
             assignment_scopes=assignment_scope_options(),
+        )
+
+    @app.route("/todas-leads/exportar")
+    @login_required
+    def exportar_todas_leads():
+        leads = all_leads_filtered_for_export(requested_assignment_scope())
+        output = build_leads_export_workbook(leads)
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=f"leads_alltera_{date.today().isoformat()}.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
     @app.route("/agendadas", methods=["GET", "POST"])

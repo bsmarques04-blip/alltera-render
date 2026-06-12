@@ -398,6 +398,7 @@ async function loadLeadSummary(leadId) {
         visibleLeads = visibleLeads.map((lead) => (Number(lead.id) === normalizedLeadId ? selectedLead : lead));
         renderDetails();
         renderMapMiniCard();
+        markers.get(normalizedLeadId)?.setPopupContent(popupHtml(selectedLead));
     } catch (error) {
         if (error.name !== "AbortError") console.warn("Resumo da lead indisponível", error);
     }
@@ -469,6 +470,7 @@ function markerVisualClass(lead) {
 }
 
 function popupHtml(lead) {
+    const timelinePreview = renderTimelinePreview(lead, { limit: 3, compact: true });
     return `
         <div class="lead-popup">
             <div class="lead-popup__header">
@@ -480,6 +482,7 @@ function popupHtml(lead) {
             <span>${leadCity(lead)}</span>
             ${hasInsights(lead) ? `<span class="lead-popup__insight" title="${insightSummary(lead)}">Insights internos</span>` : ""}
             <small>${leadCommercialLabel(lead)} · ${lead.estado}</small>
+            ${timelinePreview}
         </div>
     `;
 }
@@ -1178,20 +1181,9 @@ function renderDetails() {
             bulkAction("assign_commercial", { ids: [selectedLead.id], comercial: suggestion.key });
         });
     }
-    const timeline = Array.isArray(selectedLead.timeline) && selectedLead.timeline.length
-        ? selectedLead.timeline
-        : (Array.isArray(selectedLead.historico) ? selectedLead.historico : []);
+    const timeline = leadTimelineItems(selectedLead);
     els.leadHistory.innerHTML = timeline.length
-        ? timeline
-              .map(
-                  (item) =>
-                      `<article class="lead-drawer-timeline-item">
-                          <strong>${displayValue(item.titulo || item.acao || "Evento")}</strong>
-                          <span>${displayValue([item.created_at, item.utilizador || item.user].filter(Boolean).join(" · "), "")}</span>
-                          <p>${displayValue(item.descricao || item.observacao || item.resultado, "")}</p>
-                      </article>`
-              )
-              .join("")
+        ? timeline.map(renderTimelineItem).join("")
         : `<p class="lead-drawer-timeline-empty">Sem histórico.</p>`;
     els.tagList.innerHTML = selectedLead.tags?.length
         ? selectedLead.tags.map((tag) => `<span class="tag removable-tag" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)} &times;</span>`).join("")
@@ -1213,6 +1205,7 @@ function renderMapMiniCard() {
         return;
     }
     els.mapLeadMiniCard.hidden = false;
+    const timelinePreview = renderTimelinePreview(selectedLead, { limit: 3, compact: true });
     els.mapLeadMiniCard.innerHTML = `
         <div class="map-mini-card__header">
             <div>
@@ -1221,6 +1214,7 @@ function renderMapMiniCard() {
             </div>
             <button type="button" class="map-mini-card__close" aria-label="Fechar">×</button>
         </div>
+        ${timelinePreview}
         <div class="map-mini-card__actions">
             <a class="link-button" href="${selectedLead.telefone ? `tel:${selectedLead.telefone}` : "#"}">Ligar</a>
             <button class="link-button" type="button" data-mini-action="adiar">Reagendar</button>
@@ -1253,6 +1247,71 @@ function escapeHtml(value) {
 function displayValue(value, fallback = "-") {
     const text = String(value ?? "").trim();
     return text ? escapeHtml(text) : fallback;
+}
+
+function timelineDateParts(value) {
+    const text = String(value || "").trim();
+    if (!text) return { date: "-", time: "-" };
+    const [date = "-", time = "-"] = text.split(/\s+/);
+    return { date, time: time || "-" };
+}
+
+function timelineActionLabel(item) {
+    const raw = String(item.tipo_acao || item.acao || item.titulo || "atividade");
+    const key = normalize(raw);
+    if (key.includes("import") || key.includes("criada")) return "Lead criada";
+    if (key.includes("contact")) return "Contacto efetuado";
+    if (key.includes("reuniao") || key.includes("crm")) return "Reunião marcada";
+    if (key.includes("followup") || key.includes("adiar") || key.includes("reagend")) return "Follow-up reagendado";
+    if (key.includes("estado")) return "Estado alterado";
+    return raw;
+}
+
+function timelineActionKind(item) {
+    const key = normalize([item.tipo_acao, item.acao, item.titulo].filter(Boolean).join(" "));
+    if (key.includes("import") || key.includes("criada")) return "created";
+    if (key.includes("contact")) return "contact";
+    if (key.includes("reuniao") || key.includes("crm")) return "meeting";
+    if (key.includes("followup") || key.includes("adiar") || key.includes("reagend")) return "followup";
+    if (key.includes("estado")) return "state";
+    return "default";
+}
+
+function leadTimelineItems(lead) {
+    if (Array.isArray(lead?.timeline) && lead.timeline.length) return lead.timeline;
+    if (Array.isArray(lead?.historico) && lead.historico.length) return lead.historico;
+    return [];
+}
+
+function renderTimelineItem(item) {
+    const { date, time } = timelineDateParts(item.created_at);
+    const action = timelineActionLabel(item);
+    const user = item.utilizador || item.user || "Sem utilizador";
+    const observation = item.descricao || item.observacao || item.resultado || "Sem observação";
+    return `<article class="lead-drawer-timeline-item lead-drawer-timeline-item--${timelineActionKind(item)}">
+        <div class="lead-drawer-timeline-head">
+            <strong>${displayValue(action)}</strong>
+            <span class="lead-drawer-timeline-type">${displayValue(item.tipo_acao || item.acao || "atividade")}</span>
+        </div>
+        <div class="lead-drawer-timeline-meta">
+            <span class="lead-drawer-timeline-date">${displayValue(date)} · ${displayValue(time)}</span>
+            <span class="lead-drawer-timeline-user">${displayValue(user)}</span>
+        </div>
+        <p>${displayValue(observation, "Sem observação")}</p>
+    </article>`;
+}
+
+function renderTimelinePreview(lead, { limit = 3, compact = false } = {}) {
+    const items = leadTimelineItems(lead).slice(0, limit);
+    if (!items.length) return "";
+    return `
+        <section class="map-timeline-preview ${compact ? "map-timeline-preview--compact" : ""}">
+            <h4>Últimos eventos</h4>
+            <div>
+                ${items.map(renderTimelineItem).join("")}
+            </div>
+        </section>
+    `;
 }
 
 function leadEditUrl(lead) {

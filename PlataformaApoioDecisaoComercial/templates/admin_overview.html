@@ -40,6 +40,8 @@
     }
 
     .admin-metric {
+        position: relative;
+        overflow: hidden;
         border: 1px solid rgba(148, 163, 184, 0.22);
         background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.86));
         color: #f8fafc;
@@ -47,7 +49,20 @@
         border-radius: 8px;
     }
 
+    .admin-metric::after {
+        content: "";
+        position: absolute;
+        right: -38px;
+        bottom: -44px;
+        width: 112px;
+        height: 112px;
+        border-radius: 999px;
+        background: rgba(20, 184, 166, 0.12);
+    }
+
     .admin-metric span {
+        position: relative;
+        z-index: 1;
         display: block;
         color: #94a3b8;
         font-weight: 700;
@@ -56,6 +71,8 @@
     }
 
     .admin-metric strong {
+        position: relative;
+        z-index: 1;
         font-size: 2.1rem;
         letter-spacing: 0;
     }
@@ -271,11 +288,12 @@
         <a class="button" href="{{ url_for('admin_users') }}">Ver utilizadores</a>
     </section>
 
-    <section class="admin-metric-grid" aria-label="Metricas principais">
-        <article class="admin-metric"><span>Total de leads</span><strong>{{ metrics.total_leads }}</strong></article>
-        <article class="admin-metric"><span>Leads contactadas</span><strong>{{ metrics.contacted_leads }}</strong></article>
-        <article class="admin-metric"><span>Reunioes/agendadas</span><strong>{{ metrics.scheduled_leads }}</strong></article>
+    <section class="admin-metric-grid" aria-label="Metricas principais da operacao comercial">
+        <article class="admin-metric"><span>Leads ativas</span><strong>{{ metrics.active_leads }}</strong></article>
+        <article class="admin-metric"><span>Leads inativas</span><strong>{{ metrics.inactive_leads }}</strong></article>
+        <article class="admin-metric"><span>Reunioes agendadas</span><strong>{{ metrics.scheduled_leads }}</strong></article>
         <article class="admin-metric"><span>Follow-ups pendentes</span><strong>{{ metrics.pending_followups }}</strong></article>
+        <article class="admin-metric"><span>Leads tratadas hoje</span><strong>{{ metrics.treated_today }}</strong></article>
         <article class="admin-metric"><span>Utilizadores ativos</span><strong>{{ metrics.active_users }}</strong></article>
     </section>
 
