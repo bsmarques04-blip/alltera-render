@@ -1660,6 +1660,7 @@ async function performAction(action) {
         payload.observacao = observation || "";
     }
 
+    const actedLeadId = selectedLead.id;
     const response = await fetch(`/api/leads/${selectedLead.id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1669,7 +1670,13 @@ async function performAction(action) {
         await showAlert("Nao foi possivel atualizar a lead.", { type: "error", title: "Erro" });
         return;
     }
-    await loadLeads();
+    await loadLeads({ force: true });
+    if (["crm", "reuniao", "cliente_existente", "sem_interesse", "adiar", "ligar_volta"].includes(action)) {
+        const leadStillVisible = leadsById.has(actedLeadId) && visibleLeads.some((lead) => lead.id === actedLeadId);
+        if (!leadStillVisible) selectLead(null);
+        renderMarkers({ force: true });
+        renderMapMiniCard();
+    }
 }
 
 async function tagAction(action, tag) {

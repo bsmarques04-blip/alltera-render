@@ -78,7 +78,6 @@ MAP_INACTIVE_STATE_KEYS = {
     "perdida",
     "perdido",
     "seminteresse",
-    "seminteressemomentaneo",
     "naointeressada",
     "naointeressado",
     "tratadonocrm",
@@ -4418,8 +4417,35 @@ def register_routes(app):
             time_note = f" às {new_contact_time}" if new_contact_time else ""
             add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}{time_note}. {observation}", commercial, tipo_acao="followup_reagendado")
         elif action == "sem_interesse":
-            lead.estado = "Sem interesse"
-            add_history(lead, "Estado alterado", observation or "Lead marcada sem interesse.", commercial)
+            new_contact_date = parse_date(data.get("data_novo_contacto"))
+            new_contact_time = parse_time_value(data.get("hora_reuniao"))
+            temporary_interest_tokens = [
+                "não agora",
+                "nao agora",
+                "sem interesse momentâneo",
+                "sem interesse momentaneo",
+                "contactar mais tarde",
+                "ligar mais tarde",
+                "voltar a ligar",
+                "voltar a contactar",
+            ]
+            observation_lookup = normalize_lookup(observation)
+            if new_contact_date or any(token in observation_lookup for token in temporary_interest_tokens):
+                if not new_contact_date:
+                    return jsonify({"error": "Data de novo contacto obrigatoria"}), 400
+                lead.estado = "Adiar contacto"
+                lead.estado_lead = "Adiar contacto"
+                lead.comercial_responsavel = commercial
+                lead.data_novo_contacto = new_contact_date
+                lead.hora_reuniao = new_contact_time
+                time_note = f" às {new_contact_time}" if new_contact_time else ""
+                add_history(lead, "Adiar contacto", f"Novo contacto: {lead.data_novo_contacto or ''}{time_note}. {observation}", commercial, tipo_acao="followup_reagendado")
+            else:
+                lead.estado = "Sem interesse"
+                lead.estado_lead = "Sem interesse"
+                lead.data_novo_contacto = None
+                lead.hora_reuniao = None
+                add_history(lead, "Estado alterado", observation or "Lead marcada sem interesse definitivo.", commercial)
         elif action == "atribuir":
             lead.comercial_responsavel = commercial
             add_history(lead, "Comercial atribuido", observation, commercial)
