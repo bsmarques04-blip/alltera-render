@@ -37,12 +37,15 @@
                 <a href="{{ url_for('admin_overview') }}" {% if request.endpoint == 'admin_overview' %}aria-current="page"{% endif %}>Overview</a>
                 <a href="{{ url_for('mapa_leads') }}" {% if request.endpoint == 'mapa_leads' %}aria-current="page"{% endif %}>Mapa</a>
                 <a href="{{ url_for('todas_leads') }}" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>Leads</a>
+                <a href="{{ url_for('leads_inativas') }}" {% if request.endpoint == 'leads_inativas' %}aria-current="page"{% endif %}>Leads inativas</a>
+                <a href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>Agendadas</a>
                 <a href="{{ url_for('admin_users') }}" {% if request.endpoint == 'admin_users' %}aria-current="page"{% endif %}>Equipa</a>
                 <a href="{{ url_for('historico') }}" {% if request.endpoint == 'historico' %}aria-current="page"{% endif %}>Auditoria</a>
                 <a href="{{ url_for('importar_leads') }}" {% if request.endpoint == 'importar_leads' %}aria-current="page"{% endif %}>Importar Leads</a>
                 {% else %}
                 <a href="{{ url_for('mapa_leads') }}" {% if request.endpoint == 'mapa_leads' %}aria-current="page"{% endif %}>Mapa</a>
                 <a href="{{ url_for('todas_leads') }}" {% if request.endpoint == 'todas_leads' %}aria-current="page"{% endif %}>Leads</a>
+                <a href="{{ url_for('leads_inativas') }}" {% if request.endpoint == 'leads_inativas' %}aria-current="page"{% endif %}>Leads inativas</a>
                 <a href="{{ url_for('esquecidas') }}" {% if request.endpoint == 'esquecidas' %}aria-current="page"{% endif %}>Follow-ups</a>
                 <a href="{{ url_for('agendadas') }}" {% if request.endpoint == 'agendadas' %}aria-current="page"{% endif %}>
                     Agendadas
