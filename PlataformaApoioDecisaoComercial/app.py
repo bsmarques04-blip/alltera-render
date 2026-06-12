@@ -3595,6 +3595,35 @@ def register_routes(app):
             "operational_notifications": operational_notifications_context(),
         }
 
+    @app.route("/registo", methods=["GET", "POST"])
+    def registo():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            nome = clean_text(request.form.get("nome"))
+            email = clean_text(request.form.get("email")).lower()
+            password = request.form.get("password") or ""
+            confirm_password = request.form.get("confirm_password") or ""
+
+            if not nome:
+                flash("Nome obrigatorio.", "error")
+            elif not email:
+                flash("Email obrigatorio.", "error")
+            elif len(password) < 6:
+                flash("A password deve ter pelo menos 6 caracteres.", "error")
+            elif password != confirm_password:
+                flash("As passwords nao coincidem.", "error")
+            elif User.query.filter_by(email=email).first():
+                flash("Este email ja existe.", "error")
+            else:
+                user = User(nome=nome, email=email, role="comercial", ativo=False, approval_status="pending")
+                user.set_password(password)
+                db.session.add(user)
+                db.session.commit()
+                flash("Pedido de registo enviado. Aguarda aprovação do administrador.", "success")
+                return redirect(url_for("login"))
+        return render_template("registo.html")
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if current_user.is_authenticated:

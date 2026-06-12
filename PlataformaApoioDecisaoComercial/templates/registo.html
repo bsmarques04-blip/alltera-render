@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Entrar | Alltera</title>
+    <title>Pedir acesso | Alltera</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,8 +11,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body class="login-page">
-    <main class="login-shell" aria-labelledby="login-title">
-        <section class="login-card" aria-label="Acesso Alltera">
+    <main class="login-shell" aria-labelledby="register-title">
+        <section class="login-card" aria-label="Pedido de acesso Alltera">
             <div class="login-brand">
                 <span class="login-brand__mark" aria-hidden="true">
                     <img src="{{ url_for('static', filename='alltera-logo.png') }}" alt="">
@@ -23,9 +23,9 @@
             </div>
 
             <div class="login-card__header">
-                <p class="login-eyebrow">Lead Planner</p>
-                <h1 id="login-title">Planeamento comercial geogr&aacute;fico</h1>
-                <p>Gest&atilde;o operacional de leads para equipas comerciais no terreno.</p>
+                <p class="login-eyebrow">Pedido de acesso</p>
+                <h1 id="register-title">Criar pedido de utilizador</h1>
+                <p>O acesso fica pendente ate ser aprovado por um administrador.</p>
             </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -38,27 +38,31 @@
             {% endif %}
             {% endwith %}
 
-            <form class="login-form" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+            <form class="login-form" method="post" action="{{ url_for('registo') }}">
+                <div class="login-field">
+                    <label for="nome">Nome</label>
+                    <input id="nome" name="nome" type="text" autocomplete="name" placeholder="O teu nome" required autofocus>
+                </div>
+
                 <div class="login-field">
                     <label for="email">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" placeholder="nome@alltera.pt" required autofocus>
+                    <input id="email" name="email" type="email" autocomplete="email" placeholder="nome@alltera.pt" required>
                 </div>
 
                 <div class="login-field">
                     <label for="password">Password</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" placeholder="A tua password" required>
+                    <input id="password" name="password" type="password" autocomplete="new-password" placeholder="Minimo 6 caracteres" minlength="6" required>
                 </div>
 
-                <label class="login-remember">
-                    <input type="checkbox" name="remember" value="1">
-                    <span>Manter sess&atilde;o iniciada</span>
-                </label>
+                <div class="login-field">
+                    <label for="confirm_password">Confirmar password</label>
+                    <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" placeholder="Repete a password" minlength="6" required>
+                </div>
 
-                <button class="login-submit" type="submit">Entrar</button>
+                <button class="login-submit" type="submit">Enviar pedido</button>
             </form>
 
-            <p class="login-footnote"><a href="{{ url_for('registo') }}">Pedir acesso</a></p>
-            <p class="login-footnote">Acesso reservado a utilizadores autorizados. As a&ccedil;&otilde;es ficam associadas ao utilizador autenticado.</p>
+            <p class="login-footnote"><a href="{{ url_for('login') }}">Voltar ao login</a></p>
         </section>
     </main>
 </body>
