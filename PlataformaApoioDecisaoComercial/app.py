@@ -467,6 +467,17 @@ def rebuild_legacy_lead_table_if_needed():
 
 def migrate_database():
     rebuild_legacy_lead_table_if_needed()
+    user_columns = {row[1] for row in db.session.execute(db.text("PRAGMA table_info(users)")).fetchall()}
+    user_migrations = {
+        "approval_status": "ALTER TABLE users ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'approved'",
+        "approved_at": "ALTER TABLE users ADD COLUMN approved_at DATETIME",
+        "approved_by_id": "ALTER TABLE users ADD COLUMN approved_by_id INTEGER",
+    }
+    for column, sql in user_migrations.items():
+        if column not in user_columns:
+            db.session.execute(db.text(sql))
+    db.session.commit()
+
     columns = {row[1] for row in db.session.execute(db.text("PRAGMA table_info(lead)")).fetchall()}
     migrations = {
         "nome_cliente": "ALTER TABLE lead ADD COLUMN nome_cliente VARCHAR(180)",

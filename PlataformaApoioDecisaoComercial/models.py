@@ -19,6 +19,9 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(40), nullable=False, default="comercial")
     ativo = db.Column(db.Boolean, nullable=False, default=True)
+    approval_status = db.Column(db.String(20), nullable=False, default="approved")
+    approved_at = db.Column(db.DateTime, nullable=True)
+    approved_by_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
