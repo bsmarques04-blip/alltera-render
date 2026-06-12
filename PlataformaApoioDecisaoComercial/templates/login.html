@@ -12,53 +12,67 @@
 </head>
 <body class="login-page">
     <main class="login-shell" aria-labelledby="login-title">
-        <section class="login-card" aria-label="Acesso Alltera">
-            <div class="login-brand">
-                <span class="login-brand__mark" aria-hidden="true">
-                    <img src="{{ url_for('static', filename='alltera-logo.png') }}" alt="">
-                </span>
-                <span class="login-brand__text">
-                    <small>Acesso interno Alltera</small>
-                </span>
-            </div>
+        <section class="login-card login-card--login" aria-label="Acesso Alltera">
+            <aside class="login-card__aside" aria-label="Resumo da plataforma">
+                <div class="login-brand">
+                    <span class="login-brand__mark" aria-hidden="true">
+                        <img src="{{ url_for('static', filename='alltera-logo.png') }}" alt="">
+                    </span>
+                    <span class="login-brand__text">
+                        <strong>Alltera</strong>
+                        <small>Commercial Operations Platform</small>
+                    </span>
+                </div>
+                <div class="login-aside-copy">
+                    <h2>Organiza leads, equipas e territ&oacute;rio.</h2>
+                    <p>Planeamento comercial com mapa, follow-ups e hist&oacute;rico operacional num s&oacute; lugar.</p>
+                </div>
+                <div class="login-benefits" aria-label="Benef&iacute;cios">
+                    <span>Gest&atilde;o de leads</span>
+                    <span>Planeamento por zona</span>
+                    <span>Follow-ups controlados</span>
+                </div>
+            </aside>
 
-            <div class="login-card__header">
-                <p class="login-eyebrow">Lead Planner</p>
-                <h1 id="login-title">Planeamento comercial geogr&aacute;fico</h1>
-                <p>Gest&atilde;o operacional de leads para equipas comerciais no terreno.</p>
-            </div>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            <div class="login-messages" role="status" aria-live="polite">
-                {% for category, message in messages %}
-                <div class="login-message login-message--{{ category }}">{{ message }}</div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% endwith %}
-
-            <form class="login-form" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
-                <div class="login-field">
-                    <label for="email">Email</label>
-                    <input id="email" name="email" type="email" autocomplete="email" placeholder="nome@alltera.pt" required autofocus>
+            <div class="login-card__main">
+                <div class="login-card__header">
+                    <p class="login-eyebrow">Lead Planner</p>
+                    <h1 id="login-title">Entrar na Alltera</h1>
+                    <p>Gest&atilde;o operacional de leads para equipas comerciais no terreno.</p>
                 </div>
 
-                <div class="login-field">
-                    <label for="password">Password</label>
-                    <input id="password" name="password" type="password" autocomplete="current-password" placeholder="A tua password" required>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                <div class="login-messages" role="status" aria-live="polite">
+                    {% for category, message in messages %}
+                    <div class="login-message login-message--{{ category }}">{{ message }}</div>
+                    {% endfor %}
                 </div>
+                {% endif %}
+                {% endwith %}
 
-                <label class="login-remember">
-                    <input type="checkbox" name="remember" value="1">
-                    <span>Manter sess&atilde;o iniciada</span>
-                </label>
+                <form class="login-form" method="post" action="{{ url_for('login', next=request.args.get('next')) }}">
+                    <div class="login-field">
+                        <label for="email">Email</label>
+                        <input id="email" name="email" type="email" autocomplete="email" placeholder="nome@alltera.pt" required autofocus>
+                    </div>
 
-                <button class="login-submit" type="submit">Entrar</button>
-            </form>
+                    <div class="login-field">
+                        <label for="password">Password</label>
+                        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="A tua password" required>
+                    </div>
 
-            <p class="login-footnote"><a href="{{ url_for('registo') }}">Pedir acesso</a></p>
-            <p class="login-footnote">Acesso reservado a utilizadores autorizados. As a&ccedil;&otilde;es ficam associadas ao utilizador autenticado.</p>
+                    <label class="login-remember">
+                        <input type="checkbox" name="remember" value="1">
+                        <span>Manter sess&atilde;o iniciada</span>
+                    </label>
+
+                    <button class="login-submit" type="submit">Entrar</button>
+                </form>
+
+                <p class="login-footnote login-secondary-action">Ainda n&atilde;o tens conta? <a href="{{ url_for('registo') }}">Pedir acesso</a></p>
+                <p class="login-footnote">Acesso reservado a utilizadores autorizados. As a&ccedil;&otilde;es ficam associadas ao utilizador autenticado.</p>
+            </div>
         </section>
     </main>
 </body>
