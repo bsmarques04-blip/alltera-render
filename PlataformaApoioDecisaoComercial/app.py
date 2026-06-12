@@ -3632,13 +3632,24 @@ def register_routes(app):
             email = clean_text(request.form.get("email")).lower()
             password = request.form.get("password") or ""
             user = User.query.filter_by(email=email).first()
-            if user and user.ativo and user.check_password(password):
+            if not user or not user.check_password(password):
+                flash("Email ou password invalidos.", "error")
+                return render_template("login.html")
+            approval_status = user.approval_status or "approved"
+            if approval_status == "pending":
+                flash("O teu pedido ainda aguarda aprovação do administrador.", "warning")
+            elif approval_status == "rejected":
+                flash("O teu pedido de acesso foi rejeitado.", "error")
+            elif not user.ativo:
+                flash("A tua conta está inativa. Contacta o administrador.", "error")
+            elif approval_status == "approved":
                 login_user(user, remember=request.form.get("remember") == "1")
                 next_url = request.args.get("next")
                 if is_safe_next_url(next_url):
                     return redirect(next_url)
                 return redirect(url_for("admin_overview" if user.role == "admin" else "mapa_leads"))
-            flash("Email ou password invalidos.", "error")
+            else:
+                flash("Email ou password invalidos.", "error")
         return render_template("login.html")
 
     @app.route("/logout")
