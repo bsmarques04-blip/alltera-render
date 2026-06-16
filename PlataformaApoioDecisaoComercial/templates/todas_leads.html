@@ -320,7 +320,7 @@
         updateExportLink();
         const rows = sortedRows(allLeads.filter(matches));
         els.table.innerHTML = rows.map((lead) => `
-            <article class="all-leads-row" data-lead-drawer="${lead.id}">
+            <article class="all-leads-row">
                 <div class="all-leads-main">
                     <strong>${leadName(lead)}</strong>
                     <p>${lead.nome_empresa || "Sem empresa"} · ${lead.cidade || lead.localidade || "Sem cidade"} · ${lead.telefone || "Sem telefone"}</p>

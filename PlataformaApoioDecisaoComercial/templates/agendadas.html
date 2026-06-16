@@ -17,7 +17,7 @@
 {% set next_action = "Contactar hoje" if tone == "today" else ("Retomar contacto" if tone == "overdue" else "Preparar follow-up") %}
 {% set tags = lead.tag_list() %}
 {% set insight_tags = lead.insight_tag_list() %}
-<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}" data-lead-card="{{ lead.id }}" data-lead-drawer="{{ lead.id }}">
+<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}" data-lead-card="{{ lead.id }}">
     <div class="scheduled-lead-card__top">
         <div class="scheduled-avatar" aria-hidden="true">{{ name[:1]|upper }}</div>
         <div class="scheduled-lead-card__identity">

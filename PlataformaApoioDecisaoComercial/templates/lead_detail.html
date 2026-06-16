@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}{{ lead.nome_cliente or lead.nome_empresa or "Lead" }} | Alltera{% endblock %}
+
+{% block content %}
+{% set empty = "-" %}
+{% set lead_title = lead.nome_cliente or lead.nome_empresa or "Lead sem nome" %}
+{% set company = lead.empresa or lead.nome_empresa %}
+{% set edit_url = url_for('adicionar_lead', lead_id=lead.id, next=url_for('lead_detail', lead_id=lead.id)) %}
+{% set map_url = url_for('mapa_leads', lead_id=lead.id, lat=lead.latitude, lng=lead.longitude) if has_coordinates else url_for('mapa_leads', lead_id=lead.id) %}
+<main class="page-shell lead-detail-page">
+    <section class="panel import-hero">
+        <div>
+            <p class="eyebrow">Lead</p>
+            <h1>{{ lead_title }}</h1>
+            <p>{{ company or "Sem empresa" }} · {{ lead.cidade or lead.localidade or "Sem cidade" }}</p>
+        </div>
+        <div class="sheet-actions">
+            <a class="button secondary" href="{{ next_url }}">Voltar</a>
+            <a class="button secondary" href="{{ map_url }}">Abrir no mapa</a>
+            <a class="button" href="{{ edit_url }}">Editar lead</a>
+        </div>
+    </section>
+
+    <section class="metric-grid dashboard-metrics">
+        <article><span>Estado</span><strong>{{ lead.estado or empty }}</strong></article>
+        <article><span>Prioridade</span><strong>{{ lead.prioridade or empty }}</strong></article>
+        <article><span>Operação</span><strong>{{ lead.comercial_responsavel or empty }}</strong></article>
+        <article><span>Localização</span><strong>{{ "Com mapa" if has_coordinates else "Sem mapa" }}</strong></article>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Resumo</h2>
+        </div>
+        <dl class="history-entry__meta">
+            <div><dt>Nome cliente</dt><dd>{{ lead.nome_cliente or empty }}</dd></div>
+            <div><dt>Empresa</dt><dd>{{ company or empty }}</dd></div>
+            <div><dt>Área de negócio</dt><dd>{{ lead.area_negocio or lead.tipo_cliente or empty }}</dd></div>
+            <div><dt>NIF</dt><dd>{{ lead.nif or empty }}</dd></div>
+            <div><dt>Tags</dt><dd>{{ lead.tag_list()|join(", ") if lead.tag_list() else empty }}</dd></div>
+            <div><dt>Comercial responsável</dt><dd>{{ lead.comercial_responsavel or empty }}</dd></div>
+        </dl>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Contacto</h2>
+        </div>
+        <dl class="history-entry__meta">
+            <div><dt>Telefone</dt><dd>{{ lead.telefone or lead.contacto or empty }}</dd></div>
+            <div><dt>Email</dt><dd>{{ lead.email or empty }}</dd></div>
+            <div><dt>Contacto</dt><dd>{{ lead.contacto or empty }}</dd></div>
+        </dl>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Localização</h2>
+        </div>
+        <dl class="history-entry__meta">
+            <div><dt>Cidade</dt><dd>{{ lead.cidade or empty }}</dd></div>
+            <div><dt>Localidade</dt><dd>{{ lead.localidade or empty }}</dd></div>
+            <div><dt>Morada</dt><dd>{{ lead.morada or empty }}</dd></div>
+            <div><dt>Código postal</dt><dd>{{ lead.codigo_postal or empty }}</dd></div>
+            <div><dt>Latitude</dt><dd>{{ lead.latitude if lead.latitude is not none else empty }}</dd></div>
+            <div><dt>Longitude</dt><dd>{{ lead.longitude if lead.longitude is not none else empty }}</dd></div>
+        </dl>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Próximos contactos</h2>
+        </div>
+        <dl class="history-entry__meta">
+            <div><dt>Novo contacto</dt><dd>{{ lead.data_novo_contacto.strftime("%d/%m/%Y") if lead.data_novo_contacto else empty }}</dd></div>
+            <div><dt>Reunião</dt><dd>{{ lead.data_reuniao.strftime("%d/%m/%Y") if lead.data_reuniao else empty }}</dd></div>
+            <div><dt>Hora</dt><dd>{{ lead.hora_reuniao or empty }}</dd></div>
+            <div><dt>Info reunião</dt><dd>{{ lead.reuniao_info or empty }}</dd></div>
+        </dl>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Observações</h2>
+        </div>
+        <div class="history-table">
+            <article class="history-entry">
+                <div class="history-entry__body">
+                    <div class="history-entry__top"><strong>Observações</strong></div>
+                    <p class="history-entry__observation">{{ lead.observacoes or empty }}</p>
+                </div>
+            </article>
+            <article class="history-entry">
+                <div class="history-entry__body">
+                    <div class="history-entry__top"><strong>Observações de contacto</strong></div>
+                    <p class="history-entry__observation">{{ lead.observacoes_contacto or empty }}</p>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="panel history-panel">
+        <div class="panel-head">
+            <h2>Timeline operacional</h2>
+        </div>
+        <div class="history-table">
+            {% for entry in timeline %}
+            <article class="history-entry">
+                <div class="history-entry__date">
+                    <strong>{{ entry.created_at.strftime("%d/%m/%Y") if entry.created_at else empty }}</strong>
+                    <span>{{ entry.created_at.strftime("%H:%M") if entry.created_at else "" }}</span>
+                </div>
+                <div class="history-entry__body">
+                    <div class="history-entry__top">
+                        <strong>{{ entry.acao or "Evento" }}</strong>
+                        <span class="tag action-badge">{{ entry.tipo_acao or "atividade" }}</span>
+                    </div>
+                    <dl class="history-entry__meta">
+                        <div><dt>Utilizador</dt><dd>{{ entry.user.nome if entry.user else entry.comercial_responsavel or empty }}</dd></div>
+                        <div><dt>Resultado</dt><dd>{{ entry.resultado or empty }}</dd></div>
+                    </dl>
+                    <p class="history-entry__observation"><strong>Observação</strong>{{ entry.observacao or empty }}</p>
+                </div>
+            </article>
+            {% else %}
+            <p class="empty-state">Ainda não existem registos de histórico para esta lead.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="sheet-actions">
+            <a class="button secondary" href="{{ next_url }}">Voltar</a>
+            <a class="button secondary" href="{{ map_url }}">Abrir no mapa</a>
+            <a class="button" href="{{ edit_url }}">Editar lead</a>
+        </div>
+    </section>
+</main>
+{% endblock %}
