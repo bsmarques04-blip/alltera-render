@@ -3099,6 +3099,20 @@ def geocode_single_lead(lead):
     return False, message
 
 
+def try_auto_geocode_lead(lead):
+    if valid_coordinates(lead.latitude, lead.longitude):
+        return True, ""
+    try:
+        return geocode_single_lead(lead)
+    except Exception as exc:
+        message = f"Não foi possível obter coordenadas automaticamente: {exc}"
+        try:
+            add_history(lead, "Geocoding automático pendente", message)
+        except Exception:
+            pass
+        return False, message
+
+
 def normalize_legacy_state(state):
     value = clean_text(state)
     mapping = {
@@ -4182,8 +4196,12 @@ def register_routes(app):
             if edit_lead:
                 update_manual_lead(edit_lead, lead_data)
                 add_history(edit_lead, "Lead editada manualmente", "Dados atualizados diretamente na aplicação.")
+                geocoded, _ = try_auto_geocode_lead(edit_lead)
                 db.session.commit()
-                flash("Lead guardada com sucesso.", "success")
+                if geocoded:
+                    flash("Lead guardada com sucesso.", "success")
+                else:
+                    flash("Lead guardada, mas não foi possível obter coordenadas automaticamente.", "warning")
                 return redirect(request.form.get("next") or url_for("mapa_leads"))
 
             lead = Lead(**lead_data)
@@ -4197,18 +4215,12 @@ def register_routes(app):
                 tipo_acao="Lead criada manualmente",
                 user_id=current_user.id if current_user.is_authenticated else None,
             )
+            geocoded, _ = try_auto_geocode_lead(lead)
             db.session.commit()
-            try:
-                geocoded, message = geocode_single_lead(lead)
-                if not geocoded:
-                    add_history(lead, "Geocoding manual pendente", message)
-                db.session.commit()
-            except Exception as exc:
-                db.session.rollback()
-                lead = db.session.get(Lead, lead.id)
-                add_history(lead, "Geocoding manual pendente", f"Não foi possível obter coordenadas: {exc}")
-                db.session.commit()
-            flash("Lead criada com sucesso.", "success")
+            if geocoded:
+                flash("Lead criada com sucesso.", "success")
+            else:
+                flash("Lead guardada, mas não foi possível obter coordenadas automaticamente.", "warning")
             return redirect(request.form.get("next") or url_for("todas_leads"))
 
         prefill = {key: value for key, value in request.args.items() if value is not None}

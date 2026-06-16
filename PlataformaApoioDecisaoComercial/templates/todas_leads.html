@@ -230,7 +230,6 @@
         return `
             <div class="all-leads-actions">
                 ${lead.tem_coordenadas ? `<a class="button secondary" href="${mapUrl}">Ver no mapa</a>` : `<span class="tag">Sem mapa</span>`}
-                ${lead.tem_coordenadas ? "" : `<button class="button secondary" type="button" data-geocode-id="${lead.id}">Geocodificar</button>`}
                 <a class="button secondary" href="${editUrl}">Abrir/editar</a>
                 <div class="all-leads-state-menu">
                     <button class="button secondary all-leads-state-trigger" type="button" data-state-menu="${lead.id}">Mudar estado</button>
@@ -316,26 +315,6 @@
         render();
     }
 
-    async function forceGeocodeLead(id, button) {
-        if (!id) return;
-        button.disabled = true;
-        try {
-            const response = await fetch(`/api/leads/${id}/action`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "force_geocode" }),
-            });
-            const data = await response.json().catch(() => ({}));
-            alert(data.message || (response.ok ? "Lead geocodificada com sucesso." : "Não foi possível geocodificar esta lead."));
-            if (response.ok && data.success) {
-                window.location.reload();
-                return;
-            }
-        } finally {
-            button.disabled = false;
-        }
-    }
-
     function render() {
         const previousScroll = els.table.scrollTop;
         updateExportLink();
@@ -376,11 +355,6 @@
                     item.hidden = true;
                 });
                 await changeLeadState(button.dataset.stateId, button.dataset.stateAction);
-            });
-        });
-        els.table.querySelectorAll("[data-geocode-id]").forEach((button) => {
-            button.addEventListener("click", async () => {
-                await forceGeocodeLead(button.dataset.geocodeId, button);
             });
         });
         els.table.scrollTop = previousScroll;
