@@ -169,8 +169,13 @@
                                 <input type="hidden" name="action" value="activate">
                                 <button type="submit">Ativar</button>
                             </form>
-                            {% else %}
+                            {% elif user.ativo or user.id == current_user.id %}
                             -
+                            {% endif %}
+                            {% if not user.ativo and user.id != current_user.id %}
+                            <form method="post" action="{{ url_for('admin_user_delete', user_id=user.id) }}" onsubmit="return confirm('Eliminar definitivamente este utilizador? Esta ação não pode ser anulada.');">
+                                <button class="danger" type="submit">Eliminar</button>
+                            </form>
                             {% endif %}
                         </div>
                     </td>

@@ -439,7 +439,6 @@ async function loadLeadSummary(leadId) {
         visibleLeads = visibleLeads.map((lead) => (Number(lead.id) === normalizedLeadId ? selectedLead : lead));
         renderDetails();
         renderMapMiniCard();
-        markers.get(normalizedLeadId)?.setPopupContent(popupHtml(selectedLead));
     } catch (error) {
         if (error.name !== "AbortError") console.warn("Resumo da lead indisponível", error);
     }
@@ -688,7 +687,7 @@ function renderMarkers({ force = false } = {}) {
             selectedLead && lead.id === selectedLead.id ? 900 : nearbyLeadIds.has(lead.id) ? 500 : 0;
         const marker = L.marker([lead.latitude, lead.longitude], { icon: markerIcon(lead), zIndexOffset: zIndex, lead });
         marker.on("click", () => {
-            marker.bindPopup(popupHtml(lead), { maxWidth: 260 }).openPopup();
+            map.closePopup();
             openLeadDrawer(lead.id);
         });
         if (clusterLayer) clusterLayer.addLayer(marker);

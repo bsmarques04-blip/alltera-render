@@ -43,6 +43,7 @@ DB_PATH = os.path.join(INSTANCE_DIR, "decisao_comercial.db")
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_USER_AGENT = "AllteraLeadPlanner/1.0 academico"
 PHOTON_URL = "https://photon.komoot.io/api/"
+GEOCODING_TIMEOUT_SECONDS = 2
 # Em ambiente académico/local é preferível não bloquear o fluxo de importação
 # com um lock global entre processos do reloader Flask. O POST continua a usar
 # transação/rollback, mas uma importação interrompida já não deixa a UI presa.
@@ -598,6 +599,22 @@ def migrate_database():
             if column not in history_columns:
                 db.session.execute(db.text(sql))
         db.session.commit()
+
+    performance_indexes = [
+        "CREATE INDEX IF NOT EXISTS ix_lead_estado ON lead (estado)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_cidade ON lead (cidade)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_latitude ON lead (latitude)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_longitude ON lead (longitude)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_data_novo_contacto ON lead (data_novo_contacto)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_data_reuniao ON lead (data_reuniao)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_created_at ON lead (created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_lead_updated_at ON lead (updated_at)",
+        "CREATE INDEX IF NOT EXISTS ix_historico_lead_lead_id ON historico_lead (lead_id)",
+        "CREATE INDEX IF NOT EXISTS ix_historico_lead_created_at ON historico_lead (created_at)",
+    ]
+    for sql in performance_indexes:
+        db.session.execute(db.text(sql))
+    db.session.commit()
 
     for lead in Lead.query.all():
         lead.estado = normalize_legacy_state(lead.estado)
@@ -1611,7 +1628,7 @@ def geocode_lead(lead, import_cache=None):
                 NOMINATIM_URL,
                 params={"q": query, "format": "json", "limit": 1, "countrycodes": "pt"},
                 headers={"User-Agent": NOMINATIM_USER_AGENT},
-                timeout=5,
+                timeout=GEOCODING_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
             payload = response.json()
@@ -2465,7 +2482,7 @@ def simple_geocode_city(location, import_cache):
                 NOMINATIM_URL,
                 params={"q": query, "format": "json", "limit": 1, "countrycodes": "pt"},
                 headers={"User-Agent": NOMINATIM_USER_AGENT},
-                timeout=5,
+                timeout=GEOCODING_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
             payload = response.json()
@@ -2815,10 +2832,15 @@ def admin_overview_context():
     today = date.today()
     today_start = datetime.combine(today, datetime.min.time())
     since = datetime.utcnow() - timedelta(days=30)
-    leads_snapshot = Lead.query.all()
-    total_leads = len(leads_snapshot)
-    active_leads = sum(1 for lead in leads_snapshot if is_active_lead(lead, today))
-    inactive_leads = total_leads - active_leads
+    total_leads = db.session.query(db.func.count(Lead.id)).scalar() or 0
+    inactive_states = ["Já tratado / no CRM", "Sem interesse", "Reunião marcada", "Sem interesse definitivo", "Cliente existente"]
+    inactive_leads = Lead.query.filter(or_(
+        Lead.estado.in_(inactive_states),
+        and_(Lead.estado == "Adiar contacto", Lead.data_novo_contacto > today),
+        Lead.classificacao_observacao.in_(inactive_states),
+        and_(Lead.classificacao_observacao == "Adiar contacto", Lead.data_novo_contacto > today),
+    )).count()
+    active_leads = max(total_leads - inactive_leads, 0)
     contacted_leads = Lead.query.filter(Lead.estado != "Por contactar").count()
     scheduled_leads = Lead.query.filter(
         (Lead.data_novo_contacto.isnot(None)) | (Lead.data_reuniao.isnot(None))
@@ -2829,7 +2851,12 @@ def admin_overview_context():
     ).count()
     active_users_query = User.query.filter(User.ativo.is_(True))
     active_users = active_users_query.count()
-    today_activity = HistoricoLead.query.filter(HistoricoLead.created_at >= today_start).all()
+    today_activity = (
+        HistoricoLead.query
+        .with_entities(HistoricoLead.tipo_acao, HistoricoLead.acao, HistoricoLead.resultado, HistoricoLead.observacao)
+        .filter(HistoricoLead.created_at >= today_start)
+        .all()
+    )
     treated_today_tokens = ["reuniao_marcada", "reuniao", "crm", "cliente existente", "sem interesse", "estado alterado"]
     treated_today = sum(1 for entry in today_activity if history_matches(entry, treated_today_tokens))
     recent_activity = (
@@ -3079,7 +3106,7 @@ def photon_geocode_query(query, expected=None):
             PHOTON_URL,
             params={"q": query, "limit": 1, "lang": "pt"},
             headers={"User-Agent": NOMINATIM_USER_AGENT},
-            timeout=5,
+            timeout=GEOCODING_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         payload = response.json()
@@ -3129,7 +3156,7 @@ def geocode_freeform_query(query, import_cache, expected=None):
             NOMINATIM_URL,
             params={"q": query, "format": "json", "limit": 1, "countrycodes": "pt", "addressdetails": 1},
             headers={"User-Agent": NOMINATIM_USER_AGENT},
-            timeout=5,
+            timeout=GEOCODING_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         payload = response.json()
@@ -3535,9 +3562,52 @@ def search_leads(query, limit=8):
     return results
 
 
+def lead_list_payload(lead):
+    heat_score = lightweight_heat_score(lead)
+    heat_band = heat_band_from_score(heat_score)
+    return {
+        "id": lead.id,
+        "nome_cliente": lead.nome_cliente or lead.nome_empresa,
+        "area_negocio": lead.area_negocio or lead.tipo_cliente,
+        "cidade": lead.cidade or lead.localidade,
+        "empresa": lead.empresa or "",
+        "nome_empresa": lead.nome_empresa,
+        "tipo_cliente": lead.tipo_cliente,
+        "morada": lead.morada or "",
+        "codigo_postal": lead.codigo_postal or "",
+        "localidade": lead.localidade,
+        "contacto": lead.contacto or "",
+        "telefone": lead.telefone or "",
+        "email": lead.email or "",
+        "categoria": lead.categoria or "",
+        "nif": lead.nif or "",
+        "observacoes": lead.observacoes or "",
+        "observacoes_contacto": lead.observacoes_contacto or "",
+        "latitude": lead.latitude,
+        "longitude": lead.longitude,
+        "estado": normalize_legacy_state(lead.estado),
+        "prioridade": lead.prioridade or "",
+        "comercial_responsavel": display_commercial(lead.comercial_responsavel),
+        "data_novo_contacto": lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else "",
+        "data_reuniao": lead.data_reuniao.isoformat() if lead.data_reuniao else "",
+        "hora_reuniao": lead.hora_reuniao or "",
+        "tags": lead.tag_list(),
+        "insight_tags": lead.insight_tag_list(),
+        "assigned_to_id": lead.assigned_to_id,
+        "assigned_to_nome": lead.assigned_to.nome if lead.assigned_to else "",
+        "created_at": lead.created_at.isoformat() if lead.created_at else "",
+        "updated_at": lead.updated_at.isoformat() if lead.updated_at else "",
+        "score": heat_score,
+        "score_band": heat_band,
+        "heat_score": heat_score,
+        "heat_band": heat_band,
+        "heat_label": heat_label_from_band(heat_band),
+    }
+
+
 def all_leads_payload(scope=None):
     scope = scope if scope is not None else requested_assignment_scope()
-    query = apply_assignment_scope(Lead.query.options(joinedload(Lead.assigned_to), selectinload(Lead.historico)), scope)
+    query = apply_assignment_scope(Lead.query.options(joinedload(Lead.assigned_to)), scope)
     leads = [
         lead
         for lead in query.order_by(Lead.nome_empresa.asc()).all()
@@ -3547,7 +3617,7 @@ def all_leads_payload(scope=None):
     tags = set()
     states = set()
     for lead in leads:
-        item = lead.to_dict(include_history=False)
+        item = lead_list_payload(lead)
         item["estado"] = normalize_legacy_state(item["estado"])
         item["ativa"] = is_active_lead(lead)
         item["agendada"] = is_scheduled_lead(lead)
@@ -4786,11 +4856,18 @@ def register_routes(app):
                 ]))
             ]
 
+        option_rows = Lead.query.with_entities(
+            Lead.estado,
+            Lead.cidade,
+            Lead.localidade,
+            Lead.comercial_responsavel,
+            Lead.classificacao_observacao,
+        ).all()
         options = {
-            "estados": sorted({lead.estado for lead in Lead.query.all() if lead.estado}),
-            "cidades": sorted({lead.cidade or lead.localidade for lead in Lead.query.all() if lead.cidade or lead.localidade}),
-            "comerciais": sorted({lead.comercial_responsavel for lead in Lead.query.all() if lead.comercial_responsavel}),
-            "motivos": sorted({lead.classificacao_observacao for lead in Lead.query.all() if lead.classificacao_observacao}),
+            "estados": sorted({row.estado for row in option_rows if row.estado}),
+            "cidades": sorted({row.cidade or row.localidade for row in option_rows if row.cidade or row.localidade}),
+            "comerciais": sorted({row.comercial_responsavel for row in option_rows if row.comercial_responsavel}),
+            "motivos": sorted({row.classificacao_observacao for row in option_rows if row.classificacao_observacao}),
         }
         return render_template("leads_inativas.html", leads=leads, filters=filters, options=options, estados=LEAD_STATES)
 
@@ -4873,10 +4950,10 @@ def register_routes(app):
         query = apply_assignment_scope(Lead.query, scope)
         if lite:
             query = aplicar_filtro_leads_operacionais_mapa(query)
-        if not lite:
+        if include_history:
             query = query.options(joinedload(Lead.assigned_to), selectinload(Lead.historico))
-        elif include_history:
-            query = query.options(selectinload(Lead.historico))
+        elif not lite:
+            query = query.options(joinedload(Lead.assigned_to))
         if has_bounds:
             spatial_filters = (
                 Lead.latitude.isnot(None),
@@ -4893,7 +4970,10 @@ def register_routes(app):
                 query = query.filter(or_(spatial_filter, Lead.id == selected_lead_id))
             else:
                 query = query.filter(spatial_filter)
-        leads = query.order_by(Lead.nome_empresa.asc()).all()
+        query = query.order_by(Lead.nome_empresa.asc())
+        if lite and not has_bounds and not selected_lead_id:
+            query = query.limit(1200)
+        leads = query.all()
         query_elapsed = time.perf_counter() - start
         payload = []
         for lead in leads:
