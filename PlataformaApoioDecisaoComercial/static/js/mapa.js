@@ -37,6 +37,7 @@ let heatmapScriptPromise = null;
 let leadFetchController = null;
 let leadSummaryController = null;
 let lastLeadFetchKey = "";
+let leadDrawerExpanded = false;
 const LEAD_LIST_RENDER_LIMIT = 160;
 const initialUrlParams = new URLSearchParams(window.location.search);
 const initialFocusLeadId = Number(initialUrlParams.get("lead_id")) || null;
@@ -130,7 +131,7 @@ const els = {
     mapLoading: document.getElementById("mapLoading"),
     leadListTabVisible: document.getElementById("leadListTabVisible"),
     leadListTabAll: document.getElementById("leadListTabAll"),
-    openFullLead: document.getElementById("openFullLead"),
+    toggleLeadDetails: document.getElementById("toggleLeadDetails"),
     focusSelectedLead: document.getElementById("focusSelectedLead"),
 };
 
@@ -372,6 +373,34 @@ function insightSummary(lead) {
     return [tags, note].filter(Boolean).join(" · ");
 }
 
+function mergeLeadData(base = {}, incoming = {}, { preserveDetails = false } = {}) {
+    const merged = { ...base, ...incoming };
+    if (preserveDetails) {
+        ["timeline", "historico", "tags", "observacoes", "observacoes_contacto", "insight_tags", "insight_note"].forEach((field) => {
+            const previous = base?.[field];
+            const next = incoming?.[field];
+            const previousHasValue = Array.isArray(previous) ? previous.length > 0 : Boolean(previous);
+            const nextIsEmpty = Array.isArray(next) ? next.length === 0 : next === undefined || next === null || next === "";
+            if (previousHasValue && nextIsEmpty) merged[field] = previous;
+        });
+    }
+    return merged;
+}
+
+function setLeadDrawerExpanded(expanded) {
+    leadDrawerExpanded = Boolean(expanded && selectedLead);
+    if (els.leadDrawer) els.leadDrawer.classList.toggle("is-expanded", leadDrawerExpanded);
+    document.body.classList.toggle("map-drawer-expanded", leadDrawerExpanded);
+    if (els.toggleLeadDetails) {
+        const label = leadDrawerExpanded ? "Reduzir detalhes" : "Expandir detalhes";
+        els.toggleLeadDetails.title = label;
+        els.toggleLeadDetails.setAttribute("aria-label", label);
+        els.toggleLeadDetails.disabled = !selectedLead;
+        const icon = els.toggleLeadDetails.querySelector("span");
+        if (icon) icon.textContent = leadDrawerExpanded ? "⤡" : "⤢";
+    }
+}
+
 function setDrawerOpen(open) {
     if (els.leadDrawer) {
         els.leadDrawer.classList.toggle("open", open);
@@ -379,6 +408,7 @@ function setDrawerOpen(open) {
         els.leadDrawer.setAttribute("aria-hidden", String(!open));
     }
     document.body.classList.toggle("map-drawer-open", open);
+    if (!open) setLeadDrawerExpanded(false);
     if (open) requestAnimationFrame(() => els.drawerClose?.focus({ preventScroll: true }));
 }
 
@@ -392,7 +422,7 @@ async function loadLeadSummary(leadId) {
         if (!response.ok) return;
         const summary = await response.json();
         if (!selectedLead || Number(selectedLead.id) !== normalizedLeadId) return;
-        selectedLead = { ...selectedLead, ...summary };
+        selectedLead = mergeLeadData(selectedLead, summary);
         leadsById.set(normalizedLeadId, selectedLead);
         allLeads = allLeads.map((lead) => (Number(lead.id) === normalizedLeadId ? selectedLead : lead));
         visibleLeads = visibleLeads.map((lead) => (Number(lead.id) === normalizedLeadId ? selectedLead : lead));
@@ -1113,10 +1143,7 @@ function renderDetails() {
         els.addTag.disabled = true;
         if (els.leadNoteInput) els.leadNoteInput.value = "";
         if (els.addLeadNote) els.addLeadNote.disabled = true;
-        if (els.openFullLead) {
-            els.openFullLead.href = "#";
-            els.openFullLead.setAttribute("aria-disabled", "true");
-        }
+        setLeadDrawerExpanded(false);
         if (els.editLeadLink) {
             els.editLeadLink.href = "#";
             els.editLeadLink.setAttribute("aria-disabled", "true");
@@ -1126,10 +1153,7 @@ function renderDetails() {
     els.leadDetails.classList.remove("empty-state");
     els.addTag.disabled = false;
     if (els.addLeadNote) els.addLeadNote.disabled = false;
-    if (els.openFullLead) {
-        els.openFullLead.href = `/mapa?lead_id=${selectedLead.id}&history=1`;
-        els.openFullLead.setAttribute("aria-disabled", "false");
-    }
+    setLeadDrawerExpanded(leadDrawerExpanded);
     if (els.editLeadLink) {
         els.editLeadLink.href = leadEditUrl(selectedLead);
         els.editLeadLink.setAttribute("aria-disabled", "false");
@@ -1143,6 +1167,7 @@ function renderDetails() {
     const company = selectedLead.empresa || selectedLead.nome_empresa || "";
     const address = selectedLead.morada || "";
     const postalCode = selectedLead.codigo_postal || "";
+    const coordinates = hasCoordinates(selectedLead) ? `${selectedLead.latitude}, ${selectedLead.longitude}` : "";
     if (els.leadDrawerTitle) els.leadDrawerTitle.textContent = leadName(selectedLead);
     els.leadDetails.innerHTML = `
         <section class="lead-drawer-block">
@@ -1161,11 +1186,25 @@ function renderDetails() {
             </dl>
             ${lastContactInfo(selectedLead) ? `<span class="contact-recency ${lastContactInfo(selectedLead).avoid ? "contact-recency--avoid" : ""}">${lastContactInfo(selectedLead).label}</span>` : ""}
         </section>
+        ${leadDrawerExpanded ? `<section class="lead-drawer-block">
+            <h4>Contacto</h4>
+            <dl class="lead-details-dl lead-details-dl--grid">
+                ${detailLine("NIF", selectedLead.nif)}
+                ${detailLine("Contacto", selectedLead.contacto)}
+                ${detailLine("Estado", selectedLead.estado)}
+                ${detailLine("Prioridade", selectedLead.prioridade)}
+                ${detailLine("Novo contacto", selectedLead.data_novo_contacto)}
+                ${detailLine("Reunião", selectedLead.data_reuniao)}
+                ${detailLine("Hora", selectedLead.hora_reuniao)}
+            </dl>
+        </section>` : ""}
         <section class="lead-drawer-block">
             <h4>Localiza&ccedil;&atilde;o</h4>
             <dl class="lead-details-dl lead-details-dl--grid">
+                ${leadDrawerExpanded ? detailLine("Localidade", selectedLead.localidade) : ""}
                 ${detailLine("Morada", address)}
                 ${detailLine("C&oacute;digo postal", postalCode)}
+                ${leadDrawerExpanded ? detailLine("Coordenadas", coordinates) : ""}
             </dl>
         </section>
         ${observationBlock("Observa&ccedil;&otilde;es", selectedLead.observacoes, "Sem observa&ccedil;&otilde;es")}
@@ -2118,8 +2157,10 @@ function bindEvents() {
     document.querySelectorAll("[data-action]").forEach((button) => {
         button.addEventListener("click", () => performAction(button.dataset.action));
     });
-    els.openFullLead?.addEventListener("click", (event) => {
-        if (!selectedLead) event.preventDefault();
+    els.toggleLeadDetails?.addEventListener("click", () => {
+        if (!selectedLead) return;
+        setLeadDrawerExpanded(!leadDrawerExpanded);
+        renderDetails();
     });
     els.focusSelectedLead?.addEventListener("click", () => {
         if (!selectedLead || !hasCoordinates(selectedLead)) return;
@@ -2191,7 +2232,7 @@ async function loadLeads({ force = false, viewportOnly = true } = {}) {
         id: Number(lead?.id),
         latitude: lead?.latitude === "" || lead?.latitude == null ? null : Number(lead.latitude),
         longitude: lead?.longitude === "" || lead?.longitude == null ? null : Number(lead.longitude),
-    }));
+    })).map((lead) => mergeLeadData(leadsById.get(lead.id), lead, { preserveDetails: true }));
     leadsById = new Map(allLeads.map((lead) => [lead.id, lead]));
     applyCityOffsets();
     if (focusLeadId) {

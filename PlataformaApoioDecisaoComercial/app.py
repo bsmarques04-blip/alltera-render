@@ -4278,6 +4278,26 @@ def register_routes(app):
             assignment_scopes=assignment_scope_options(),
         )
 
+    @app.route("/leads/<int:lead_id>")
+    @login_required
+    def lead_detail(lead_id):
+        lead = Lead.query.options(joinedload(Lead.assigned_to)).get_or_404(lead_id)
+        timeline = (
+            HistoricoLead.query
+            .options(joinedload(HistoricoLead.user))
+            .filter(HistoricoLead.lead_id == lead.id)
+            .order_by(HistoricoLead.created_at.desc())
+            .all()
+        )
+        next_url = request.args.get("next") or url_for("todas_leads")
+        return render_template(
+            "lead_detail.html",
+            lead=lead,
+            timeline=timeline,
+            next_url=next_url,
+            has_coordinates=valid_coordinates(lead.latitude, lead.longitude),
+        )
+
     @app.route("/todas-leads/exportar")
     @login_required
     def exportar_todas_leads():
@@ -4886,13 +4906,11 @@ def register_routes(app):
             "motivo_classificacao": lead.motivo_classificacao or "",
             "insight_note": lead.insight_note or "",
         })
-        # Resumo leve para o drawer: a timeline completa continua fora do payload inicial do mapa.
         history = (
             HistoricoLead.query
             .options(joinedload(HistoricoLead.user))
             .filter(HistoricoLead.lead_id == lead.id)
             .order_by(HistoricoLead.created_at.desc())
-            .limit(5)
             .all()
         )
         timeline = []
