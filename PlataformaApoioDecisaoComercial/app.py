@@ -2305,6 +2305,57 @@ def detect_duplicate(lead, phone_index=None, fallback_index=None, exclude_lead_i
     return None, ""
 
 
+def find_duplicate_lead_fast(lead_data, exclude_id=None):
+    def scoped(query):
+        if exclude_id:
+            query = query.filter(Lead.id != exclude_id)
+        return query
+
+    nif = normalize_phone(lead_data.get("nif"))
+    if nif:
+        duplicate = scoped(Lead.query.filter(Lead.nif == lead_data.get("nif"))).first()
+        if duplicate:
+            return duplicate, f"nif:{nif}"
+        candidates = scoped(Lead.query.filter(Lead.nif.ilike(f"%{nif[-6:]}%"))).limit(5).all()
+        for candidate in candidates:
+            if normalize_phone(candidate.nif) == nif:
+                return candidate, f"nif:{nif}"
+
+    email = clean_text(lead_data.get("email")).lower()
+    if email:
+        duplicate = scoped(Lead.query.filter(db.func.lower(Lead.email) == email)).first()
+        if duplicate:
+            return duplicate, f"email:{email}"
+
+    phones = extract_phone_numbers(lead_data.get("telefone"))
+    for phone in phones:
+        phone_tail = phone[-7:] if len(phone) >= 7 else phone
+        if not phone_tail:
+            continue
+        candidates = scoped(Lead.query.filter(Lead.telefone.ilike(f"%{phone_tail}%"))).limit(5).all()
+        for candidate in candidates:
+            if phone in extract_phone_numbers(candidate.telefone):
+                return candidate, f"telefone:{phone}"
+
+    company = clean_text(lead_data.get("nome_empresa") or lead_data.get("empresa"))
+    city = clean_text(lead_data.get("cidade") or lead_data.get("localidade"))
+    if company and city:
+        company_key = normalize_lookup(company)
+        city_key = normalize_lookup(city)
+        candidates_query = scoped(Lead.query.filter(or_(
+            Lead.nome_empresa.ilike(f"%{company}%"),
+            Lead.empresa.ilike(f"%{company}%"),
+        )))
+        candidates = candidates_query.limit(5).all()
+        for candidate in candidates:
+            candidate_name = normalize_lookup(candidate.nome_empresa or candidate.empresa)
+            candidate_city = normalize_lookup(candidate.cidade or candidate.localidade)
+            if candidate_city == city_key and (candidate_name == company_key or similarity(candidate_name, company_key) >= 0.92):
+                return candidate, "nome/empresa + cidade"
+
+    return None, ""
+
+
 def update_manual_lead(lead, lead_data):
     editable_fields = {
         "nome_cliente",
@@ -3797,22 +3848,21 @@ def lead_map_payload(lead, include_history=False):
         "tipo_cliente": lead.tipo_cliente,
         "cidade": lead.cidade or lead.localidade,
         "localidade": lead.localidade,
+        "morada": lead.morada or "",
+        "codigo_postal": lead.codigo_postal or "",
         "telefone": lead.telefone or lead.contacto or "",
         "email": lead.email or "",
         "latitude": lead.latitude,
         "longitude": lead.longitude,
         "estado": normalize_legacy_state(lead.estado),
         "prioridade": lead.prioridade or "",
+        "classificacao_observacao": lead.classificacao_observacao or "",
         "comercial_responsavel": display_commercial(lead.comercial_responsavel),
         "comercial_key": normalize_commercial_key(lead.comercial_responsavel),
         "data_novo_contacto": lead.data_novo_contacto.isoformat() if lead.data_novo_contacto else "",
         "data_reuniao": lead.data_reuniao.isoformat() if lead.data_reuniao else "",
         "hora_reuniao": lead.hora_reuniao or "",
         "tags": lead.tag_list(),
-        "insight_tags": lead.insight_tag_list(),
-        "insight_note": "",
-        "observacoes": "",
-        "observacoes_contacto": "",
         "score": heat_score,
         "score_band": heat_band,
         "heat_score": heat_score,
@@ -4474,13 +4524,7 @@ def register_routes(app):
                 flash("Indica pelo menos Cidade, Morada ou Código Postal.", "error")
                 return render_template("adicionar_lead.html", form=request.form, edit_lead=edit_lead, **template_options)
 
-            phone_index, fallback_index = build_duplicate_indexes(exclude_lead_id=edit_lead.id if edit_lead else None)
-            duplicate, reason = detect_duplicate(
-                lead_data,
-                phone_index,
-                fallback_index,
-                exclude_lead_id=edit_lead.id if edit_lead else None,
-            )
+            duplicate, reason = find_duplicate_lead_fast(lead_data, exclude_id=edit_lead.id if edit_lead else None)
             if duplicate:
                 action = "guardada" if edit_lead else "criada uma nova lead"
                 flash(f"Lead duplicada encontrada ({reason}). Não foi {action}.", "error")
@@ -5019,6 +5063,7 @@ def register_routes(app):
             "reuniao_info": lead.reuniao_info or "",
             "classificacao_observacao": lead.classificacao_observacao or "",
             "motivo_classificacao": lead.motivo_classificacao or "",
+            "insight_tags": lead.insight_tag_list(),
             "insight_note": lead.insight_note or "",
         })
         history = (
@@ -5026,6 +5071,7 @@ def register_routes(app):
             .options(joinedload(HistoricoLead.user))
             .filter(HistoricoLead.lead_id == lead.id)
             .order_by(HistoricoLead.created_at.desc())
+            .limit(50)
             .all()
         )
         timeline = []

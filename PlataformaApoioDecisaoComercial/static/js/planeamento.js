@@ -153,7 +153,7 @@ function bindPlanning() {
 
 async function loadPlanningLeads() {
     try {
-        const response = await fetch("/api/leads?history=1");
+        const response = await fetch("/api/leads?lite=1");
         if (!response.ok) return;
         planningState.leads = await response.json();
         renderPlanning();
