@@ -3099,8 +3099,17 @@ def geocode_single_lead(lead):
     return False, message
 
 
-def try_auto_geocode_lead(lead):
-    if valid_coordinates(lead.latitude, lead.longitude):
+def lead_location_signature(lead):
+    return (
+        clean_text(lead.morada),
+        normalize_city(lead.cidade),
+        normalize_city(lead.localidade),
+        clean_text(lead.codigo_postal),
+    )
+
+
+def try_auto_geocode_lead(lead, force=False):
+    if not force and valid_coordinates(lead.latitude, lead.longitude):
         return True, ""
     try:
         return geocode_single_lead(lead)
@@ -4194,9 +4203,22 @@ def register_routes(app):
                 return render_template("adicionar_lead.html", form=request.form, duplicate=duplicate, edit_lead=edit_lead, **template_options)
 
             if edit_lead:
+                old_location_signature = lead_location_signature(edit_lead)
+                old_latitude = edit_lead.latitude
+                old_longitude = edit_lead.longitude
                 update_manual_lead(edit_lead, lead_data)
+                new_location_signature = lead_location_signature(edit_lead)
+                location_changed = old_location_signature != new_location_signature
+                if location_changed:
+                    edit_lead.latitude = None
+                    edit_lead.longitude = None
+                    add_history(
+                        edit_lead,
+                        "Localização alterada",
+                        f"Localização textual alterada; coordenadas antigas removidas para nova geocodificação. Coordenadas anteriores: {old_latitude}, {old_longitude}.",
+                    )
                 add_history(edit_lead, "Lead editada manualmente", "Dados atualizados diretamente na aplicação.")
-                geocoded, _ = try_auto_geocode_lead(edit_lead)
+                geocoded, _ = try_auto_geocode_lead(edit_lead, force=location_changed)
                 db.session.commit()
                 if geocoded:
                     flash("Lead guardada com sucesso.", "success")
