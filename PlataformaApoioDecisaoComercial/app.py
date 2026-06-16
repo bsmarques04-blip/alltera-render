@@ -42,6 +42,7 @@ INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
 DB_PATH = os.path.join(INSTANCE_DIR, "decisao_comercial.db")
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_USER_AGENT = "AllteraLeadPlanner/1.0 academico"
+PHOTON_URL = "https://photon.komoot.io/api/"
 # Em ambiente académico/local é preferível não bloquear o fluxo de importação
 # com um lock global entre processos do reloader Flask. O POST continua a usar
 # transação/rollback, mas uma importação interrompida já não deixa a UI presa.
@@ -2994,23 +2995,139 @@ def useful_geocode_value(value):
     return "" if key in invalid_values else text
 
 
-def geocode_freeform_query(query, import_cache):
+def geocode_postal_prefix(value):
+    digits = re.sub(r"\D+", "", clean_text(value))
+    return digits[:4] if len(digits) >= 4 else digits
+
+
+def geocode_expected_context(query, expected=None):
+    expected = expected or {}
+    city = useful_geocode_value(expected.get("city"))
+    locality = useful_geocode_value(expected.get("locality"))
+    postal = useful_geocode_value(expected.get("postal"))
+    return {
+        "city": city,
+        "locality": locality,
+        "postal_prefix": geocode_postal_prefix(postal),
+        "lookup": normalize_lookup(" ".join([query, city, locality, postal])),
+    }
+
+
+def geocode_country_is_portugal(address=None, display_name=""):
+    address = address or {}
+    country_code = clean_text(address.get("country_code") or address.get("countrycode")).lower()
+    country = normalize_lookup(address.get("country") or display_name)
+    return country_code in {"pt", "prt"} or "portugal" in country
+
+
+def geocode_text_contains_place(text, place):
+    text_key = re.sub(r"[^a-z0-9]+", " ", normalize_lookup(text)).strip()
+    place_key = re.sub(r"[^a-z0-9]+", " ", normalize_lookup(place)).strip()
+    if not text_key or not place_key:
+        return False
+    return re.search(rf"(^|\s){re.escape(place_key)}(\s|$)", text_key) is not None
+
+
+def geocode_result_matches_context(address, display_name, context, query=""):
+    if not geocode_country_is_portugal(address, display_name):
+        print(f"[GEOCODE] rejeitado fora de contexto: query={query}, esperado={context}, resultado={display_name}", flush=True)
+        return False
+    text = normalize_lookup(" ".join([
+        display_name or "",
+        address.get("city") or "",
+        address.get("town") or "",
+        address.get("village") or "",
+        address.get("municipality") or "",
+        address.get("county") or "",
+        address.get("state") or "",
+        address.get("district") or "",
+        address.get("postcode") or "",
+    ]))
+    postal_prefix = context.get("postal_prefix")
+    result_postal = geocode_postal_prefix(address.get("postcode"))
+    if postal_prefix and result_postal and result_postal != postal_prefix:
+        print(f"[GEOCODE] rejeitado fora de contexto: query={query}, esperado={context}, resultado={display_name}", flush=True)
+        return False
+    expected_city = context.get("city")
+    if expected_city and not geocode_text_contains_place(text, expected_city):
+        if not postal_prefix or result_postal != postal_prefix:
+            print(f"[GEOCODE] rejeitado fora de contexto: query={query}, esperado={context}, resultado={display_name}", flush=True)
+            return False
+    elif not expected_city:
+        expected_places = [context.get("locality")]
+        expected_places = [place for place in expected_places if place]
+        if expected_places and text and not any(geocode_text_contains_place(text, place) for place in expected_places):
+            if not postal_prefix or result_postal != postal_prefix:
+                print(f"[GEOCODE] rejeitado fora de contexto: query={query}, esperado={context}, resultado={display_name}", flush=True)
+                return False
+    major_cities = {"lisboa", "porto", "coimbra", "braga", "setubal", "faro", "aveiro"}
+    expected_city_key = normalize_lookup(expected_city)
+    if expected_city_key in major_cities and not geocode_text_contains_place(text, expected_city):
+        if not postal_prefix or result_postal != postal_prefix:
+            print(f"[GEOCODE] rejeitado fora de contexto: query={query}, esperado={context}, resultado={display_name}", flush=True)
+            return False
+    return True
+
+
+def photon_geocode_query(query, expected=None):
+    query = clean_text(query)
+    if not query:
+        return None
+    context = geocode_expected_context(query, expected)
+    try:
+        response = requests.get(
+            PHOTON_URL,
+            params={"q": query, "limit": 1, "lang": "pt"},
+            headers={"User-Agent": NOMINATIM_USER_AGENT},
+            timeout=5,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        features = payload.get("features") or []
+        if not features:
+            return None
+        feature = features[0]
+        coordinates = ((feature.get("geometry") or {}).get("coordinates") or [])
+        if len(coordinates) < 2:
+            return None
+        lon = parse_float_optional(coordinates[0])
+        lat = parse_float_optional(coordinates[1])
+        properties = feature.get("properties") or {}
+        address = {
+            "countrycode": properties.get("countrycode"),
+            "country": properties.get("country"),
+            "city": properties.get("city") or properties.get("name"),
+            "town": properties.get("city"),
+            "county": properties.get("county"),
+            "state": properties.get("state"),
+            "postcode": properties.get("postcode"),
+        }
+        display_name = " ".join(clean_text(properties.get(key)) for key in ["name", "street", "city", "county", "state", "country"] if properties.get(key))
+        if valid_coordinates(lat, lon) and geocode_result_matches_context(address, display_name, context, query):
+            return {"latitude": lat, "longitude": lon, "query": query, "method": "photon", "resolved_city": properties.get("city") or properties.get("name") or query}
+    except Exception as exc:
+        print(f"[GEOCODE] photon falhou para {query}: {exc}", flush=True)
+    return None
+
+
+def geocode_freeform_query(query, import_cache, expected=None):
     query = clean_text(query)
     if not query:
         return None
     if query in import_cache:
         return import_cache[query]
+    context = geocode_expected_context(query, expected)
     try:
         with db.session.no_autoflush:
             cached = GeocodingCache.query.filter_by(query_text=query).first()
-        if cached and valid_coordinates(cached.latitude, cached.longitude):
+        if cached and valid_coordinates(cached.latitude, cached.longitude) and not context.get("city"):
             result = {"latitude": cached.latitude, "longitude": cached.longitude, "query": query, "cache": True, "method": "cache", "resolved_city": query}
             import_cache[query] = result
             return result
 
         response = requests.get(
             NOMINATIM_URL,
-            params={"q": query, "format": "json", "limit": 1, "countrycodes": "pt"},
+            params={"q": query, "format": "json", "limit": 1, "countrycodes": "pt", "addressdetails": 1},
             headers={"User-Agent": NOMINATIM_USER_AGENT},
             timeout=5,
         )
@@ -3019,11 +3136,17 @@ def geocode_freeform_query(query, import_cache):
         if payload:
             lat = parse_float_optional(payload[0].get("lat"))
             lon = parse_float_optional(payload[0].get("lon"))
-            if valid_coordinates(lat, lon):
+            address = payload[0].get("address") or {}
+            if valid_coordinates(lat, lon) and geocode_result_matches_context(address, payload[0].get("display_name", ""), context, query):
                 safe_cache_geocoding(query, lat, lon)
-                result = {"latitude": lat, "longitude": lon, "query": query, "cache": False, "method": "geocoding", "resolved_city": query}
+                result = {"latitude": lat, "longitude": lon, "query": query, "cache": False, "method": "nominatim", "resolved_city": query}
                 import_cache[query] = result
                 return result
+        photon_result = photon_geocode_query(query, expected)
+        if photon_result:
+            safe_cache_geocoding(query, photon_result["latitude"], photon_result["longitude"])
+            import_cache[query] = photon_result
+            return photon_result
         safe_cache_geocoding(query, None, None)
         import_cache[query] = None
     except Exception as exc:
@@ -3043,6 +3166,7 @@ def geocode_single_lead(lead):
     company = useful_geocode_value(lead.nome_empresa or lead.empresa)
     client_name = useful_geocode_value(lead.nome_cliente)
     name_candidate = company if company and company != client_name else ""
+    expected = {"city": city, "locality": locality, "postal": postal}
 
     candidates = []
     seen = set()
@@ -3059,10 +3183,13 @@ def geocode_single_lead(lead):
 
     add_candidate(address, postal, city, "Portugal")
     add_candidate(address, city, "Portugal")
+    for address_part in re.split(r"\s*,\s*", address):
+        if address_part and address_part != address:
+            add_candidate(address_part, city, "Portugal")
     add_candidate(postal, city, "Portugal")
+    add_candidate(postal, "Portugal")
     add_candidate(city, "Portugal")
     add_candidate(locality, "Portugal")
-    add_candidate(postal, "Portugal")
     if address and not city:
         add_candidate(address, "Portugal")
     if not city:
@@ -3072,14 +3199,14 @@ def geocode_single_lead(lead):
         add_candidate(name_candidate, city or locality or postal, "Portugal")
 
     if not candidates:
-        message = "Não existem dados de localização suficientes para geocodificar esta lead. Preenche pelo menos cidade ou código postal."
+        message = "Não foi possível geocodificar com os dados disponíveis. Confirma cidade, código postal ou morada."
         add_history(lead, "Erro de geocoding manual", message)
         return False, message
 
     import_cache = {}
     result = None
     for candidate in candidates:
-        result = geocode_freeform_query(candidate, import_cache)
+        result = geocode_freeform_query(candidate, import_cache, expected)
         if result:
             break
 
@@ -3093,8 +3220,8 @@ def geocode_single_lead(lead):
         lead.latitude = result["latitude"]
         lead.longitude = result["longitude"]
         add_history(lead, "Geocoding manual", f"Query: {result.get('query', '')}. Resultado: {lead.latitude}, {lead.longitude}.")
-        return True, f"Coordenadas encontradas através de: {result.get('query', '')}"
-    message = f"Não foi possível geocodificar esta lead com os dados disponíveis: {', '.join(candidates)}."
+        return True, f"Coordenadas encontradas através de: {result.get('query', '')} ({result.get('method', 'geocoding')})"
+    message = "Não foi possível geocodificar com os dados disponíveis. Confirma cidade, código postal ou morada."
     add_history(lead, "Erro de geocoding manual", message)
     return False, message
 
@@ -3204,6 +3331,38 @@ def build_manual_lead(form):
         "classificacao_observacao": "",
         "motivo_classificacao": "",
     }
+
+
+def manual_lead_form_values(lead=None, args=None):
+    args = args or {}
+    if not lead:
+        return {key: value for key, value in args.items() if value is not None}
+    values = {
+        "lead_id": lead.id,
+        "next": args.get("next", ""),
+        "nome_cliente": lead.nome_cliente or lead.nome_empresa or "",
+        "empresa": lead.empresa or lead.nome_empresa or "",
+        "nome_empresa": lead.nome_empresa or lead.empresa or "",
+        "area_negocio": lead.area_negocio or lead.tipo_cliente or "",
+        "tipo_cliente": lead.tipo_cliente or lead.area_negocio or "",
+        "telefone": lead.telefone or "",
+        "email": lead.email or "",
+        "nif": lead.nif or "",
+        "cidade": lead.cidade or lead.localidade or "",
+        "localidade": lead.localidade or lead.cidade or "",
+        "morada": lead.morada or "",
+        "codigo_postal": lead.codigo_postal or "",
+        "estado": normalize_legacy_state(lead.estado or lead.estado_lead or "Por contactar"),
+        "prioridade": lead.prioridade or "Baixa",
+        "tags": lead.tags or "",
+        "observacoes": lead.observacoes or "",
+        "observacoes_contacto": lead.observacoes_contacto or "",
+        "comercial_responsavel": lead.comercial_responsavel or "",
+    }
+    for key, value in args.items():
+        if key not in {"lead_id", "next"} and not clean_text(values.get(key)):
+            values[key] = value
+    return values
 
 
 def distance_km(a, b):
@@ -4245,7 +4404,7 @@ def register_routes(app):
                 flash("Lead guardada, mas não foi possível obter coordenadas automaticamente.", "warning")
             return redirect(request.form.get("next") or url_for("todas_leads"))
 
-        prefill = {key: value for key, value in request.args.items() if value is not None}
+        prefill = manual_lead_form_values(edit_lead, request.args)
         return render_template("adicionar_lead.html", form=prefill, edit_lead=edit_lead, **template_options)
 
     @app.route("/api/import/sheets", methods=["POST"])

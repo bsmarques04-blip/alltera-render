@@ -1316,24 +1316,9 @@ function renderTimelinePreview(lead, { limit = 3, compact = false } = {}) {
 
 function leadEditUrl(lead) {
     if (!lead?.id) return "#";
-    const params = new URLSearchParams({
-        lead_id: lead.id,
-        next: window.location.pathname,
-        nome_cliente: lead.nome_cliente || "",
-        empresa: lead.empresa || lead.nome_empresa || "",
-        nome_empresa: lead.nome_empresa || "",
-        cidade: lead.cidade || lead.localidade || "",
-        localidade: lead.localidade || lead.cidade || "",
-        morada: lead.morada || "",
-        codigo_postal: lead.codigo_postal || "",
-        telefone: lead.telefone || "",
-        email: lead.email || "",
-        area_negocio: lead.area_negocio || lead.tipo_cliente || "",
-        tipo_cliente: lead.tipo_cliente || lead.area_negocio || "",
-        comercial_responsavel: lead.comercial_responsavel || "",
-        observacoes: lead.observacoes || "",
-        observacoes_contacto: lead.observacoes_contacto || "",
-    });
+    const params = new URLSearchParams();
+    params.set("lead_id", lead.id);
+    params.set("next", window.location.pathname || "/mapa");
     return `/leads/nova?${params}`;
 }
 
