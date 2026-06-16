@@ -2980,21 +2980,123 @@ def coordinate_review_reason(lead):
     return ""
 
 
+def useful_geocode_value(value):
+    text = clean_text(value)
+    if not text:
+        return ""
+    key = normalize_lookup(text)
+    invalid_values = INVALID_CITY_VALUES | {
+        normalize_lookup("Sem morada"),
+        normalize_lookup("Sem localidade"),
+        normalize_lookup("Sem codigo postal"),
+        normalize_lookup("Sem código postal"),
+    }
+    return "" if key in invalid_values else text
+
+
+def geocode_freeform_query(query, import_cache):
+    query = clean_text(query)
+    if not query:
+        return None
+    if query in import_cache:
+        return import_cache[query]
+    try:
+        with db.session.no_autoflush:
+            cached = GeocodingCache.query.filter_by(query_text=query).first()
+        if cached and valid_coordinates(cached.latitude, cached.longitude):
+            result = {"latitude": cached.latitude, "longitude": cached.longitude, "query": query, "cache": True, "method": "cache", "resolved_city": query}
+            import_cache[query] = result
+            return result
+
+        response = requests.get(
+            NOMINATIM_URL,
+            params={"q": query, "format": "json", "limit": 1, "countrycodes": "pt"},
+            headers={"User-Agent": NOMINATIM_USER_AGENT},
+            timeout=5,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if payload:
+            lat = parse_float_optional(payload[0].get("lat"))
+            lon = parse_float_optional(payload[0].get("lon"))
+            if valid_coordinates(lat, lon):
+                safe_cache_geocoding(query, lat, lon)
+                result = {"latitude": lat, "longitude": lon, "query": query, "cache": False, "method": "geocoding", "resolved_city": query}
+                import_cache[query] = result
+                return result
+        safe_cache_geocoding(query, None, None)
+        import_cache[query] = None
+    except Exception as exc:
+        db.session.rollback()
+        import_cache[query] = None
+        print(f"[GEOCODE] geocoding falhou para {query}: {exc}", flush=True)
+    return None
+
+
 def geocode_single_lead(lead):
     if valid_coordinates(lead.latitude, lead.longitude):
         return True, "Lead ja tem coordenadas."
-    result = simple_geocode_city({
-        "city": lead.cidade or lead.localidade,
-        "raw": lead.cidade or lead.localidade,
-        "postal": lead.codigo_postal,
-    }, {})
+    city = useful_geocode_value(lead.cidade)
+    locality = useful_geocode_value(lead.localidade)
+    address = useful_geocode_value(lead.morada)
+    postal = useful_geocode_value(lead.codigo_postal)
+    company = useful_geocode_value(lead.nome_empresa or lead.empresa)
+    client_name = useful_geocode_value(lead.nome_cliente)
+    name_candidate = company if company and company != client_name else ""
+
+    candidates = []
+    seen = set()
+
+    def add_candidate(*parts):
+        pieces = [useful_geocode_value(part) for part in parts]
+        if not any(piece and normalize_lookup(piece) != normalize_lookup("Portugal") for piece in pieces):
+            return
+        query = ", ".join(piece for piece in pieces if piece)
+        key = normalize_lookup(query)
+        if query and key not in seen:
+            candidates.append(query)
+            seen.add(key)
+
+    add_candidate(address, postal, city, "Portugal")
+    add_candidate(address, city, "Portugal")
+    add_candidate(postal, city, "Portugal")
+    add_candidate(city, "Portugal")
+    add_candidate(locality, "Portugal")
+    add_candidate(postal, "Portugal")
+    if address and not city:
+        add_candidate(address, "Portugal")
+    if not city:
+        add_candidate(postal, locality, "Portugal")
+        add_candidate(address, locality, "Portugal")
+    if name_candidate and (city or locality or postal):
+        add_candidate(name_candidate, city or locality or postal, "Portugal")
+
+    if not candidates:
+        message = "Não existem dados de localização suficientes para geocodificar esta lead. Preenche pelo menos cidade ou código postal."
+        add_history(lead, "Erro de geocoding manual", message)
+        return False, message
+
+    import_cache = {}
+    result = None
+    for candidate in candidates:
+        result = geocode_freeform_query(candidate, import_cache)
+        if result:
+            break
+
+    if not result:
+        result = simple_geocode_city({
+            "city": city or locality,
+            "raw": city or locality or address or postal,
+            "postal": postal,
+        }, import_cache)
     if result:
         lead.latitude = result["latitude"]
         lead.longitude = result["longitude"]
         add_history(lead, "Geocoding manual", f"Query: {result.get('query', '')}. Resultado: {lead.latitude}, {lead.longitude}.")
-        return True, "Coordenadas atualizadas."
-    add_history(lead, "Erro de geocoding manual", f"Nao foi possivel geocodificar {lead.cidade or lead.localidade or lead.codigo_postal or 'sem localizacao'}.")
-    return False, "Geocoding falhou."
+        return True, f"Coordenadas encontradas através de: {result.get('query', '')}"
+    message = f"Não foi possível geocodificar esta lead com os dados disponíveis: {', '.join(candidates)}."
+    add_history(lead, "Erro de geocoding manual", message)
+    return False, message
 
 
 def normalize_legacy_state(state):
@@ -4827,6 +4929,26 @@ def register_routes(app):
             lead.latitude = latitude
             lead.longitude = longitude
             add_history(lead, "Coordenadas completadas", f"Latitude: {latitude}; Longitude: {longitude}", commercial)
+        elif action == "force_geocode":
+            ok, message = geocode_single_lead(lead)
+            if ok:
+                has_coords = valid_coordinates(lead.latitude, lead.longitude)
+                observation = f"Coordenadas: {lead.latitude}, {lead.longitude}." if has_coords else message
+                add_history(lead, "Geocoding manual", observation, commercial)
+                db.session.commit()
+                return jsonify({
+                    "success": True,
+                    "message": "Lead geocodificada com sucesso.",
+                    "latitude": lead.latitude,
+                    "longitude": lead.longitude,
+                    "tem_coordenadas": has_coords,
+                    "lead": lead.to_dict(include_history=True),
+                })
+            db.session.rollback()
+            return jsonify({
+                "success": False,
+                "message": message or "Não foi possível geocodificar esta lead.",
+            }), 400
         else:
             return jsonify({"error": "Acao invalida"}), 400
 
