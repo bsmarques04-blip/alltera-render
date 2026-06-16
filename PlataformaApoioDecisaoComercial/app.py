@@ -4133,6 +4133,8 @@ def register_routes(app):
     @login_required
     def notas_equipa():
         if request.method == "POST":
+            if current_user.role != "admin":
+                abort(403)
             title = clean_text(request.form.get("titulo"))
             content = clean_text(request.form.get("conteudo"))
             if not title:
@@ -4155,6 +4157,8 @@ def register_routes(app):
     @app.route("/notas-equipa/<int:note_id>/editar", methods=["POST"])
     @login_required
     def atualizar_nota_equipa(note_id):
+        if current_user.role != "admin":
+            abort(403)
         note = EquipaNota.query.get_or_404(note_id)
         title = clean_text(request.form.get("titulo"))
         content = clean_text(request.form.get("conteudo"))
@@ -4171,6 +4175,8 @@ def register_routes(app):
     @app.route("/notas-equipa/<int:note_id>/apagar", methods=["POST"])
     @login_required
     def apagar_nota_equipa(note_id):
+        if current_user.role != "admin":
+            abort(403)
         note = EquipaNota.query.get_or_404(note_id)
         db.session.delete(note)
         db.session.commit()
@@ -4227,6 +4233,35 @@ def register_routes(app):
             flash("Acao invalida.", "error")
             return redirect(url_for("admin_users"))
         db.session.commit()
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+    @login_required
+    @admin_required
+    def admin_user_delete(user_id):
+        user = User.query.get_or_404(user_id)
+        if user.id == current_user.id:
+            flash("Nao podes eliminar o teu proprio utilizador.", "error")
+            return redirect(url_for("admin_users"))
+        if user.ativo:
+            flash("Nao e possivel eliminar um utilizador ativo. Desativa-o primeiro.", "error")
+            return redirect(url_for("admin_users"))
+        has_related_records = (
+            user.historico.count()
+            or user.assigned_leads.count()
+            or user.notas_equipa.count()
+            or User.query.filter(User.approved_by_id == user.id).count()
+        )
+        if has_related_records:
+            flash("Não é possível eliminar este utilizador porque existem registos associados. Pode mantê-lo inativo.", "error")
+            return redirect(url_for("admin_users"))
+        try:
+            db.session.delete(user)
+            db.session.commit()
+            flash("Utilizador eliminado.", "success")
+        except IntegrityError:
+            db.session.rollback()
+            flash("Não é possível eliminar este utilizador porque existem registos associados. Pode mantê-lo inativo.", "error")
         return redirect(url_for("admin_users"))
 
     @app.route("/meu-desempenho")

@@ -28,6 +28,10 @@
         gap: 18px;
     }
 
+    .team-notes-layout--readonly {
+        grid-template-columns: 1fr;
+    }
+
     .team-note-form {
         display: grid;
         gap: 12px;
@@ -72,11 +76,12 @@
 
     .team-note {
         display: grid;
-        gap: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 8px;
-        padding: 16px;
-        background: rgba(255, 255, 255, 0.72);
+        gap: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 12px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
     }
 
     .team-note__header {
@@ -89,29 +94,44 @@
     .team-note__header h2 {
         margin: 0;
         color: #0f172a;
-        font-size: 1.05rem;
+        font-size: 1.08rem;
+        line-height: 1.28;
         letter-spacing: 0;
     }
 
     .team-note__meta {
         display: flex;
         flex-wrap: wrap;
+        justify-content: flex-end;
         gap: 8px;
         color: #64748b;
-        font-size: 0.8rem;
+        font-size: 0.76rem;
         font-weight: 700;
+        text-align: right;
     }
 
     .team-note__body {
         margin: 0;
+        padding: 2px 0 4px;
         color: #334155;
-        line-height: 1.65;
+        font-size: 0.94rem;
+        line-height: 1.7;
         white-space: pre-wrap;
+    }
+
+    .team-note__footer {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(148, 163, 184, 0.12);
     }
 
     .team-note__actions {
         display: flex;
         flex-wrap: wrap;
+        align-items: flex-start;
         gap: 10px;
     }
 
@@ -151,6 +171,10 @@
         color: #cbd5e1;
     }
 
+    body.dark-mode .team-note__footer {
+        border-color: rgba(45, 212, 191, 0.1);
+    }
+
     @media (max-width: 900px) {
         .team-notes-hero {
             align-items: flex-start;
@@ -159,6 +183,16 @@
 
         .team-notes-layout {
             grid-template-columns: 1fr;
+        }
+
+        .team-note__footer {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .team-note__meta {
+            justify-content: flex-start;
+            text-align: left;
         }
     }
 </style>
@@ -174,7 +208,8 @@
         </div>
     </section>
 
-    <section class="team-notes-layout">
+    <section class="team-notes-layout {% if current_user.role != 'admin' %}team-notes-layout--readonly{% endif %}">
+        {% if current_user.role == "admin" %}
         <article class="panel">
             <p class="eyebrow">Nova nota</p>
             <form class="team-note-form" method="post" action="{{ url_for('notas_equipa') }}">
@@ -187,6 +222,7 @@
                 <button class="button" type="submit">Guardar nota</button>
             </form>
         </article>
+        {% endif %}
 
         <section class="team-notes-list" aria-label="Notas internas">
             {% for note in notes %}
@@ -194,30 +230,42 @@
                 <header class="team-note__header">
                     <div>
                         <h2>{{ note.titulo }}</h2>
-                        <div class="team-note__meta">
-                            <span>{{ note.autor.nome if note.autor else "Equipa Alltera" }}</span>
-                            <span>{{ note.updated_at.strftime("%d/%m/%Y %H:%M") if note.updated_at else note.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
-                        </div>
                     </div>
                 </header>
                 <p class="team-note__body">{{ note.conteudo }}</p>
-                <div class="team-note__actions">
-                    <details>
-                        <summary>Editar</summary>
-                        <form class="team-note-form" method="post" action="{{ url_for('atualizar_nota_equipa', note_id=note.id) }}">
-                            <label>Título
-                                <input type="text" name="titulo" maxlength="140" value="{{ note.titulo }}" required>
-                            </label>
-                            <label>Nota
-                                <textarea name="conteudo" required>{{ note.conteudo }}</textarea>
-                            </label>
-                            <button class="button secondary" type="submit">Atualizar nota</button>
-                        </form>
-                    </details>
-                    <form class="team-note__delete" method="post" action="{{ url_for('apagar_nota_equipa', note_id=note.id) }}">
-                        <button class="button secondary" type="submit">Apagar</button>
+                {% if current_user.role == "admin" %}
+                <div class="team-note-editor" hidden>
+                    <form class="team-note-form team-note-edit-form" method="post" action="{{ url_for('atualizar_nota_equipa', note_id=note.id) }}">
+                        <div class="team-note-editor__head">
+                            <h3>Editar nota</h3>
+                        </div>
+                        <label>Título
+                            <input type="text" name="titulo" maxlength="140" value="{{ note.titulo }}" required>
+                        </label>
+                        <label>Nota
+                            <textarea name="conteudo" required>{{ note.conteudo }}</textarea>
+                        </label>
+                        <div class="team-note-editor__buttons">
+                            <button class="button" type="submit">Guardar alterações</button>
+                            <button class="button secondary" type="button" data-note-edit-cancel>Cancelar</button>
+                        </div>
                     </form>
                 </div>
+                {% endif %}
+                <footer class="team-note__footer">
+                {% if current_user.role == "admin" %}
+                <div class="team-note__actions">
+                    <button class="button secondary team-note-edit-toggle" type="button" data-note-edit-open>Editar</button>
+                    <form class="team-note__delete" method="post" action="{{ url_for('apagar_nota_equipa', note_id=note.id) }}">
+                        <button class="button secondary team-note__delete-button" type="submit">Apagar</button>
+                    </form>
+                </div>
+                {% endif %}
+                    <div class="team-note__meta">
+                        <span>{{ note.autor.nome if note.autor else "Equipa Alltera" }}</span>
+                        <span>{{ note.updated_at.strftime("%d/%m/%Y %H:%M") if note.updated_at else note.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+                    </div>
+                </footer>
             </article>
             {% else %}
             <article class="panel">
@@ -227,4 +275,28 @@
         </section>
     </section>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-note-edit-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const card = button.closest(".team-note");
+        const editor = card?.querySelector(".team-note-editor");
+        if (!card || !editor) return;
+        editor.hidden = false;
+        card.classList.add("is-editing");
+    });
+});
+
+document.querySelectorAll("[data-note-edit-cancel]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const editor = button.closest(".team-note-editor");
+        if (!editor) return;
+        editor.hidden = true;
+        const card = editor.closest(".team-note");
+        if (card) card.classList.remove("is-editing");
+    });
+});
+</script>
 {% endblock %}
