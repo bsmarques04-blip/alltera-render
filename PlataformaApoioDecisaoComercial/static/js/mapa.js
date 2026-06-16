@@ -132,7 +132,9 @@ const els = {
     leadListTabVisible: document.getElementById("leadListTabVisible"),
     leadListTabAll: document.getElementById("leadListTabAll"),
     toggleLeadDetails: document.getElementById("toggleLeadDetails"),
-    focusSelectedLead: document.getElementById("focusSelectedLead"),
+    leadActionsMenu: document.getElementById("leadActionsMenu"),
+    leadActionsToggle: document.getElementById("leadActionsToggle"),
+    leadActionsDropdown: document.getElementById("leadActionsDropdown"),
 };
 
 if (els.planDate) els.planDate.value = todayIso;
@@ -401,6 +403,14 @@ function setLeadDrawerExpanded(expanded) {
     }
 }
 
+function setLeadActionsMenuOpen(open) {
+    const isOpen = Boolean(open && selectedLead);
+    if (els.leadActionsDropdown) els.leadActionsDropdown.hidden = !isOpen;
+    if (els.leadActionsToggle) els.leadActionsToggle.setAttribute("aria-expanded", String(isOpen));
+    if (els.leadActionsToggle) els.leadActionsToggle.classList.toggle("is-open", isOpen);
+    if (els.leadActionsMenu) els.leadActionsMenu.classList.toggle("is-open", isOpen);
+}
+
 function setDrawerOpen(open) {
     if (els.leadDrawer) {
         els.leadDrawer.classList.toggle("open", open);
@@ -409,6 +419,7 @@ function setDrawerOpen(open) {
     }
     document.body.classList.toggle("map-drawer-open", open);
     if (!open) setLeadDrawerExpanded(false);
+    if (!open) setLeadActionsMenuOpen(false);
     if (open) requestAnimationFrame(() => els.drawerClose?.focus({ preventScroll: true }));
 }
 
@@ -1041,9 +1052,15 @@ function openClusterPopup(cluster) {
     requestAnimationFrame(() => {
         const container = popup.getElement();
         container?.querySelectorAll("[data-cluster-lead-id]").forEach((button) => {
-            button.addEventListener("click", () => openLeadDrawer(Number(button.dataset.clusterLeadId)));
+            button.addEventListener("click", () => {
+                map.closePopup();
+                openLeadDrawer(Number(button.dataset.clusterLeadId));
+            });
         });
-        container?.querySelector("[data-cluster-expand]")?.addEventListener("click", () => expandClusterArea(cluster));
+        container?.querySelector("[data-cluster-expand]")?.addEventListener("click", () => {
+            map.closePopup();
+            expandClusterArea(cluster);
+        });
     });
 }
 
@@ -1122,7 +1139,7 @@ function renderDetails() {
     });
     if (els.generatePlan) els.generatePlan.disabled = !selectedLead || !isActive(selectedLead) || !hasCoordinates(selectedLead);
     if (els.dayContactPlan) els.dayContactPlan.disabled = !selectedLead || !hasCoordinates(selectedLead);
-    if (els.focusSelectedLead) els.focusSelectedLead.disabled = !selectedLead || !hasCoordinates(selectedLead);
+    if (els.leadActionsToggle) els.leadActionsToggle.disabled = !selectedLead;
 
     if (!selectedLead) {
         els.selectedState.textContent = "—";
@@ -2155,24 +2172,30 @@ function bindEvents() {
         });
     }
     document.querySelectorAll("[data-action]").forEach((button) => {
-        button.addEventListener("click", () => performAction(button.dataset.action));
+        button.addEventListener("click", () => {
+            setLeadActionsMenuOpen(false);
+            performAction(button.dataset.action);
+        });
+    });
+    els.leadActionsToggle?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (!selectedLead) return;
+        setLeadActionsMenuOpen(els.leadActionsDropdown?.hidden);
+    });
+    els.leadActionsMenu?.addEventListener("click", (event) => {
+        event.stopPropagation();
     });
     els.toggleLeadDetails?.addEventListener("click", () => {
         if (!selectedLead) return;
         setLeadDrawerExpanded(!leadDrawerExpanded);
         renderDetails();
     });
-    els.focusSelectedLead?.addEventListener("click", () => {
-        if (!selectedLead || !hasCoordinates(selectedLead)) return;
-        map.closePopup();
-        map.flyTo([selectedLead.latitude, selectedLead.longitude], Math.max(map.getZoom(), 14), {
-            animate: true,
-            duration: 0.22,
-            easeLinearity: 0.3,
-        });
-    });
     if (els.drawerClose) els.drawerClose.addEventListener("click", () => selectLead(null));
     if (els.drawerBackdrop) els.drawerBackdrop.addEventListener("click", () => selectLead(null));
+    document.addEventListener("click", (event) => {
+        if (event.target.closest("#leadActionsMenu")) return;
+        setLeadActionsMenuOpen(false);
+    });
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && selectedLead) selectLead(null);
     });

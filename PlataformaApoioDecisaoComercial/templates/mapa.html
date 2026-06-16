@@ -170,11 +170,18 @@
             </div>
 
             <div class="lead-drawer-footer" id="leadDrawerActions">
-                <button class="button secondary" data-action="contactado" disabled>Contactada</button>
-                <button class="button secondary" data-action="adiar" disabled>Reagendar</button>
-                <button class="button secondary" data-action="crm" disabled>Marcar reunião</button>
                 <a class="button secondary" id="editLeadLink" href="#" aria-disabled="true">Editar lead</a>
-                <button class="button secondary" id="focusSelectedLead" type="button" disabled>Abrir no mapa</button>
+                <div class="lead-actions-menu" id="leadActionsMenu">
+                    <button class="button secondary" id="leadActionsToggle" type="button" disabled aria-haspopup="menu" aria-expanded="false">Ações</button>
+                    <div class="lead-actions-dropdown" id="leadActionsDropdown" role="menu" hidden>
+                        <button type="button" role="menuitem" data-action="contactado" disabled>Contactada</button>
+                        <button type="button" role="menuitem" data-action="adiar" disabled>Reagendar</button>
+                        <button type="button" role="menuitem" data-action="crm" disabled>Marcar reunião</button>
+                        <button type="button" role="menuitem" data-action="ligar_volta" disabled>Ligar de volta</button>
+                        <button type="button" role="menuitem" data-action="crm" disabled>Já tratado / CRM</button>
+                        <button type="button" role="menuitem" data-action="sem_interesse" class="is-danger" disabled>Sem interesse</button>
+                    </div>
+                </div>
             </div>
     </aside>
 
