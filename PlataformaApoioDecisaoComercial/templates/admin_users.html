@@ -173,7 +173,7 @@
                             -
                             {% endif %}
                             {% if not user.ativo and user.id != current_user.id %}
-                            <form method="post" action="{{ url_for('admin_user_delete', user_id=user.id) }}" onsubmit="return confirm('Eliminar definitivamente este utilizador? Esta ação não pode ser anulada.');">
+                            <form method="post" action="{{ url_for('admin_user_delete', user_id=user.id) }}" data-confirm-delete-user>
                                 <button class="danger" type="submit">Eliminar</button>
                             </form>
                             {% endif %}
@@ -189,4 +189,97 @@
         </table>
     </section>
 </main>
+
+<div class="alltera-dialog alltera-dialog--danger admin-user-delete-dialog" id="deleteUserDialog" role="dialog" aria-modal="true" aria-labelledby="deleteUserDialogTitle" aria-describedby="deleteUserDialogDescription" hidden>
+    <div class="alltera-dialog__card">
+        <div class="alltera-dialog__icon" aria-hidden="true"></div>
+        <div class="alltera-dialog__content">
+            <h2 id="deleteUserDialogTitle">Eliminar utilizador?</h2>
+            <p id="deleteUserDialogDescription">Esta ação é definitiva e não pode ser anulada.</p>
+        </div>
+        <div class="alltera-dialog__actions">
+            <button class="button secondary alltera-dialog__cancel" type="button" data-delete-user-cancel>Cancelar</button>
+            <button class="button danger alltera-dialog__confirm" type="button" data-delete-user-confirm>Eliminar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const dialog = document.getElementById("deleteUserDialog");
+        if (!dialog) return;
+
+        document.body.appendChild(dialog);
+
+        const cancelButton = dialog.querySelector("[data-delete-user-cancel]");
+        const confirmButton = dialog.querySelector("[data-delete-user-confirm]");
+        const focusableSelector = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+        let pendingForm = null;
+        let lastActiveElement = null;
+
+        const openDialog = (form) => {
+            pendingForm = form;
+            lastActiveElement = document.activeElement;
+            dialog.hidden = false;
+            document.body.classList.add("admin-user-delete-dialog-open");
+            window.setTimeout(() => cancelButton?.focus(), 20);
+        };
+
+        const closeDialog = () => {
+            dialog.hidden = true;
+            document.body.classList.remove("admin-user-delete-dialog-open");
+            pendingForm = null;
+            if (lastActiveElement && typeof lastActiveElement.focus === "function") {
+                lastActiveElement.focus();
+            }
+            lastActiveElement = null;
+        };
+
+        document.querySelectorAll("form[data-confirm-delete-user]").forEach((form) => {
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                openDialog(form);
+            });
+        });
+
+        cancelButton?.addEventListener("click", closeDialog);
+
+        confirmButton?.addEventListener("click", () => {
+            if (!pendingForm) return;
+            const form = pendingForm;
+            closeDialog();
+            form.submit();
+        });
+
+        dialog.addEventListener("click", (event) => {
+            if (event.target === dialog) closeDialog();
+        });
+
+        dialog.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeDialog();
+                return;
+            }
+
+            if (event.key !== "Tab") return;
+
+            const focusable = Array.from(dialog.querySelectorAll(focusableSelector)).filter((element) => !element.disabled);
+            if (!focusable.length) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+    })();
+</script>
 {% endblock %}

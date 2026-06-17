@@ -2810,7 +2810,6 @@ def split_distinct_tags(column):
 
 
 def get_options():
-    start = time.perf_counter()
     existing_commercials = safe_options_query(
         "comerciais",
         [],
@@ -2830,14 +2829,11 @@ def get_options():
             lambda: sorted(set(INSIGHT_TAG_OPTIONS) | set(split_distinct_tags(Lead.insight_tags))),
         ),
     }
-    safe_perf_log(f"[PERF] get_options {time.perf_counter() - start:.3f}s")
     return options
 
 
 def minimal_map_metrics():
-    start = time.perf_counter()
     total = db.session.query(db.func.count(Lead.id)).scalar() or 0
-    safe_perf_log(f"[PERF] minimal_map_metrics {time.perf_counter() - start:.3f}s")
     return {
         "total": total,
         "active": 0,
@@ -3234,9 +3230,7 @@ def geocode_freeform_query(query, import_cache, expected=None):
     return None
 
 
-def geocode_single_lead(lead):
-    if valid_coordinates(lead.latitude, lead.longitude):
-        return True, "Lead ja tem coordenadas."
+def lead_geocode_candidate_context(lead):
     city = useful_geocode_value(lead.cidade)
     locality = useful_geocode_value(lead.localidade)
     address = useful_geocode_value(lead.morada)
@@ -3275,6 +3269,62 @@ def geocode_single_lead(lead):
         add_candidate(address, locality, "Portugal")
     if name_candidate and (city or locality or postal):
         add_candidate(name_candidate, city or locality or postal, "Portugal")
+    return {
+        "address": address,
+        "candidates": candidates,
+        "city": city,
+        "expected": expected,
+        "locality": locality,
+        "postal": postal,
+    }
+
+
+def cached_geocode_result(query):
+    query = clean_text(query)
+    if not query:
+        return None
+    with db.session.no_autoflush:
+        cached = GeocodingCache.query.filter_by(query_text=query).first()
+    if cached and valid_coordinates(cached.latitude, cached.longitude):
+        return {"latitude": cached.latitude, "longitude": cached.longitude, "query": query, "cache": True, "method": "cache"}
+    return None
+
+
+def geocode_single_lead_from_cache(lead):
+    if valid_coordinates(lead.latitude, lead.longitude):
+        return True, "Lead ja tem coordenadas."
+    context = lead_geocode_candidate_context(lead)
+    candidates = list(context["candidates"])
+    for city_candidate in geocode_candidates({
+        "city": context["city"] or context["locality"],
+        "raw": context["city"] or context["locality"] or context["address"] or context["postal"],
+        "postal": context["postal"],
+    }):
+        key = normalize_lookup(city_candidate)
+        fallback = region_fallback_lookup(key)
+        query = regional_cache_query(key) if fallback else f"{city_candidate}, Portugal"
+        if normalize_lookup(query) not in {normalize_lookup(item) for item in candidates}:
+            candidates.append(query)
+    for candidate in candidates:
+        result = cached_geocode_result(candidate)
+        if result:
+            lead.latitude = result["latitude"]
+            lead.longitude = result["longitude"]
+            add_history(lead, "Geocoding automático", f"Coordenadas obtidas em cache através de: {result['query']}.")
+            return True, f"Coordenadas encontradas em cache através de: {result['query']}"
+    return False, "Geocoding pendente: sem resultado em cache para os dados disponíveis."
+
+
+def geocode_single_lead(lead):
+    if valid_coordinates(lead.latitude, lead.longitude):
+        return True, "Lead ja tem coordenadas."
+    context = lead_geocode_candidate_context(lead)
+    candidates = context["candidates"]
+    expected = context["expected"]
+    city = context["city"]
+    locality = context["locality"]
+    address = context["address"]
+    postal = context["postal"]
 
     if not candidates:
         message = "Não foi possível geocodificar com os dados disponíveis. Confirma cidade, código postal ou morada."
@@ -3313,11 +3363,16 @@ def lead_location_signature(lead):
     )
 
 
-def try_auto_geocode_lead(lead, force=False):
+def try_auto_geocode_lead(lead, force=False, external=True):
     if not force and valid_coordinates(lead.latitude, lead.longitude):
         return True, ""
     try:
-        return geocode_single_lead(lead)
+        if external:
+            return geocode_single_lead(lead)
+        ok, message = geocode_single_lead_from_cache(lead)
+        if not ok:
+            add_history(lead, "Geocoding pendente", message)
+        return ok, message
     except Exception as exc:
         message = f"Não foi possível obter coordenadas automaticamente: {exc}"
         try:
@@ -4399,10 +4454,8 @@ def register_routes(app):
     @app.route("/mapa")
     @login_required
     def mapa_leads():
-        start = time.perf_counter()
         options = get_options()
         metrics = minimal_map_metrics()
-        safe_perf_log(f"[PERF] /mapa route {time.perf_counter() - start:.3f}s")
         return render_template(
             "mapa.html",
             options=options,
@@ -4546,12 +4599,12 @@ def register_routes(app):
                         f"Localização textual alterada; coordenadas antigas removidas para nova geocodificação. Coordenadas anteriores: {old_latitude}, {old_longitude}.",
                     )
                 add_history(edit_lead, "Lead editada manualmente", "Dados atualizados diretamente na aplicação.")
-                geocoded, _ = try_auto_geocode_lead(edit_lead, force=location_changed)
+                geocoded, _ = try_auto_geocode_lead(edit_lead, force=location_changed, external=False)
                 db.session.commit()
                 if geocoded:
                     flash("Lead guardada com sucesso.", "success")
                 else:
-                    flash("Lead guardada, mas não foi possível obter coordenadas automaticamente.", "warning")
+                    flash("Lead guardada. A localização poderá ser atualizada posteriormente.", "warning")
                 return redirect(request.form.get("next") or url_for("mapa_leads"))
 
             lead = Lead(**lead_data)
@@ -4565,12 +4618,12 @@ def register_routes(app):
                 tipo_acao="Lead criada manualmente",
                 user_id=current_user.id if current_user.is_authenticated else None,
             )
-            geocoded, _ = try_auto_geocode_lead(lead)
+            geocoded, _ = try_auto_geocode_lead(lead, external=False)
             db.session.commit()
             if geocoded:
                 flash("Lead criada com sucesso.", "success")
             else:
-                flash("Lead guardada, mas não foi possível obter coordenadas automaticamente.", "warning")
+                flash("Lead guardada. A localização poderá ser atualizada posteriormente.", "warning")
             return redirect(request.form.get("next") or url_for("todas_leads"))
 
         prefill = manual_lead_form_values(edit_lead, request.args)
@@ -4981,7 +5034,6 @@ def register_routes(app):
     @app.route("/api/leads")
     @login_required
     def api_leads():
-        start = time.perf_counter()
         include_history = request.args.get("history") == "1"
         lite = request.args.get("lite") == "1"
         scope = requested_assignment_scope()
@@ -5018,7 +5070,6 @@ def register_routes(app):
         if lite and not has_bounds and not selected_lead_id:
             query = query.limit(1200)
         leads = query.all()
-        query_elapsed = time.perf_counter() - start
         payload = []
         for lead in leads:
             if lite:
@@ -5033,9 +5084,6 @@ def register_routes(app):
                 item["agenda_bucket"] = scheduled_bucket(lead)
                 item["tem_coordenadas"] = lead.latitude is not None and lead.longitude is not None
             payload.append(item)
-        safe_perf_log(
-            f"[PERF] /api/leads count={len(leads)} bounds={has_bounds} lite={lite} query={query_elapsed:.3f}s total={time.perf_counter() - start:.3f}s"
-        )
         return jsonify(payload)
 
     @app.route("/api/leads/<int:lead_id>/resumo")

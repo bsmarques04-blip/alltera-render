@@ -5386,6 +5386,44 @@ body.dark-mode .scheduled-card--warning {
     font-weight: 900;
 }
 
+.scheduled-responsible-filter {
+    margin: -6px 0 22px;
+}
+
+.scheduled-responsible-filter__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.scheduled-filter-chip {
+    min-height: 34px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    padding: 0 13px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 900;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.scheduled-filter-chip:hover {
+    transform: translateY(-1px);
+    border-color: rgba(15, 118, 110, 0.22);
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f766e;
+}
+
+.scheduled-filter-chip.is-active {
+    border-color: rgba(15, 118, 110, 0.3);
+    background: linear-gradient(135deg, #0f766e, #115e59);
+    color: #ffffff;
+    box-shadow: 0 14px 30px rgba(15, 118, 110, 0.18);
+}
+
 .scheduled-grid-v2 {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6055,6 +6093,26 @@ body.dark-mode .scheduled-date-pill {
     color: #99f6e4;
 }
 
+body.dark-mode .scheduled-filter-chip {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(15, 23, 42, 0.72);
+    color: #cbd5e1;
+    box-shadow: none;
+}
+
+body.dark-mode .scheduled-filter-chip:hover {
+    border-color: rgba(45, 212, 191, 0.22);
+    background: rgba(20, 184, 166, 0.1);
+    color: #99f6e4;
+}
+
+body.dark-mode .scheduled-filter-chip.is-active {
+    border-color: rgba(45, 212, 191, 0.3);
+    background: linear-gradient(135deg, #0f766e, #14b8a6);
+    color: #ffffff;
+    box-shadow: 0 16px 34px rgba(20, 184, 166, 0.16);
+}
+
 body.dark-mode .scheduled-more-info div {
     background: rgba(15, 23, 42, 0.58);
 }
@@ -6666,14 +6724,21 @@ body.dark-mode .all-leads-actions .button:hover {
 .alltera-dialog {
     position: fixed;
     inset: 0;
-    z-index: 9999;
-    display: grid;
-    place-items: center;
+    width: 100vw;
+    height: 100vh;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 18px;
     background: rgba(15, 23, 42, 0.36);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     animation: dialogFadeIn 150ms ease both;
+}
+
+.alltera-dialog[hidden] {
+    display: none !important;
 }
 
 .alltera-dialog--closing {
@@ -6738,6 +6803,53 @@ body.dark-mode .all-leads-actions .button:hover {
     min-height: 34px;
     padding: 7px 12px;
     font-size: 12px;
+}
+
+.alltera-dialog__actions .button.danger {
+    border-color: rgba(220, 38, 38, 0.22);
+    background: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+    box-shadow: none;
+}
+
+.alltera-dialog__actions .button.danger:hover {
+    border-color: rgba(220, 38, 38, 0.32);
+    background: rgba(220, 38, 38, 0.16);
+    box-shadow: 0 12px 26px rgba(220, 38, 38, 0.14);
+}
+
+body.admin-user-delete-dialog-open {
+    overflow: hidden;
+}
+
+body.dark-mode .alltera-dialog {
+    background: rgba(2, 6, 23, 0.62);
+}
+
+body.dark-mode .alltera-dialog__card {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(15, 23, 42, 0.96);
+    color: #f8fafc;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .alltera-dialog__content h2 {
+    color: #f8fafc;
+}
+
+body.dark-mode .alltera-dialog__content p {
+    color: #cbd5e1;
+}
+
+body.dark-mode .alltera-dialog__actions .button.danger {
+    border-color: rgba(248, 113, 113, 0.26);
+    background: rgba(248, 113, 113, 0.12);
+    color: #fecaca;
+}
+
+body.dark-mode .alltera-dialog__actions .button.danger:hover {
+    border-color: rgba(248, 113, 113, 0.4);
+    background: rgba(248, 113, 113, 0.18);
 }
 
 @keyframes dialogFadeIn {

@@ -17,7 +17,10 @@
 {% set next_action = "Contactar hoje" if tone == "today" else ("Retomar contacto" if tone == "overdue" else "Preparar follow-up") %}
 {% set tags = lead.tag_list() %}
 {% set insight_tags = lead.insight_tag_list() %}
-<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}" data-lead-card="{{ lead.id }}">
+{% set responsible_label = lead.assigned_to.nome if lead.assigned_to else ((latest.user.nome if latest.user else none) if latest else none) or "Sem responsável" %}
+{% set responsible_key_source = responsible_label if responsible_label == "Sem responsável" else responsible_label.split()[0] %}
+{% set responsible_key = responsible_key_source|lower|replace("á", "a")|replace("à", "a")|replace("ã", "a")|replace("â", "a")|replace("é", "e")|replace("ê", "e")|replace("í", "i")|replace("ó", "o")|replace("õ", "o")|replace("ô", "o")|replace("ú", "u")|replace("ç", "c")|replace(" ", "_") %}
+<article class="scheduled-lead-card scheduled-lead-card--{{ tone }}" data-lead-card="{{ lead.id }}" data-responsavel="{{ responsible_key }}" data-responsavel-label="{{ responsible_label }}">
     <div class="scheduled-lead-card__top">
         <div class="scheduled-avatar" aria-hidden="true">{{ name[:1]|upper }}</div>
         <div class="scheduled-lead-card__identity">
@@ -82,6 +85,10 @@
                     <div class="scheduled-info-field">
                         <dt>Cidade/localidade</dt>
                         <dd>{{ lead.cidade or lead.localidade or "-" }}{% if lead.codigo_postal %} &middot; {{ lead.codigo_postal }}{% endif %}</dd>
+                    </div>
+                    <div class="scheduled-info-field">
+                        <dt>Responsável</dt>
+                        <dd>{{ responsible_label }}</dd>
                     </div>
                     <div class="scheduled-info-field">
                         <dt>Operação</dt>
@@ -166,6 +173,7 @@
             "nome_cliente": name,
             "empresa": lead.empresa or lead.nome_empresa or "-",
             "cidade": lead.cidade or lead.localidade or "-",
+            "responsavel": responsible_label,
             "comercial": lead.comercial_responsavel or "Sem operação",
             "telefone": lead.telefone or lead.contacto or "-",
             "email": lead.email or "-",
@@ -185,13 +193,13 @@
 {% endmacro %}
 
 {% macro scheduled_section(title, subtitle, count, items, tone, empty_title, empty_subtitle) %}
-<section class="scheduled-section-card scheduled-section-card--{{ tone }}">
+<section class="scheduled-section-card scheduled-section-card--{{ tone }}" data-scheduled-section="{{ tone }}">
     <header class="scheduled-section-card__header">
         <div>
             <p class="eyebrow">{{ subtitle }}</p>
             <h2>{{ title }}</h2>
         </div>
-        <span class="scheduled-count scheduled-count--{{ tone }}">{{ count }}</span>
+        <span class="scheduled-count scheduled-count--{{ tone }}" data-scheduled-count>{{ count }}</span>
     </header>
     <div class="scheduled-section-card__body">
         {% for lead in items %}
@@ -199,6 +207,11 @@
         {% else %}
             {{ empty_state(empty_title, empty_subtitle) }}
         {% endfor %}
+        <div class="scheduled-empty scheduled-empty--filter" data-filter-empty hidden>
+            <div class="scheduled-empty__icon" aria-hidden="true"></div>
+            <strong>Sem leads para este responsável</strong>
+            <span>Escolhe outro filtro ou volta a Todas.</span>
+        </div>
     </div>
 </section>
 {% endmacro %}
@@ -212,9 +225,30 @@
             <p>Follow-ups, contactos adiados e oportunidades a retomar no momento certo.</p>
         </div>
         <div class="scheduled-hero-stats">
-            <article><span>Hoje</span><strong>{{ scheduled.today_count }}</strong></article>
-            <article class="is-warning"><span>Atrasadas</span><strong>{{ scheduled.overdue_count }}</strong></article>
-            <article><span>Total em agenda</span><strong>{{ scheduled.today|length + scheduled.overdue|length + scheduled.next7|length + scheduled.future|length }}</strong></article>
+            <article><span>Hoje</span><strong data-scheduled-summary="today">{{ scheduled.today_count }}</strong></article>
+            <article class="is-warning"><span>Atrasadas</span><strong data-scheduled-summary="overdue">{{ scheduled.overdue_count }}</strong></article>
+            <article><span>Total em agenda</span><strong data-scheduled-summary="total">{{ scheduled.today|length + scheduled.overdue|length + scheduled.next7|length + scheduled.future|length }}</strong></article>
+        </div>
+    </section>
+
+    <section class="scheduled-responsible-filter" aria-label="Filtrar por responsável">
+        <div class="scheduled-responsible-filter__chips" role="list">
+            {% set responsible_filters = [
+                ("all", "Todas"),
+                ("bernardo", "Bernardo"),
+                ("irina", "Irina"),
+                ("miriam", "Miriam"),
+                ("rita", "Rita"),
+                ("sem_responsavel", "Sem responsável")
+            ] %}
+            {% for value, label in responsible_filters %}
+            <button
+                class="scheduled-filter-chip{% if loop.first %} is-active{% endif %}"
+                type="button"
+                data-scheduled-filter="{{ value }}"
+                aria-pressed="{{ 'true' if loop.first else 'false' }}"
+            >{{ label }}</button>
+            {% endfor %}
         </div>
     </section>
 
@@ -286,11 +320,59 @@
         </div>
     `;
 
+    let activeResponsibleFilter = "all";
+
+    const applyResponsibleFilter = (filterValue = activeResponsibleFilter) => {
+        activeResponsibleFilter = filterValue || "all";
+        const totals = { today: 0, overdue: 0, next: 0, future: 0 };
+
+        document.querySelectorAll("[data-scheduled-section]").forEach((section) => {
+            const sectionKey = section.dataset.scheduledSection;
+            const body = section.querySelector(".scheduled-section-card__body");
+            const cards = Array.from(section.querySelectorAll(".scheduled-lead-card"));
+            const count = section.querySelector("[data-scheduled-count]");
+            const initialEmpty = body?.querySelector(".scheduled-empty:not(.scheduled-empty--filter)");
+            const filterEmpty = body?.querySelector("[data-filter-empty]");
+            let visibleCount = 0;
+
+            cards.forEach((card) => {
+                const matches = activeResponsibleFilter === "all" || card.dataset.responsavel === activeResponsibleFilter;
+                card.hidden = !matches;
+                if (matches) visibleCount += 1;
+            });
+
+            if (count) count.textContent = visibleCount;
+            if (sectionKey in totals) totals[sectionKey] = visibleCount;
+
+            if (initialEmpty) initialEmpty.hidden = !(cards.length === 0 && activeResponsibleFilter === "all");
+            if (filterEmpty) filterEmpty.hidden = !(visibleCount === 0 && (cards.length > 0 || activeResponsibleFilter !== "all"));
+        });
+
+        const todaySummary = document.querySelector("[data-scheduled-summary='today']");
+        const overdueSummary = document.querySelector("[data-scheduled-summary='overdue']");
+        const totalSummary = document.querySelector("[data-scheduled-summary='total']");
+        if (todaySummary) todaySummary.textContent = totals.today;
+        if (overdueSummary) overdueSummary.textContent = totals.overdue;
+        if (totalSummary) totalSummary.textContent = totals.today + totals.overdue + totals.next + totals.future;
+    };
+
+    document.querySelectorAll("[data-scheduled-filter]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+            document.querySelectorAll("[data-scheduled-filter]").forEach((item) => {
+                const isActive = item === chip;
+                item.classList.toggle("is-active", isActive);
+                item.setAttribute("aria-pressed", String(isActive));
+            });
+            applyResponsibleFilter(chip.dataset.scheduledFilter || "all");
+        });
+    });
+
     const renderInfo = (data) => `
         <dl class="scheduled-info-grid">
             ${field("Nome cliente", data.nome_cliente)}
             ${field("Empresa", data.empresa)}
             ${field("Cidade/localidade", data.cidade)}
+            ${field("Responsável", data.responsavel)}
             ${field("Operação", data.comercial)}
             ${field("Telefone", data.telefone)}
             ${field("Email", data.email)}
@@ -329,8 +411,15 @@
             const sectionBody = card.closest(".scheduled-section-card__body");
             card.remove();
             if (sectionBody && !sectionBody.querySelector(".scheduled-lead-card")) {
-                sectionBody.innerHTML = `<div class="scheduled-empty"><strong>Sem leads nesta fila.</strong><span>Atualizado sem recarregar a página.</span></div>`;
+                const filterEmpty = sectionBody.querySelector("[data-filter-empty]");
+                if (!sectionBody.querySelector(".scheduled-empty:not(.scheduled-empty--filter)")) {
+                    const empty = document.createElement("div");
+                    empty.className = "scheduled-empty";
+                    empty.innerHTML = `<div class="scheduled-empty__icon" aria-hidden="true"></div><strong>Sem leads nesta fila.</strong><span>Atualizado sem recarregar a página.</span>`;
+                    sectionBody.insertBefore(empty, filterEmpty || null);
+                }
             }
+            applyResponsibleFilter(activeResponsibleFilter);
         }, 220);
     };
 
@@ -478,6 +567,8 @@
         if (card.classList.contains("is-expanded")) closeCard(card);
         else openCard(card);
     });
+
+    applyResponsibleFilter("all");
 })();
 </script>
 {% endblock %}
