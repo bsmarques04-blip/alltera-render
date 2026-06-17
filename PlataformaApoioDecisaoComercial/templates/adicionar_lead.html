@@ -66,13 +66,15 @@
                     {% endfor %}
                 </select>
             </label>
-            <label class="manual-lead-grid__wide">Tags
-                <input name="tags" value="{{ form.get('tags', '') }}" list="manualLeadTags" placeholder="Quente, VIP, Recuperar">
-                <datalist id="manualLeadTags">
-                    {% for tag in tag_options %}
-                    <option value="{{ tag }}"></option>
+            <label class="manual-lead-grid__wide manual-tags-field">Tags
+                <input name="tags" id="manualLeadTagsInput" value="{{ form.get('tags', '') }}" placeholder="Quente, VIP, Recuperar" autocomplete="off">
+                <small>Seleciona uma ou mais tags ou escreve manualmente.</small>
+                <div class="selected-tags-row" id="selectedTagsRow" aria-live="polite"></div>
+                <div class="tag-suggestions" aria-label="Tags sugeridas">
+                    {% for tag in ["Quente", "Morna", "Fria", "VIP", "Recuperar", "Por contactar", "Ligar de volta", "Sem interesse", "Restaurante", "Hotel", "Revendedor", "Prioridade alta"] %}
+                    <button class="manual-tag-chip" type="button" data-manual-tag="{{ tag }}" aria-pressed="false">{{ tag }}</button>
                     {% endfor %}
-                </datalist>
+                </div>
             </label>
         </section>
 
@@ -90,4 +92,114 @@
         <p class="hint">Obrigatorio: Nome cliente ou Empresa; e Cidade, Morada ou Codigo postal. O telefone e recomendado, normalizado e usado para evitar duplicados.</p>
     </form>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const input = document.getElementById("manualLeadTagsInput");
+    const selectedWrap = document.getElementById("selectedTagsRow");
+    const chips = Array.from(document.querySelectorAll("[data-manual-tag]"));
+    if (!input || !selectedWrap || !chips.length) return;
+
+    const normalize = (value) => String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase();
+
+    const parseTags = (value) => {
+        const seen = new Set();
+        return String(value || "")
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+            .filter((tag) => {
+                const key = normalize(tag);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+    };
+
+    const syncInput = (tags) => {
+        input.value = tags.join(", ");
+    };
+
+    let selectedTags = parseTags(input.value);
+
+    const renderSuggestionTags = () => {
+        const selected = new Set(selectedTags.map(normalize));
+        chips.forEach((chip) => {
+            const active = selected.has(normalize(chip.dataset.manualTag));
+            chip.classList.toggle("is-selected", active);
+            chip.setAttribute("aria-pressed", String(active));
+        });
+    };
+
+    const renderSelectedTags = () => {
+        selectedWrap.hidden = selectedTags.length === 0;
+        selectedWrap.innerHTML = selectedTags.map((tag) => `
+            <span class="selected-tag-chip">
+                ${tag}
+                <button type="button" aria-label="Remover ${tag}" data-remove-selected-tag="${tag}">&times;</button>
+            </span>
+        `).join("");
+    };
+
+    const renderTags = () => {
+        renderSelectedTags();
+        renderSuggestionTags();
+    };
+
+    const addTag = (tag) => {
+        const cleanTag = String(tag || "").trim();
+        if (!cleanTag) return;
+        if (selectedTags.some((item) => normalize(item) === normalize(cleanTag))) return;
+        selectedTags = [...selectedTags, cleanTag];
+        syncInput(selectedTags);
+        renderTags();
+    };
+
+    const removeTag = (tag) => {
+        const key = normalize(tag);
+        selectedTags = selectedTags.filter((item) => normalize(item) !== key);
+        syncInput(selectedTags);
+        renderTags();
+    };
+
+    const normalizeInput = () => {
+        selectedTags = parseTags(input.value);
+        syncInput(selectedTags);
+        renderTags();
+    };
+
+    chips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+            const tag = chip.dataset.manualTag || "";
+            const key = normalize(tag);
+            const exists = selectedTags.some((item) => normalize(item) === key);
+            if (exists) removeTag(tag);
+            else addTag(tag);
+            input.focus();
+        });
+    });
+
+    selectedWrap.addEventListener("click", (event) => {
+        const removeButton = event.target.closest("[data-remove-selected-tag]");
+        if (!removeButton) return;
+        removeTag(removeButton.dataset.removeSelectedTag);
+        input.focus();
+    });
+
+    input.addEventListener("input", () => {
+        if (input.value.includes(",")) normalizeInput();
+    });
+
+    input.addEventListener("blur", normalizeInput);
+
+    syncInput(selectedTags);
+    renderTags();
+})();
+</script>
 {% endblock %}

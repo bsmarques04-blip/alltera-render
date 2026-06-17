@@ -225,6 +225,7 @@
             comercial_responsavel: lead.comercial_responsavel || "",
             observacoes: lead.observacoes || "",
             observacoes_contacto: lead.observacoes_contacto || "",
+            tags: (lead.tags || []).join(", "),
         }).toString();
         const editUrl = `/leads/nova?${editParams}`;
         return `
@@ -334,6 +335,7 @@
                     ${lead.agendada ? badge("Agendada", "tag--info") : ""}
                     ${lead.estado === "Por contactar" ? badge("Por contactar", "tag--soft") : ""}
                     ${lead.prioridade ? badge(lead.prioridade, "tag--soft") : ""}
+                    ${(lead.tags || []).map((tag) => badge(tag, "tag--soft")).join("")}
                 </div>
                 ${actions(lead)}
             </article>

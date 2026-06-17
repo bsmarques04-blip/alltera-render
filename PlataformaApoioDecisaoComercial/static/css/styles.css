@@ -2631,17 +2631,168 @@ body.presentation-mode .topbar {
 
 .manual-lead-form {
     display: grid;
-    gap: 18px;
+    gap: 16px;
+    padding: 22px;
 }
 
 .manual-lead-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: 14px 16px;
 }
 
 .manual-lead-grid__wide {
     grid-column: 1 / -1;
+}
+
+.manual-tags-field {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid rgba(15, 118, 110, 0.1);
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(248, 250, 252, 0.62)),
+        rgba(255, 255, 255, 0.56);
+}
+
+.manual-tags-field small {
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 750;
+}
+
+.manual-tags-field input {
+    width: 100%;
+}
+
+.selected-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.selected-tags-row::before {
+    content: "Selecionadas";
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.selected-tags-row[hidden] {
+    display: none;
+}
+
+.selected-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    border-radius: 999px;
+    padding: 6px 10px;
+    border: 1px solid rgba(20, 184, 166, 0.22);
+    background: rgba(20, 184, 166, 0.12);
+    color: #0f766e;
+    font-size: 0.76rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.selected-tag-chip button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: currentColor;
+    cursor: pointer;
+    font-size: 0.86rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.selected-tag-chip button:hover {
+    color: #115e59;
+}
+
+.tag-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 2px;
+}
+
+.manual-tag-chip {
+    min-height: 28px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    padding: 4px 11px;
+    background: rgba(255, 255, 255, 0.72);
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 850;
+    line-height: 1;
+    box-shadow: none;
+    transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.manual-tag-chip:hover {
+    transform: translateY(-1px);
+    border-color: rgba(15, 118, 110, 0.24);
+    background: rgba(15, 118, 110, 0.08);
+    color: #0f766e;
+}
+
+.manual-tag-chip.is-selected {
+    border-color: rgba(15, 118, 110, 0.32);
+    background: linear-gradient(135deg, #0f766e, #115e59);
+    color: #ffffff;
+}
+
+body.dark-mode .manual-tag-chip {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(15, 23, 42, 0.72);
+    color: #cbd5e1;
+}
+
+body.dark-mode .manual-tag-chip:hover {
+    border-color: rgba(45, 212, 191, 0.22);
+    background: rgba(20, 184, 166, 0.1);
+    color: #99f6e4;
+}
+
+body.dark-mode .manual-tag-chip.is-selected {
+    border-color: rgba(45, 212, 191, 0.32);
+    background: linear-gradient(135deg, #0f766e, #14b8a6);
+    color: #ffffff;
+}
+
+body.dark-mode .manual-tags-field {
+    border-color: rgba(45, 212, 191, 0.12);
+    background:
+        linear-gradient(135deg, rgba(15, 23, 42, 0.84), rgba(17, 24, 39, 0.72)),
+        rgba(15, 23, 42, 0.76);
+}
+
+body.dark-mode .manual-tags-field small {
+    color: #94a3b8;
+}
+
+body.dark-mode .selected-tags-row::before {
+    color: #94a3b8;
+}
+
+body.dark-mode .selected-tag-chip {
+    border-color: rgba(45, 212, 191, 0.24);
+    background: rgba(45, 212, 191, 0.14);
+    color: #99f6e4;
+}
+
+body.dark-mode .selected-tag-chip button:hover {
+    color: #ccfbf1;
 }
 
 .dashboard-page {

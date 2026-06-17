@@ -1780,12 +1780,23 @@ async function performAction(action) {
 
 async function tagAction(action, tag) {
     if (!selectedLead || !tag) return;
-    await fetch(`/api/leads/${selectedLead.id}/action`, {
+    const response = await fetch(`/api/leads/${selectedLead.id}/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, tag, comercial_responsavel: selectedLead.comercial_responsavel }),
     });
-    await loadLeads();
+    if (!response.ok) {
+        if (window.AllteraDialog) await window.AllteraDialog.alert("Não foi possível atualizar as tags.", { type: "error", title: "Erro" });
+        return;
+    }
+    const updated = await response.json();
+    selectedLead = mergeLeadData(selectedLead, updated);
+    leadsById.set(selectedLead.id, selectedLead);
+    allLeads = allLeads.map((lead) => (lead.id === selectedLead.id ? selectedLead : lead));
+    visibleLeads = visibleLeads.map((lead) => (lead.id === selectedLead.id ? selectedLead : lead));
+    applyFilters();
+    renderDetails();
+    renderMapMiniCard();
 }
 
 async function addLeadNote() {

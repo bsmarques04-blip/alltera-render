@@ -3426,6 +3426,20 @@ def commercial_label_from_key(key):
     return labels.get(key, UNASSIGNED_COMMERCIAL)
 
 
+def clean_tag_csv(value):
+    raw_tags = value if isinstance(value, list) else str(value or "").split(",")
+    tags = []
+    seen = set()
+    for raw_tag in raw_tags:
+        tag = clean_text(raw_tag)
+        key = normalize_lookup(tag)
+        if not tag or key in seen:
+            continue
+        tags.append(tag)
+        seen.add(key)
+    return ", ".join(tags)
+
+
 def build_manual_lead(form):
     cidade_raw = clean_text(form.get("cidade"))
     cidade = normalize_city(extract_main_city(cidade_raw) or cidade_raw) if cidade_raw else ""
@@ -3460,7 +3474,7 @@ def build_manual_lead(form):
         "estado": estado,
         "estado_lead": estado,
         "prioridade": clean_text(form.get("prioridade")) or "Baixa",
-        "tags": clean_text(form.get("tags")),
+        "tags": clean_tag_csv(form.get("tags")),
         "classificacao_observacao": "",
         "motivo_classificacao": "",
     }
@@ -5111,6 +5125,7 @@ def register_routes(app):
             "reuniao_info": lead.reuniao_info or "",
             "classificacao_observacao": lead.classificacao_observacao or "",
             "motivo_classificacao": lead.motivo_classificacao or "",
+            "tags": lead.tag_list(),
             "insight_tags": lead.insight_tag_list(),
             "insight_note": lead.insight_note or "",
         })
@@ -5309,15 +5324,17 @@ def register_routes(app):
             add_history(lead, "Adicionada a plano do dia", observation or "Lead incluida na rota do dia.", commercial)
         elif action == "add_tag":
             tag = clean_text(data.get("tag"))
-            tags = set(lead.tag_list())
             if tag:
-                tags.add(tag)
-                lead.tags = ", ".join(sorted(tags))
+                tags = lead.tag_list()
+                if normalize_lookup(tag) not in {normalize_lookup(item) for item in tags}:
+                    tags.append(tag)
+                lead.tags = clean_tag_csv(tags)
                 add_history(lead, "Tag adicionada", tag, commercial)
         elif action == "remove_tag":
             tag = clean_text(data.get("tag"))
-            tags = [item for item in lead.tag_list() if item != tag]
-            lead.tags = ", ".join(tags)
+            tag_key = normalize_lookup(tag)
+            tags = [item for item in lead.tag_list() if normalize_lookup(item) != tag_key]
+            lead.tags = clean_tag_csv(tags)
             add_history(lead, "Tag removida", tag, commercial)
         elif action == "update_insights":
             requested_tags = data.get("insight_tags") or []
